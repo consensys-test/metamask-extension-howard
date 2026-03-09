@@ -1,5 +1,5 @@
 {
-  "$comment": "Configuration for classify-failures.mts — determines whether a failed merge queue run should be retried.",
+  "$comment": "Configuration for classify-failures.mts — determines whether a failed workflow run should be retried.",
 
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "blockerPatterns": [

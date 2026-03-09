@@ -24,7 +24,8 @@
  * Outputs (to $GITHUB_OUTPUT):
  *   should-retry=true|false
  *
- * Also writes a markdown report to $GITHUB_STEP_SUMMARY.
+ * Also writes a markdown report to $GITHUB_STEP_SUMMARY and creates a
+ * "Failure Classification" Check Run on the triggering commit.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -115,6 +116,7 @@ if (!MAIN_RUN_ID) {
 }
 
 const [owner, repo] = REPO.split('/');
+const repoApi = `/repos/${owner}/${repo}`;
 
 // ---------------------------------------------------------------------------
 // Config
@@ -124,21 +126,19 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const configPath = join(scriptDir, '..', 'retry-config.json');
 const config: RetryConfig = JSON.parse(readFileSync(configPath, 'utf8'));
 
-const compiledPatterns: Record<Category, RegExp[]> = {
-  alwaysRetryable: config.jobClassification.alwaysRetryable.patterns.map(
-    (p) => new RegExp(p, 'i'),
-  ),
-  retryableOnTransientError:
-    config.jobClassification.retryableOnTransientError.patterns.map(
-      (p) => new RegExp(p, 'i'),
-    ),
-  usuallyNotFlaky: config.jobClassification.usuallyNotFlaky.patterns.map(
-    (p) => new RegExp(p, 'i'),
-  ),
-  optional: config.jobClassification.optional.patterns.map(
-    (p) => new RegExp(p, 'i'),
-  ),
-};
+const categoryOrder: Category[] = [
+  'alwaysRetryable',
+  'retryableOnTransientError',
+  'usuallyNotFlaky',
+  'optional',
+];
+
+const compiledPatterns = Object.fromEntries(
+  categoryOrder.map((cat) => [
+    cat,
+    config.jobClassification[cat].patterns.map((p) => new RegExp(p, 'i')),
+  ]),
+) as Record<Category, RegExp[]>;
 const transientErrorRegexes = config.transientErrorPatterns.map(
   (p) => new RegExp(p, 'i'),
 );
@@ -153,13 +153,6 @@ for (const cat of Object.keys(config.jobClassification) as Category[]) {
 
 const blockerRegexes = config.blockerPatterns.map((p) => new RegExp(p, 'i'));
 
-const categoryOrder: Category[] = [
-  'alwaysRetryable',
-  'retryableOnTransientError',
-  'usuallyNotFlaky',
-  'optional',
-];
-
 // ---------------------------------------------------------------------------
 // GitHub API helpers (gh CLI — no npm dependencies)
 // ---------------------------------------------------------------------------
@@ -170,36 +163,31 @@ const ghEnv = { ...process.env, GH_TOKEN: GITHUB_TOKEN };
 function ghApi(path: string): string {
   return execFileSync('gh', ['api', path], {
     encoding: 'utf8',
-    maxBuffer: 2 * 1024 * 1024,
+    maxBuffer: 5 * 1024 * 1024,
     env: ghEnv,
   });
 }
 
 /** POST to a GitHub REST API endpoint via `gh api`. */
 function ghApiPost(path: string, body: Record<string, unknown>): string {
-  return execFileSync(
-    'gh',
-    ['api', path, '--method', 'POST', '--input', '-'],
-    {
-      encoding: 'utf8',
-      input: JSON.stringify(body),
-      maxBuffer: 2 * 1024 * 1024,
-      env: ghEnv,
-    },
-  );
+  return execFileSync('gh', ['api', path, '--method', 'POST', '--input', '-'], {
+    encoding: 'utf8',
+    input: JSON.stringify(body),
+    maxBuffer: 5 * 1024 * 1024,
+    env: ghEnv,
+  });
 }
 
 function getRunHeadSha(): string {
-  const run = JSON.parse(
-    ghApi(`/repos/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`),
-  );
+  if (process.env.HEAD_SHA) return process.env.HEAD_SHA;
+  const run = JSON.parse(ghApi(`${repoApi}/actions/runs/${MAIN_RUN_ID}`));
   return run.head_sha;
 }
 
 function getFailedJobs(): Job[] {
   const jobsPath = ATTEMPT
-    ? `/repos/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100`
-    : `/repos/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}/jobs?per_page=100`;
+    ? `${repoApi}/actions/runs/${MAIN_RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100`
+    : `${repoApi}/actions/runs/${MAIN_RUN_ID}/jobs?per_page=100`;
   const response = JSON.parse(ghApi(jobsPath));
   return (response.jobs as Job[]).filter((j) => j.conclusion === 'failure');
 }
@@ -207,7 +195,7 @@ function getFailedJobs(): Job[] {
 function getAnnotations(jobId: number): Annotation[] {
   try {
     return JSON.parse(
-      ghApi(`/repos/${owner}/${repo}/check-runs/${jobId}/annotations`),
+      ghApi(`${repoApi}/check-runs/${jobId}/annotations`),
     ) as Annotation[];
   } catch {
     return [];
@@ -218,15 +206,7 @@ const LOG_TAIL_LINES = 500;
 
 function getJobLogs(jobId: number): string {
   try {
-    const full = execFileSync(
-      'gh',
-      ['api', `/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`],
-      {
-        encoding: 'utf8',
-        maxBuffer: 5 * 1024 * 1024, // 5 MB cap
-        env: ghEnv,
-      },
-    );
+    const full = ghApi(`${repoApi}/actions/jobs/${jobId}/logs`);
     // Only search the tail — error summaries appear at the end and this
     // avoids false positives from earlier benign output.
     const lines = full.split('\n');
@@ -240,31 +220,26 @@ function getJobLogs(jobId: number): string {
 // Classification logic
 // ---------------------------------------------------------------------------
 
-function matchCategory(jobName: string): Category | 'unmatched' {
+function matchCategory(jobName: string): Category {
   for (const cat of categoryOrder) {
     for (const re of compiledPatterns[cat]) {
       if (re.test(jobName)) return cat;
     }
   }
-  return 'unmatched';
+  return config.defaults.unmatchedCategory;
 }
 
 function findTransientError(
   text: string,
   category?: Category,
 ): string | undefined {
-  for (const re of transientErrorRegexes) {
+  const regexes = [
+    ...transientErrorRegexes,
+    ...(category ? (categoryTransientRegexes[category] ?? []) : []),
+  ];
+  for (const re of regexes) {
     const match = re.exec(text);
     if (match) return match[0];
-  }
-  if (category) {
-    const extras = categoryTransientRegexes[category];
-    if (extras) {
-      for (const re of extras) {
-        const match = re.exec(text);
-        if (match) return match[0];
-      }
-    }
   }
   return undefined;
 }
@@ -272,12 +247,7 @@ function findTransientError(
 function classifyJob(job: Job): JobClassification {
   const jobName = job.name;
   const jobId = job.id;
-  let category: Category | 'unmatched' = matchCategory(jobName);
-
-  // Unmatched jobs use the configured default
-  if (category === 'unmatched') {
-    category = config.defaults.unmatchedCategory;
-  }
+  const category = matchCategory(jobName);
 
   if (category === 'alwaysRetryable') {
     return {
@@ -383,40 +353,33 @@ for (const job of blockerJobs) {
   }
 }
 
-if (blockedBy) {
-  // Tag remaining failed jobs as cascade failures — no log downloads needed.
-  console.log(
-    `\n  ⛔ Blocker "${blockedBy}" failed non-transiently. Skipping remaining jobs.\n`,
-  );
-  for (const job of otherJobs) {
-    const category = matchCategory(job.name);
+function tagCascade(jobs: Job[], retryable: boolean, reason: string): void {
+  for (const job of jobs) {
     classifications.push({
       jobName: job.name,
       jobId: job.id,
-      category:
-        category === 'unmatched' ? config.defaults.unmatchedCategory : category,
-      retryable: false,
-      reason: `Cascade — blocked by ${blockedBy}`,
+      category: matchCategory(job.name),
+      retryable,
+      reason,
     });
   }
+}
+
+if (blockedBy) {
+  console.log(
+    `\n  ⛔ Blocker "${blockedBy}" failed non-transiently. Skipping remaining jobs.\n`,
+  );
+  tagCascade(otherJobs, false, `Cascade — blocked by ${blockedBy}`);
 } else if (blockerJobs.length > 0) {
-  // All blockers are retryable — downstream failures are cascade and will
-  // resolve on retry, so mark them retryable without downloading logs.
   const blockerNames = blockerJobs.map((j) => j.name).join(', ');
   console.log(
     `\n  ♻️  Blocker(s) retryable — tagging ${otherJobs.length} downstream job(s) as cascade.\n`,
   );
-  for (const job of otherJobs) {
-    const category = matchCategory(job.name);
-    classifications.push({
-      jobName: job.name,
-      jobId: job.id,
-      category:
-        category === 'unmatched' ? config.defaults.unmatchedCategory : category,
-      retryable: true,
-      reason: `Cascade — will resolve when blocker retries (${blockerNames})`,
-    });
-  }
+  tagCascade(
+    otherJobs,
+    true,
+    `Cascade — will resolve when blocker retries (${blockerNames})`,
+  );
 } else {
   // No blocker failures — classify each job individually.
   for (const job of otherJobs) {
@@ -480,10 +443,10 @@ console.log('\n' + report);
 try {
   const headSha = getRunHeadSha();
   const checkTitle = shouldRetry
-    ? 'All failures are retryable — rerun triggered'
+    ? 'All failures are retryable'
     : 'Non-retryable failures detected';
 
-  ghApiPost(`/repos/${owner}/${repo}/check-runs`, {
+  ghApiPost(`${repoApi}/check-runs`, {
     name: 'Failure Classification',
     head_sha: headSha,
     status: 'completed',
