@@ -4,9 +4,9 @@
 #
 # 1. Automatic (classification-gated):
 #    For merge_group and push-to-main/stable failures, this workflow
-#    classifies jobs as retryable or non-retryable and writes a report
-#    to the step summary. If all failures are retryable, it automatically
-#    reruns failed jobs. Push events to release/* and trigger-ci-* are excluded.
+#    classifies jobs as retryable or non-retryable, writes a report to the
+#    step summary, and creates a Check Run on the commit. If all failures
+#    are retryable, it automatically reruns failed jobs. Push events to release/* and trigger-ci-* are excluded.
 #
 # 2. Label-gated (pull requests):
 #    When a PR has the `retry-ci` label and Main fails, this workflow
@@ -58,8 +58,8 @@ jobs:
       checks: write
     env:
       GH_TOKEN: ${{ github.token }}
-      GITHUB_TOKEN: ${{ github.token }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       REPO: ${{ github.repository }}
     steps:
       - name: Checkout .github/ directory
@@ -104,8 +104,8 @@ jobs:
       pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
-      GITHUB_TOKEN: ${{ github.token }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       REPO: ${{ github.repository }}
     steps:
