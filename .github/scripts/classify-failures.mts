@@ -175,6 +175,27 @@ function ghApi(path: string): string {
   });
 }
 
+/** POST to a GitHub REST API endpoint via `gh api`. */
+function ghApiPost(path: string, body: Record<string, unknown>): string {
+  return execFileSync(
+    'gh',
+    ['api', path, '--method', 'POST', '--input', '-'],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify(body),
+      maxBuffer: 2 * 1024 * 1024,
+      env: ghEnv,
+    },
+  );
+}
+
+function getRunHeadSha(): string {
+  const run = JSON.parse(
+    ghApi(`/repos/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`),
+  );
+  return run.head_sha;
+}
+
 function getFailedJobs(): Job[] {
   const jobsPath = ATTEMPT
     ? `/repos/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100`
@@ -429,7 +450,7 @@ if (GITHUB_OUTPUT) {
 const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`;
 
 const reportLines = [
-  `## Merge Queue Failure Classification`,
+  `## Failure Classification`,
   ``,
   `**Run:** [${MAIN_RUN_ID}](${runUrl})`,
   `**Decision:** ${shouldRetry ? '✅ Would retry' : '❌ Would NOT retry'}`,
@@ -441,8 +462,6 @@ const reportLines = [
     (c) =>
       `| ${c.jobName} | ${c.category} | ${c.retryable ? '✅' : '❌'} | ${c.reason} |`,
   ),
-  ``,
-  `> **Note:** Classification is experimental (report-only). Retry is gated on the \`retry-ci\` label.`,
 ];
 
 const report = reportLines.join('\n');
@@ -453,3 +472,29 @@ if (GITHUB_STEP_SUMMARY) {
 
 // Also print to console for non-GHA usage
 console.log('\n' + report);
+
+// ---------------------------------------------------------------------------
+// Create Check Run annotation on the triggering commit
+// ---------------------------------------------------------------------------
+
+try {
+  const headSha = getRunHeadSha();
+  const checkTitle = shouldRetry
+    ? 'All failures are retryable — rerun triggered'
+    : 'Non-retryable failures detected';
+
+  ghApiPost(`/repos/${owner}/${repo}/check-runs`, {
+    name: 'Failure Classification',
+    head_sha: headSha,
+    status: 'completed',
+    conclusion: shouldRetry ? 'neutral' : 'failure',
+    output: {
+      title: checkTitle,
+      summary: report,
+    },
+  });
+  console.log(`Created 'Failure Classification' check on ${headSha}`);
+} catch (err) {
+  // Non-fatal: the check is informational. Log and continue.
+  console.warn('Failed to create check run annotation:', err);
+}
