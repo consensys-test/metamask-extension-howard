@@ -1,0 +1,70 @@
+# Automatic retry for failed merge queue runs.
+#
+# Problem:
+#   When a flaky job fails in the merge queue, the PR is ejected and all
+#   queued PRs behind it must be re-tested — a cascade failure.
+#
+# Solution:
+#   This workflow observes Main completions via `workflow_run`. For merge
+#   queue failures, it reruns the failed jobs once. When the rerun
+#   completes, the `all-jobs-pass` job in main.yml creates the required
+#   "All jobs pass" check via the Checks API — no polling needed here.
+#
+# How it works:
+#   1. Main completes (success or failure).
+#   2. For non-merge-queue events or successes, the `all-jobs-pass` job in
+#      main.yml creates the "All jobs pass" check directly — this workflow
+#      skips (job-level `if`).
+#   3. For merge queue failures, this workflow reruns failed jobs with
+#      `gh run rerun --failed`. The rerun's `all-jobs-pass` job handles
+#      the check creation.
+#
+# Branch protection:
+#   The required check is "All jobs pass" (created via Checks API).
+#   The native job is named "All jobs pass (initiator)" to avoid collision.
+#   "Do not require status checks on creation" must be enabled so that
+#   events where this workflow skips (PRs, pushes) still pass.
+#
+# TODO(POC): This workflow currently retries ALL failures unconditionally.
+#   Before production use, add logic to classify failures as retryable
+#   (e.g., e2e tests) vs non-retryable (e.g., lint, build).
+
+name: Merge Queue Validator
+
+on:
+  workflow_run:
+    workflows: ['Main']
+    types: [completed]
+
+jobs:
+  retry-and-gate:
+    name: Merge Queue Gate
+    # Only run for merge_group failures — all other cases are handled
+    # by the all-jobs-pass job in main.yml.
+    if: ${{ github.event.workflow_run.event == 'merge_group' && github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      checks: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Log failed jobs
+        run: |
+          echo "Main failed in merge queue. Run: $MAIN_RUN_ID"
+          echo "Head SHA: $HEAD_SHA"
+          echo ""
+          echo "Failed jobs:"
+          gh run view "$MAIN_RUN_ID" --repo "$REPO" --json jobs \
+            --jq '.jobs[] | select(.conclusion == "failure") | "  \(.name)"' \
+            || echo "  (could not fetch jobs)"
+
+      - name: Rerun failed jobs
+        run: |
+          echo "Rerunning failed jobs..."
+          gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
+          echo "Rerun triggered. The rerun's all-jobs-pass step will create the required check."
