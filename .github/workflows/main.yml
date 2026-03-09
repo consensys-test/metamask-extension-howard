@@ -759,12 +759,12 @@ jobs:
 
           echo "All required jobs either passed or were skipped"
 
-      # Create the required "All jobs pass" check via Checks API for all
-      # events EXCEPT merge_group failures — those are handled by the
-      # Merge Queue Validator workflow (merge-queue-validator.yml), which
-      # retries failed jobs before reporting the final result.
+      # Create the required "All jobs pass" check via Checks API.
+      # On merge_group attempt 1 failures, skip — the Merge Queue Validator
+      # will rerun the failed jobs and attempt 2's all-jobs-pass will create
+      # the check. On attempt 2+ (or any non-merge_group event), always create.
       - name: Create 'All jobs pass' check
-        if: ${{ !failure() || github.event_name != 'merge_group' }}
+        if: ${{ !failure() || github.event_name != 'merge_group' || github.run_attempt > 1 }}
         uses: actions/github-script@v7
         env:
           CHECK_CONCLUSION: ${{ job.status == 'success' && 'success' || 'failure' }}
