@@ -87,7 +87,7 @@ jobs:
 
   retry-pr:
     name: Retry PR (retry-ci label)
-    # Retry PR failures when the retry-ci label is present.
+    # Classify failures and write report, then retry if retry-ci label is present.
     # Skip forks — they don't have permission to rerun or edit labels.
     if: >-
       ${{
@@ -102,10 +102,28 @@ jobs:
       pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       REPO: ${{ github.repository }}
     steps:
+      - name: Checkout .github/ directory
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            .nvmrc
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Classify failures
+        id: classify
+        run: node .github/scripts/classify-failures.mts
+
       - name: Check for retry-ci label and rerun
         run: |
           # Find the PR for this branch
