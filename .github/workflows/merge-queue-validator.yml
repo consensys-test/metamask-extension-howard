@@ -6,18 +6,24 @@
 #
 # Solution:
 #   This workflow observes Main completions via `workflow_run`. For merge
-#   queue failures, it reruns the failed jobs once. When the rerun
-#   completes, the `all-jobs-pass` job in main.yml creates the required
-#   "All jobs pass" check via the Checks API — no polling needed here.
+#   queue failures, it reruns the failed jobs once before reporting the
+#   final result. The merge queue slot stays open during the retry because
+#   **this** workflow owns the required "All jobs pass" check (via the
+#   Checks API), not the native Main job.
 #
 # How it works:
 #   1. Main completes (success or failure).
 #   2. For non-merge-queue events or successes, the `all-jobs-pass` job in
 #      main.yml creates the "All jobs pass" check directly — this workflow
 #      skips (job-level `if`).
-#   3. For merge queue failures, this workflow reruns failed jobs with
-#      `gh run rerun --failed`. The rerun's `all-jobs-pass` job handles
-#      the check creation.
+#   3. For merge queue failures, this workflow:
+#      a. Reruns failed jobs with `gh run rerun --failed`.
+#      b. Blocks on `gh run watch` until the rerun finishes.
+#      c. Creates the "All jobs pass" check with the rerun's conclusion.
+#
+# Important:
+#   `workflow_run` does NOT fire again after `gh run rerun` completes.
+#   That's why we watch for completion in the same invocation.
 #
 # Branch protection:
 #   The required check is "All jobs pass" (created via Checks API).
@@ -63,8 +69,39 @@ jobs:
             --jq '.jobs[] | select(.conclusion == "failure") | "  \(.name)"' \
             || echo "  (could not fetch jobs)"
 
-      - name: Rerun failed jobs
+      - name: Rerun failed jobs and wait for result
         run: |
           echo "Rerunning failed jobs..."
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
-          echo "Rerun triggered. The rerun's all-jobs-pass step will create the required check."
+
+          # gh run watch blocks until the run completes, streaming live status.
+          # --exit-status makes it exit non-zero on failure; we capture the
+          # exit code to avoid failing this step before we create the check.
+          WATCH_EXIT=0
+          gh run watch "$MAIN_RUN_ID" --repo "$REPO" --exit-status || WATCH_EXIT=$?
+
+          CONCLUSION=$(gh run view "$MAIN_RUN_ID" --repo "$REPO" --json conclusion --jq '.conclusion')
+          ATTEMPT=$(gh run view "$MAIN_RUN_ID" --repo "$REPO" --json attempt --jq '.attempt')
+          echo "Rerun finished — conclusion=$CONCLUSION, attempt=$ATTEMPT (watch exit=$WATCH_EXIT)"
+          echo "RERUN_CONCLUSION=$CONCLUSION" >> "$GITHUB_ENV"
+          echo "RERUN_ATTEMPT=$ATTEMPT" >> "$GITHUB_ENV"
+
+      - name: Create 'All jobs pass' check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const conclusion = process.env.RERUN_CONCLUSION === 'success' ? 'success' : 'failure';
+            const attempt = process.env.RERUN_ATTEMPT;
+            const result = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'All jobs pass',
+              head_sha: process.env.HEAD_SHA,
+              status: 'completed',
+              conclusion,
+              output: {
+                title: `Main ${conclusion} (attempt ${attempt}, after retry)`,
+                summary: `Main was retried after failure. Final result: ${conclusion}. [View run](https://github.com/${process.env.REPO}/actions/runs/${process.env.MAIN_RUN_ID}).`,
+              },
+            });
+            core.info(`Created 'All jobs pass' check ${result.data.id}: ${conclusion}`);
