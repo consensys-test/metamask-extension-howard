@@ -53,6 +53,13 @@ jobs:
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false'}}
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false'}}
     steps:
+      # TESTING ONLY — fault injection to verify retry logic.
+      # Remove before merging to main.
+      - run: |
+          if (( ${{ github.run_attempt }} < 4 )) && [[ "${{ github.event_name }}" == "merge_group" || "${{ github.event_name }}" == "push" ]]; then
+            echo "502 Bad Gateway"; exit 1
+          fi
+
       - name: Check pull request merge queue status
         id: check-skip-merge-queue
         if: ${{ env.EVENT_NAME == 'merge_group' }}
@@ -119,7 +126,7 @@ jobs:
       # skip-everything is a shortcut for up-to-date == 'true' || needs-locales == 'true'
       - name: Compute skip-everything flag
         id: set-skip-everything
-        if: ${{ env.IS_RUN_EVERYTHING_BRANCH == 'false' && (steps.check-skip-merge-queue.outputs.up-to-date == 'true' || steps.set-needs-locales.outputs.needs-locales == 'true') }}
+        # if: ${{ env.IS_RUN_EVERYTHING_BRANCH == 'false' && (steps.check-skip-merge-queue.outputs.up-to-date == 'true' || steps.set-needs-locales.outputs.needs-locales == 'true') }}
         run: echo "skip-everything=true" >> "$GITHUB_OUTPUT"
 
       # This is very simple right now (and equivalent to !skip-everything)
