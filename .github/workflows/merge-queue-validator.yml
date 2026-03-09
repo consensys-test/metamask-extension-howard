@@ -17,9 +17,11 @@
 #      main.yml creates the "All jobs pass" check directly — this workflow
 #      skips (job-level `if`).
 #   3. For merge queue failures, this workflow:
-#      a. Reruns failed jobs with `gh run rerun --failed`.
+#      a. Reruns failed jobs with `gh run rerun --failed` (automatic).
 #      b. Blocks on `gh run watch` until the rerun finishes.
-#      c. Creates the "All jobs pass" check with the rerun's conclusion.
+#      c. If the rerun still fails AND the PR has a `retry-ci` label,
+#         removes the label and reruns one more time.
+#      d. Creates the "All jobs pass" check with the final conclusion.
 #
 # Important:
 #   `workflow_run` does NOT fire again after `gh run rerun` completes.
@@ -53,16 +55,19 @@ jobs:
     permissions:
       checks: write
       actions: write
+      pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       REPO: ${{ github.repository }}
     steps:
       - name: Log failed jobs
         run: |
           echo "Main failed in merge queue. Run: $MAIN_RUN_ID"
           echo "Head SHA: $HEAD_SHA"
+          echo "Head branch: $HEAD_BRANCH"
           echo ""
           echo "Failed jobs:"
           gh run view "$MAIN_RUN_ID" --repo "$REPO" --json jobs \
@@ -71,18 +76,49 @@ jobs:
 
       - name: Rerun failed jobs and wait for result
         run: |
-          echo "Rerunning failed jobs..."
+          echo "Rerunning failed jobs (automatic retry)..."
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
 
-          # gh run watch blocks until the run completes, streaming live status.
-          # --exit-status makes it exit non-zero on failure; we capture the
-          # exit code to avoid failing this step before we create the check.
           WATCH_EXIT=0
           gh run watch "$MAIN_RUN_ID" --repo "$REPO" --exit-status || WATCH_EXIT=$?
 
           CONCLUSION=$(gh run view "$MAIN_RUN_ID" --repo "$REPO" --json conclusion --jq '.conclusion')
           ATTEMPT=$(gh run view "$MAIN_RUN_ID" --repo "$REPO" --json attempt --jq '.attempt')
           echo "Rerun finished — conclusion=$CONCLUSION, attempt=$ATTEMPT (watch exit=$WATCH_EXIT)"
+          echo "RERUN_CONCLUSION=$CONCLUSION" >> "$GITHUB_ENV"
+          echo "RERUN_ATTEMPT=$ATTEMPT" >> "$GITHUB_ENV"
+
+      # If the automatic retry still failed, check for a retry-ci label on the
+      # PR. If present, remove the label and do one more rerun (attempt 3).
+      # Branch name format: gh-readonly-queue/main/pr-<number>-<sha>
+      - name: Check retry-ci label and optionally rerun again
+        if: ${{ env.RERUN_CONCLUSION == 'failure' }}
+        run: |
+          # Extract PR number from merge queue branch name
+          PR_NUMBER=$(echo "$HEAD_BRANCH" | grep -oP 'pr-\K[0-9]+')
+          if [[ -z "$PR_NUMBER" ]]; then
+            echo "Could not extract PR number from branch: $HEAD_BRANCH"
+            exit 0
+          fi
+          echo "PR number: $PR_NUMBER"
+
+          CURRENT_LABELS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name' | tr '\n' ',')
+          if [[ "${CURRENT_LABELS}" != *"retry-ci"* ]]; then
+            echo "No retry-ci label on PR #$PR_NUMBER. No further retries."
+            exit 0
+          fi
+
+          echo "Found retry-ci label on PR #$PR_NUMBER. Removing label and retrying..."
+          gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "retry-ci"
+
+          gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
+
+          WATCH_EXIT=0
+          gh run watch "$MAIN_RUN_ID" --repo "$REPO" --exit-status || WATCH_EXIT=$?
+
+          CONCLUSION=$(gh run view "$MAIN_RUN_ID" --repo "$REPO" --json conclusion --jq '.conclusion')
+          ATTEMPT=$(gh run view "$MAIN_RUN_ID" --repo "$REPO" --json attempt --jq '.attempt')
+          echo "Label retry finished — conclusion=$CONCLUSION, attempt=$ATTEMPT (watch exit=$WATCH_EXIT)"
           echo "RERUN_CONCLUSION=$CONCLUSION" >> "$GITHUB_ENV"
           echo "RERUN_ATTEMPT=$ATTEMPT" >> "$GITHUB_ENV"
 
