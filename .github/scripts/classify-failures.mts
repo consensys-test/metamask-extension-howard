@@ -5,7 +5,8 @@
  * failure as retryable or non-retryable based on job name patterns and
  * transient error detection.
  *
- * Uses only the `gh` CLI for API calls — no npm dependencies required.
+ * Uses the `gh` CLI for GitHub API calls — no workspace dependencies required.
+ * The workflow installs @sentry/node separately for optional logging.
  * This lets the workflow use a sparse checkout without `yarn install`.
  *
  * Usage (CLI):
@@ -17,17 +18,24 @@
  * CLI arguments take precedence over environment variables.
  * GITHUB_TOKEN (or GH_TOKEN) is always read from the environment.
  *
- * Optional environment variables:
+ * Environment variables (set by the workflow in CI):
  *   GITHUB_OUTPUT            — Path to GitHub Actions output file
  *   GITHUB_STEP_SUMMARY      — Path to GitHub Actions step summary file
- *   SENTRY_DSN_PERFORMANCE   — Sentry DSN for structured log delivery
+ *   HEAD_SHA                 — Commit SHA of the triggering run
+ *   HEAD_BRANCH              — Branch name of the triggering run
+ *   PR_NUMBER                — PR number (from workflow_run.pull_requests[0])
+ *   RUN_ATTEMPT              — Attempt number of the triggering run
+ *   VERSION                  — Extension version (from package.json via curl)
  *   WORKFLOW_EVENT           — Triggering event type (e.g. merge_group, push)
+ *   CI                       — Enables Check Run creation when 'true'
+ *   CHECK_RUN_TOKEN          — Token for Check Run creation (fork workaround)
+ *   SENTRY_DSN_PERFORMANCE   — Sentry DSN; enables structured log delivery
  *
  * Outputs (to $GITHUB_OUTPUT):
  *   should-retry=true|false
  *
  * Also writes a markdown report to $GITHUB_STEP_SUMMARY and optionally:
- *   - Creates a "Main Workflow Failure Classification" Check Run (when CI=true)
+ *   - Creates a "Main CI Failure Triage" Check Run (when CI=true)
  *   - Sends a structured log to Sentry (when SENTRY_DSN_PERFORMANCE is set)
  */
 
@@ -163,7 +171,7 @@ const blockerRegexes = config.blockerPatterns.map((p) => new RegExp(p, 'i'));
 
 const ghEnv = { ...process.env, GH_TOKEN: GITHUB_TOKEN };
 
-/** Call a GitHub REST API endpoint via `gh api`. Returns the raw response. */
+/** GET a GitHub REST API endpoint via `gh api`. Returns the response body as a string. */
 function ghApi(path: string): string {
   return execFileSync('gh', ['api', path], {
     encoding: 'utf8',
@@ -335,7 +343,8 @@ if (failedJobs.length === 0) {
 
 console.log(`Found ${failedJobs.length} failed job(s):\n`);
 
-// Partition into blockers and non-blockers so we can short-circuit.
+// Partition into blockers and non-blockers. If any blocker fails
+// non-transiently, stop early and tag all remaining jobs as cascade.
 const isBlocker = (name: string) => blockerRegexes.some((re) => re.test(name));
 const blockerJobs = failedJobs.filter((j) => isBlocker(j.name));
 const otherJobs = failedJobs.filter((j) => !isBlocker(j.name));
@@ -415,10 +424,10 @@ if (GITHUB_OUTPUT) {
 // ---------------------------------------------------------------------------
 
 const mainRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`;
-const mainCompletedRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+const triageRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
 
 const reportLines = [
-  `## Main Workflow Failure Classification`,
+  `## Main CI Failure Triage`,
   ``,
   `**Run:** [${MAIN_RUN_ID}](${mainRunUrl})${ATTEMPT ? ` (attempt ${ATTEMPT})` : ''}`,
   `**Decision:** ${shouldRetry ? '✅ Would retry' : '❌ Would NOT retry'}`,
@@ -442,7 +451,7 @@ if (GITHUB_STEP_SUMMARY) {
 console.log('\n' + report);
 
 // ---------------------------------------------------------------------------
-// Create Check Run annotation on the triggering commit
+// Create Check Run on the triggering commit
 // ---------------------------------------------------------------------------
 
 if (process.env.CI === 'true') {
@@ -468,7 +477,7 @@ if (process.env.CI === 'true') {
       {
         encoding: 'utf8',
         input: JSON.stringify({
-          name: 'Main Workflow Failure Classification',
+          name: 'Main CI Failure Triage',
           head_sha: headSha,
           status: 'completed',
           conclusion: shouldRetry ? 'neutral' : 'failure',
@@ -481,9 +490,7 @@ if (process.env.CI === 'true') {
         env: checkEnv,
       },
     );
-    console.log(
-      `Created 'Main Workflow Failure Classification' check on ${headSha}`,
-    );
+    console.log(`Created 'Main CI Failure Triage' check on ${headSha}`);
   } catch (err) {
     // Non-fatal: the check is informational. Log and continue.
     console.warn('Failed to create check run annotation:', err);
@@ -501,9 +508,9 @@ const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
 if (SENTRY_DSN) {
   try {
-    // VERSION env var is set by the workflow (via curl + node -p) for jobs
-    // that don't include package.json in their sparse checkout.
-    // Falls back to reading package.json from disk (retry-auto, CLI).
+    // VERSION env var is set by the workflow (via curl + node -p) since
+    // the sparse checkout doesn't include package.json.
+    // Falls back to reading package.json from disk (for CLI use).
     let version = process.env.VERSION ?? '';
     if (!version) {
       try {
@@ -546,7 +553,7 @@ if (SENTRY_DSN) {
     }
 
     Sentry.logger.info(
-      `Main Workflow Failure Classification: ${shouldRetry ? 'retry' : 'no-retry'}`,
+      `Main CI Failure Triage: ${shouldRetry ? 'retry' : 'no-retry'}`,
       {
         'ci.branch': process.env.HEAD_BRANCH || '',
         'ci.commitHash': process.env.HEAD_SHA || '',
@@ -561,7 +568,7 @@ if (SENTRY_DSN) {
         'ci.retry.retryableCount': retryableCount,
         'ci.retry.nonRetryableCount': classifications.length - retryableCount,
         'ci.retry.mainRunUrl': mainRunUrl,
-        'ci.retry.mainCompletedRunUrl': mainCompletedRunUrl,
+        'ci.retry.triageRunUrl': triageRunUrl,
         'ci.retry.report': report,
         ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
         ...jobAttrs,
@@ -576,7 +583,7 @@ if (SENTRY_DSN) {
     }
   } catch (err: unknown) {
     // Non-fatal: Sentry is optional. Fails gracefully when @sentry/node
-    // is not installed or has broken ESM paths (e.g. local CLI usage).
+    // is not installed (e.g. local CLI usage without `npm install @sentry/node`).
     const code = (err as NodeJS.ErrnoException)?.code;
     if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
       console.warn('Sentry skipped: @sentry/node not available');
