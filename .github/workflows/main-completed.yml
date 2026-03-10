@@ -61,6 +61,8 @@ jobs:
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       REPO: ${{ github.repository }}
+      SENTRY_DSN_PERFORMANCE: ${{ secrets.SENTRY_DSN_PERFORMANCE }}
+      WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
     steps:
       - name: Checkout .github/ directory
         uses: actions/checkout@v4
@@ -74,6 +76,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+
+      - name: Install Sentry SDK
+        run: npm install --no-save @sentry/node
 
       - name: Classify failures
         id: classify
@@ -108,6 +113,8 @@ jobs:
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       REPO: ${{ github.repository }}
+      SENTRY_DSN_PERFORMANCE: ${{ secrets.SENTRY_DSN_PERFORMANCE }}
+      WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
     steps:
       - name: Checkout .github/ directory
         uses: actions/checkout@v4
@@ -121,6 +128,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+
+      - name: Install Sentry SDK
+        run: npm install --no-save @sentry/node
 
       - name: Classify failures
         id: classify

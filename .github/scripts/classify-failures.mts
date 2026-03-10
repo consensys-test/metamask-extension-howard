@@ -18,14 +18,17 @@
  * GITHUB_TOKEN (or GH_TOKEN) is always read from the environment.
  *
  * Optional environment variables:
- *   GITHUB_OUTPUT       — Path to GitHub Actions output file
- *   GITHUB_STEP_SUMMARY — Path to GitHub Actions step summary file
+ *   GITHUB_OUTPUT            — Path to GitHub Actions output file
+ *   GITHUB_STEP_SUMMARY      — Path to GitHub Actions step summary file
+ *   SENTRY_DSN_PERFORMANCE   — Sentry DSN for structured log delivery
+ *   WORKFLOW_EVENT           — Triggering event type (e.g. merge_group, push)
  *
  * Outputs (to $GITHUB_OUTPUT):
  *   should-retry=true|false
  *
- * Also writes a markdown report to $GITHUB_STEP_SUMMARY and creates a
- * "Failure Classification" Check Run on the triggering commit.
+ * Also writes a markdown report to $GITHUB_STEP_SUMMARY, creates a
+ * "Failure Classification" Check Run on the triggering commit, and
+ * sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -460,4 +463,48 @@ try {
 } catch (err) {
   // Non-fatal: the check is informational. Log and continue.
   console.warn('Failed to create check run annotation:', err);
+}
+
+// ---------------------------------------------------------------------------
+// Send structured log to Sentry
+// ---------------------------------------------------------------------------
+
+// Disable Sentry for now
+// const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
+
+if (SENTRY_DSN) {
+  try {
+    const Sentry = await import('@sentry/node');
+    Sentry.init({ dsn: SENTRY_DSN, enableLogs: true });
+
+    const retryableCount = classifications.filter((c) => c.retryable).length;
+
+    Sentry.logger.info(
+      `Failure Classification: ${shouldRetry ? 'retry' : 'no-retry'}`,
+      {
+        'ci.decision': shouldRetry ? 'retry' : 'no-retry',
+        'ci.shouldRetry': shouldRetry,
+        'ci.runId': MAIN_RUN_ID,
+        'ci.repo': REPO,
+        'ci.attempt': ATTEMPT || 'latest',
+        'ci.event': process.env.WORKFLOW_EVENT || '',
+        'ci.failedJobCount': failedJobs.length,
+        'ci.retryableCount': retryableCount,
+        'ci.nonRetryableCount': classifications.length - retryableCount,
+        'ci.commitHash': process.env.HEAD_SHA || '',
+        ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
+      },
+    );
+
+    const flushed = await Sentry.flush(5000);
+    if (flushed) {
+      console.log('Sent classification log to Sentry');
+    } else {
+      console.warn('Sentry flush timed out');
+    }
+  } catch (err) {
+    // Non-fatal: Sentry is optional. Fails gracefully when @sentry/node
+    // is not installed (e.g. local CLI usage).
+    console.warn('Failed to send classification log to Sentry:', err);
+  }
 }
