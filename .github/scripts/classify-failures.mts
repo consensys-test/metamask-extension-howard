@@ -543,7 +543,7 @@ if (SENTRY_DSN) {
       {
         'ci.branch': process.env.HEAD_BRANCH || '',
         'ci.commitHash': process.env.HEAD_SHA || '',
-        'ci.prNumber': prNumber,
+        'ci.prNumber': prNumber || 'none',
         'ci.repo': REPO,
         'ci.retry.decision': shouldRetry ? 'retry' : 'no-retry',
         'ci.retry.shouldRetry': shouldRetry,
