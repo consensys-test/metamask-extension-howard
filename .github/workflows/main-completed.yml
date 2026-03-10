@@ -5,8 +5,8 @@
 #
 #   1. Classifies each failed job as retryable or non-retryable
 #   2. Writes a markdown report to the step summary
-#   3. Creates a "Failure Classification" Check Run on the commit
-#   4. Sends a structured log to Sentry (if configured)
+#   3. Creates a "Main Workflow Failure Classification" Check Run (CI only)
+#   4. Sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set)
 #
 # Then applies the appropriate retry mode:
 #
@@ -134,10 +134,8 @@ jobs:
       - name: Retry PR (retry-ci label)
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
         run: |
-          # Find the PR for this branch
-          PR_NUMBER=$(gh pr list --repo "$REPO" --head "$HEAD_BRANCH" --json number --jq '.[0].number')
           if [[ -z "$PR_NUMBER" || "$PR_NUMBER" == "null" ]]; then
-            echo "Could not determine PR number for branch $HEAD_BRANCH. Skipping."
+            echo "PR_NUMBER not set. Skipping."
             exit 0
           fi
 
