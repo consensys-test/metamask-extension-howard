@@ -493,9 +493,20 @@ const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
 if (SENTRY_DSN) {
   try {
-    const { version } = JSON.parse(readFileSync('package.json', 'utf-8')) as {
-      version: string;
-    };
+    // VERSION env var is set by the workflow (via curl + node -p) for jobs
+    // that don't include package.json in their sparse checkout.
+    // Falls back to reading package.json from disk (retry-auto, CLI).
+    let version = process.env.VERSION ?? '';
+    if (!version) {
+      try {
+        const pkgPath = join(scriptDir, '..', '..', 'package.json');
+        version = (
+          JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
+        ).version;
+      } catch {
+        version = 'unknown';
+      }
+    }
 
     const Sentry = await import('@sentry/node');
     Sentry.init({
