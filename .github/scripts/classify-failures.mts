@@ -521,6 +521,23 @@ if (SENTRY_DSN) {
 
     const retryableCount = classifications.filter((c) => c.retryable).length;
 
+    // Per-job structured attributes, capped to stay under Sentry's
+    // 100-attribute limit (~16 top-level + 4 per job → max 20 jobs).
+    const MAX_JOB_ATTRS = 20;
+    const jobAttrs: Record<string, string | boolean> = {};
+    const jobSlice = classifications.slice(0, MAX_JOB_ATTRS);
+    for (let i = 0; i < jobSlice.length; i++) {
+      const c = jobSlice[i];
+      const p = `ci.retry.jobs.${i}`;
+      jobAttrs[`${p}.name`] = c.jobName;
+      jobAttrs[`${p}.category`] = c.category;
+      jobAttrs[`${p}.retryable`] = c.retryable;
+      jobAttrs[`${p}.reason`] = c.reason;
+    }
+    if (classifications.length > MAX_JOB_ATTRS) {
+      jobAttrs['ci.retry.jobs.truncated'] = true;
+    }
+
     Sentry.logger.info(
       `Failure Classification: ${shouldRetry ? 'retry' : 'no-retry'}`,
       {
@@ -528,18 +545,19 @@ if (SENTRY_DSN) {
         'ci.commitHash': process.env.HEAD_SHA || '',
         'ci.prNumber': prNumber,
         'ci.repo': REPO,
-        'retryCI.decision': shouldRetry ? 'retry' : 'no-retry',
-        'retryCI.shouldRetry': shouldRetry,
-        'retryCI.runId': MAIN_RUN_ID,
-        'retryCI.attempt': ATTEMPT || 'latest',
-        'retryCI.event': process.env.WORKFLOW_EVENT || '',
-        'retryCI.failedJobCount': failedJobs.length,
-        'retryCI.retryableCount': retryableCount,
-        'retryCI.nonRetryableCount': classifications.length - retryableCount,
-        'retryCI.mainRunUrl': mainRunUrl,
-        'retryCI.mainCompletedRunUrl': mainCompletedRunUrl,
-        'retryCI.report': report,
+        'ci.retry.decision': shouldRetry ? 'retry' : 'no-retry',
+        'ci.retry.shouldRetry': shouldRetry,
+        'ci.retry.runId': MAIN_RUN_ID,
+        'ci.retry.attempt': ATTEMPT || 'latest',
+        'ci.retry.event': process.env.WORKFLOW_EVENT || '',
+        'ci.retry.failedJobCount': failedJobs.length,
+        'ci.retry.retryableCount': retryableCount,
+        'ci.retry.nonRetryableCount': classifications.length - retryableCount,
+        'ci.retry.mainRunUrl': mainRunUrl,
+        'ci.retry.mainCompletedRunUrl': mainCompletedRunUrl,
+        'ci.retry.report': report,
         ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
+        ...jobAttrs,
       },
     );
 
