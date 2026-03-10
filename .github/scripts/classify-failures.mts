@@ -145,7 +145,7 @@ function stripJsonComments(jsonc: string): string {
 }
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const configPath = join(scriptDir, '..', 'retry-config.jsonc');
+const configPath = join(scriptDir, '..', 'rules', 'retry-config.jsonc');
 const config: RetryConfig = JSON.parse(
   stripJsonComments(readFileSync(configPath, 'utf8')),
 );
