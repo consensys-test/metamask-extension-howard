@@ -5,7 +5,7 @@
 #
 #   1. Classifies each failed job as retryable or non-retryable
 #   2. Writes a markdown report to the step summary
-#   3. Creates a "Main Workflow Failure Classification" Check Run (CI only)
+#   3. Creates a "Main CI Failure Triage" Check Run (CI only)
 #   4. Sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set)
 #
 # Then applies the appropriate retry mode:
@@ -25,7 +25,7 @@
 #   "Do not require status checks on creation" must be enabled so that
 #   events where this workflow skips still pass.
 
-name: Main Completed
+name: Main CI Failure Triage
 
 on:
   workflow_run:
