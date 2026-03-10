@@ -413,12 +413,13 @@ if (GITHUB_OUTPUT) {
 // Write GITHUB_STEP_SUMMARY (markdown report)
 // ---------------------------------------------------------------------------
 
-const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`;
+const mainRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`;
+const mainCompletedRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
 
 const reportLines = [
   `## Failure Classification`,
   ``,
-  `**Run:** [${MAIN_RUN_ID}](${runUrl})`,
+  `**Run:** [${MAIN_RUN_ID}](${mainRunUrl})`,
   `**Decision:** ${shouldRetry ? '✅ Would retry' : '❌ Would NOT retry'}`,
   `**Failed jobs:** ${failedJobs.length}`,
   ``,
@@ -488,6 +489,9 @@ try {
 // Send structured log to Sentry
 // ---------------------------------------------------------------------------
 
+// PR_NUMBER is set by the workflow from workflow_run.pull_requests[0].number.
+const prNumber = process.env.PR_NUMBER ?? '';
+
 // Disable Sentry for now
 const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
@@ -520,18 +524,21 @@ if (SENTRY_DSN) {
     Sentry.logger.info(
       `Failure Classification: ${shouldRetry ? 'retry' : 'no-retry'}`,
       {
-        'ci.decision': shouldRetry ? 'retry' : 'no-retry',
-        'ci.shouldRetry': shouldRetry,
-        'ci.runId': MAIN_RUN_ID,
-        'ci.repo': REPO,
-        'ci.attempt': ATTEMPT || 'latest',
-        'ci.event': process.env.WORKFLOW_EVENT || '',
-        'ci.failedJobCount': failedJobs.length,
-        'ci.retryableCount': retryableCount,
-        'ci.nonRetryableCount': classifications.length - retryableCount,
+        'ci.branch': process.env.HEAD_BRANCH || '',
         'ci.commitHash': process.env.HEAD_SHA || '',
-        'ci.runUrl': runUrl,
-        'ci.report': report,
+        'ci.prNumber': prNumber,
+        'ci.repo': REPO,
+        'retryCI.decision': shouldRetry ? 'retry' : 'no-retry',
+        'retryCI.shouldRetry': shouldRetry,
+        'retryCI.runId': MAIN_RUN_ID,
+        'retryCI.attempt': ATTEMPT || 'latest',
+        'retryCI.event': process.env.WORKFLOW_EVENT || '',
+        'retryCI.failedJobCount': failedJobs.length,
+        'retryCI.retryableCount': retryableCount,
+        'retryCI.nonRetryableCount': classifications.length - retryableCount,
+        'retryCI.mainRunUrl': mainRunUrl,
+        'retryCI.mainCompletedRunUrl': mainCompletedRunUrl,
+        'retryCI.report': report,
         ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
       },
     );
