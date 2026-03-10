@@ -44,7 +44,7 @@
     },
     "optional": {
       "$comment": "Optional jobs that do not need retry.",
-      "patterns": ["^dapp-page-load", "^run-benchmarks"]
+      "patterns": ["^All jobs pass", "^dapp-page-load", "^run-benchmarks"]
     }
   },
 
