@@ -500,7 +500,7 @@ jobs:
 
   build-ts-migration-dashboard:
     name: Build ts migration dashboard
-    if: ${{ github.event_name != 'merge_group' && needs.get-requirements.outputs.skip-everything != 'true' }}
+    # if: ${{ github.event_name != 'merge_group' && needs.get-requirements.outputs.skip-everything != 'true' }}
     needs:
       - get-requirements
     uses: ./.github/workflows/build-ts-migration-dashboard.yml
@@ -545,7 +545,7 @@ jobs:
       - get-requirements
       - prep-deps
       - build-dist-browserify
-    if: ${{ needs.get-requirements.outputs.skip-everything != 'true' }}
+    # if: ${{ needs.get-requirements.outputs.skip-everything != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -562,6 +562,8 @@ jobs:
     outputs:
       lavamoat-policy-changed: ${{ steps.lavamoat-policy-changed.outputs.lavamoat-policy-changed }}
     steps:
+      - run: exit 1
+
       - name: Checkout and setup environment
         uses: MetaMask/action-checkout-and-setup@v3
         with:

@@ -15,6 +15,8 @@ jobs:
       # For a `push` event, the branch is `github.ref_name`.
       BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
+      - run: exit 1
+
       - name: Checkout and setup environment
         uses: MetaMask/action-checkout-and-setup@v3
         with:
