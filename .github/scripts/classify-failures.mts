@@ -489,12 +489,20 @@ try {
 // ---------------------------------------------------------------------------
 
 // Disable Sentry for now
-// const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
+const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
 if (SENTRY_DSN) {
   try {
+    const { version } = JSON.parse(readFileSync('package.json', 'utf-8')) as {
+      version: string;
+    };
+
     const Sentry = await import('@sentry/node');
-    Sentry.init({ dsn: SENTRY_DSN, enableLogs: true });
+    Sentry.init({
+      dsn: SENTRY_DSN,
+      enableLogs: true,
+      release: `metamask-extension@${version}`,
+    });
 
     const retryableCount = classifications.filter((c) => c.retryable).length;
 
@@ -511,6 +519,8 @@ if (SENTRY_DSN) {
         'ci.retryableCount': retryableCount,
         'ci.nonRetryableCount': classifications.length - retryableCount,
         'ci.commitHash': process.env.HEAD_SHA || '',
+        'ci.runUrl': runUrl,
+        'ci.report': report,
         ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
       },
     );

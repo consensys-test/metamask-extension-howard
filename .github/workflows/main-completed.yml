@@ -65,7 +65,7 @@ jobs:
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       REPO: ${{ github.repository }}
-      SENTRY_DSN_PERFORMANCE: ${{ secrets.SENTRY_DSN_PERFORMANCE }}
+      SENTRY_DSN_PERFORMANCE: ${{ vars.SENTRY_DSN_PERFORMANCE }}
       WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
     steps:
       - name: Checkout .github/ directory
@@ -74,6 +74,7 @@ jobs:
           sparse-checkout: |
             .github
             .nvmrc
+            package.json
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
@@ -119,7 +120,7 @@ jobs:
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       REPO: ${{ github.repository }}
-      SENTRY_DSN_PERFORMANCE: ${{ secrets.SENTRY_DSN_PERFORMANCE }}
+      SENTRY_DSN_PERFORMANCE: ${{ vars.SENTRY_DSN_PERFORMANCE }}
       WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
     steps:
       - name: Checkout .github/ directory
@@ -137,6 +138,15 @@ jobs:
 
       - name: Install Sentry SDK
         run: npm install --no-save @sentry/node
+
+      - name: Checkout .github/ directory
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            .nvmrc
+            package.json
+          sparse-checkout-cone-mode: false
 
       - name: Classify failures
         id: classify
