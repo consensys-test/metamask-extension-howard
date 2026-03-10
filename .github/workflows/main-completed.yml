@@ -64,6 +64,8 @@ jobs:
       CHECK_RUN_TOKEN: ${{ secrets.CHECK_RUN_TOKEN }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
       REPO: ${{ github.repository }}
       SENTRY_DSN_PERFORMANCE: ${{ vars.SENTRY_DSN_PERFORMANCE }}
       WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
@@ -88,7 +90,7 @@ jobs:
         run: |
           TMPFILE=$(mktemp)
           if curl -sSf -o "$TMPFILE" "https://raw.githubusercontent.com/${REPO}/${HEAD_SHA}/package.json"; then
-            echo "VERSION=$(node -p "require('$TMPFILE').version")" >> "$GITHUB_ENV"
+            echo "VERSION=$(node -p "JSON.parse(require('fs').readFileSync('$TMPFILE','utf8')).version")" >> "$GITHUB_ENV"
           else
             echo "::warning::Could not download package.json — VERSION will be 'unknown'"
           fi
@@ -128,6 +130,7 @@ jobs:
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
       REPO: ${{ github.repository }}
       SENTRY_DSN_PERFORMANCE: ${{ vars.SENTRY_DSN_PERFORMANCE }}
       WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
@@ -152,7 +155,7 @@ jobs:
         run: |
           TMPFILE=$(mktemp)
           if curl -sSf -o "$TMPFILE" "https://raw.githubusercontent.com/${REPO}/${HEAD_SHA}/package.json"; then
-            echo "VERSION=$(node -p "require('$TMPFILE').version")" >> "$GITHUB_ENV"
+            echo "VERSION=$(node -p "JSON.parse(require('fs').readFileSync('$TMPFILE','utf8')).version")" >> "$GITHUB_ENV"
           else
             echo "::warning::Could not download package.json — VERSION will be 'unknown'"
           fi
