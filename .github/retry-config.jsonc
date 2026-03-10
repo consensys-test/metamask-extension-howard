@@ -1,8 +1,10 @@
+// Configuration for classify-failures.mts — determines whether a failed
+// workflow run should be retried.
 {
-  "$comment": "Configuration for classify-failures.mts — determines whether a failed workflow run should be retried.",
-
-  "$comment:blockerPatterns": "Blockers control cascade logic — if one fails non-transiently, all downstream jobs are marked non-retryable. Each blocker must also appear in a jobClassification category (usually retryableOnTransientError) so it gets proper transient error detection.",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  // Blockers (blockerPatterns) control cascade logic — if one fails
+  // non-transiently, all downstream jobs are marked non-retryable. Each blocker
+  // must also appear in a jobClassification category (usually
+  // retryableOnTransientError) so it gets proper transient error detection.
   "blockerPatterns": [
     "^Get workflow",
     "^Prepare dependencies$",
@@ -11,16 +13,21 @@
   ],
 
   "defaults": {
-    "$comment": "Jobs not matching any pattern are treated as this category.",
+    // Jobs not matching any pattern use this category. Unmatched jobs trigger
+    // a warning in the report and a ci.retry.unmatchedJobCount Sentry
+    // attribute — add explicit patterns to avoid this.
     "unmatchedCategory": "alwaysRetryable"
   },
+
   "jobClassification": {
+    // Jobs that are inherently flaky and should always be retried.
     "alwaysRetryable": {
-      "$comment": "Jobs that are inherently flaky and should always be retried.",
       "patterns": ["^e2e-", "^prep-e2e"]
     },
+
+    // Jobs that are normally deterministic but can fail due to infrastructure
+    // issues. Retried only if error matches a transient pattern.
     "retryableOnTransientError": {
-      "$comment": "Jobs that are normally deterministic but can fail due to infrastructure issues. Retried only if error matches a transient pattern.",
       "patterns": [
         "^build-",
         "^Build lavamoat",
@@ -41,13 +48,16 @@
         "^validate-lavamoat-policies"
       ]
     },
+
+    // Jobs that are usually deterministic and should not be retried unless
+    // we have strong evidence of a transient error.
     "usuallyNotFlaky": {
-      "$comment": "Jobs that are usually deterministic and should not be retried unless we have strong evidence of a transient error.",
       "patterns": ["^Run tests", "^Test storybook"],
       "transientErrorPatterns": ["Exceeded timeout of \\d+ ms for a test"]
     },
+
+    // Optional jobs that do not need retry.
     "optional": {
-      "$comment": "Optional jobs that do not need retry.",
       "patterns": ["^All jobs pass", "^dapp-page-load", "^run-benchmarks"]
     }
   },

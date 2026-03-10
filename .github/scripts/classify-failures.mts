@@ -75,6 +75,7 @@ interface JobClassification {
   retryable: boolean;
   reason: string;
   errorSnippet?: string;
+  unmatched?: boolean;
 }
 
 interface CategoryConfig {
@@ -134,9 +135,20 @@ const repoApi = `/repos/${owner}/${repo}`;
 // Config
 // ---------------------------------------------------------------------------
 
+/** Strip // comments and trailing commas from JSONC for JSON.parse(). */
+function stripJsonComments(jsonc: string): string {
+  return jsonc
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n')
+    .replace(/,\s*([\]}])/g, '$1');
+}
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const configPath = join(scriptDir, '..', 'retry-config.json');
-const config: RetryConfig = JSON.parse(readFileSync(configPath, 'utf8'));
+const configPath = join(scriptDir, '..', 'retry-config.jsonc');
+const config: RetryConfig = JSON.parse(
+  stripJsonComments(readFileSync(configPath, 'utf8')),
+);
 
 const categoryOrder: Category[] = [
   'alwaysRetryable',
@@ -232,13 +244,16 @@ function getJobLogs(jobId: number): string {
 // Classification logic
 // ---------------------------------------------------------------------------
 
-function matchCategory(jobName: string): Category {
+function matchCategory(jobName: string): {
+  category: Category;
+  unmatched: boolean;
+} {
   for (const cat of categoryOrder) {
     for (const re of compiledPatterns[cat]) {
-      if (re.test(jobName)) return cat;
+      if (re.test(jobName)) return { category: cat, unmatched: false };
     }
   }
-  return config.defaults.unmatchedCategory;
+  return { category: config.defaults.unmatchedCategory, unmatched: true };
 }
 
 function findTransientError(
@@ -259,7 +274,13 @@ function findTransientError(
 function classifyJob(job: Job): JobClassification {
   const jobName = job.name;
   const jobId = job.id;
-  const category = matchCategory(jobName);
+  const { category, unmatched } = matchCategory(jobName);
+
+  if (unmatched) {
+    console.warn(
+      `  ⚠️  "${jobName}" did not match any pattern — using default category '${category}'`,
+    );
+  }
 
   if (category === 'alwaysRetryable') {
     return {
@@ -268,6 +289,7 @@ function classifyJob(job: Job): JobClassification {
       category,
       retryable: true,
       reason: 'Job is in the always-retryable category',
+      unmatched,
     };
   }
 
@@ -278,6 +300,7 @@ function classifyJob(job: Job): JobClassification {
       category,
       retryable: false,
       reason: 'Optional job — no retry needed',
+      unmatched,
     };
   }
 
@@ -296,6 +319,7 @@ function classifyJob(job: Job): JobClassification {
       retryable: true,
       reason: `Transient error in annotations: ${transientMatch}`,
       errorSnippet: transientMatch,
+      unmatched,
     };
   }
 
@@ -312,6 +336,7 @@ function classifyJob(job: Job): JobClassification {
         retryable: true,
         reason: `Transient error in logs: ${transientMatch}`,
         errorSnippet: transientMatch,
+        unmatched,
       };
     }
   }
@@ -322,6 +347,7 @@ function classifyJob(job: Job): JobClassification {
     category,
     retryable: false,
     reason: 'No transient error pattern detected',
+    unmatched,
   };
 }
 
@@ -368,12 +394,14 @@ for (const job of blockerJobs) {
 
 function tagCascade(jobs: Job[], retryable: boolean, reason: string): void {
   for (const job of jobs) {
+    const { category, unmatched } = matchCategory(job.name);
     classifications.push({
       jobName: job.name,
       jobId: job.id,
-      category: matchCategory(job.name),
+      category,
       retryable,
       reason,
+      unmatched,
     });
   }
 }
@@ -437,9 +465,18 @@ const reportLines = [
   `|-----|----------|-----------|--------|`,
   ...classifications.map(
     (c) =>
-      `| ${c.jobName} | ${c.category} | ${c.retryable ? '✅' : '❌'} | ${c.reason} |`,
+      `| ${c.jobName} | ${c.unmatched ? '⚠️ ' : ''}${c.category} | ${c.retryable ? '✅' : '❌'} | ${c.reason} |`,
   ),
 ];
+
+const unmatchedJobs = classifications.filter((c) => c.unmatched);
+if (unmatchedJobs.length > 0) {
+  reportLines.push(
+    ``,
+    `> ⚠️ **${unmatchedJobs.length} job(s) did not match any pattern** in retry-config.jsonc and used the default category \`${config.defaults.unmatchedCategory}\`:`,
+    ...unmatchedJobs.map((c) => `> - ${c.jobName}`),
+  );
+}
 
 const report = reportLines.join('\n');
 
@@ -567,6 +604,7 @@ if (SENTRY_DSN) {
         'ci.retry.failedJobCount': failedJobs.length,
         'ci.retry.retryableCount': retryableCount,
         'ci.retry.nonRetryableCount': classifications.length - retryableCount,
+        'ci.retry.unmatchedJobCount': unmatchedJobs.length,
         'ci.retry.mainRunUrl': mainRunUrl,
         'ci.retry.triageRunUrl': triageRunUrl,
         'ci.retry.report': report,
