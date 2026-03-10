@@ -27,7 +27,7 @@
  *   should-retry=true|false
  *
  * Also writes a markdown report to $GITHUB_STEP_SUMMARY, creates a
- * "Failure Classification" Check Run on the triggering commit, and
+ * "Main Workflow Failure Classification" Check Run on the triggering commit, and
  * sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set).
  */
 
@@ -108,7 +108,7 @@ if (flags.help) {
 const GITHUB_TOKEN = getGitHubToken();
 const MAIN_RUN_ID = positionals[0] || process.env.MAIN_RUN_ID || '';
 const REPO = flags.repo || process.env.REPO || 'MetaMask/metamask-extension';
-const ATTEMPT = flags.attempt ?? '';
+const ATTEMPT = flags.attempt || process.env.RUN_ATTEMPT || '';
 const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT ?? '';
 const GITHUB_STEP_SUMMARY = process.env.GITHUB_STEP_SUMMARY ?? '';
 
@@ -418,9 +418,9 @@ const mainRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${MAIN_RUN_
 const mainCompletedRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
 
 const reportLines = [
-  `## Failure Classification`,
+  `## Main Workflow Failure Classification`,
   ``,
-  `**Run:** [${MAIN_RUN_ID}](${mainRunUrl})`,
+  `**Run:** [${MAIN_RUN_ID}](${mainRunUrl})${ATTEMPT ? ` (attempt ${ATTEMPT})` : ''}`,
   `**Decision:** ${shouldRetry ? '✅ Would retry' : '❌ Would NOT retry'}`,
   `**Failed jobs:** ${failedJobs.length}`,
   ``,
@@ -468,7 +468,7 @@ if (process.env.CI === 'true') {
       {
         encoding: 'utf8',
         input: JSON.stringify({
-          name: 'Failure Classification',
+          name: 'Main Workflow Failure Classification',
           head_sha: headSha,
           status: 'completed',
           conclusion: shouldRetry ? 'neutral' : 'failure',
@@ -481,7 +481,9 @@ if (process.env.CI === 'true') {
         env: checkEnv,
       },
     );
-    console.log(`Created 'Failure Classification' check on ${headSha}`);
+    console.log(
+      `Created 'Main Workflow Failure Classification' check on ${headSha}`,
+    );
   } catch (err) {
     // Non-fatal: the check is informational. Log and continue.
     console.warn('Failed to create check run annotation:', err);
@@ -545,7 +547,7 @@ if (SENTRY_DSN) {
     }
 
     Sentry.logger.info(
-      `Failure Classification: ${shouldRetry ? 'retry' : 'no-retry'}`,
+      `Main Workflow Failure Classification: ${shouldRetry ? 'retry' : 'no-retry'}`,
       {
         'ci.branch': process.env.HEAD_BRANCH || '',
         'ci.commitHash': process.env.HEAD_SHA || '',
@@ -554,7 +556,7 @@ if (SENTRY_DSN) {
         'ci.retry.decision': shouldRetry ? 'retry' : 'no-retry',
         'ci.retry.shouldRetry': shouldRetry,
         'ci.retry.runId': MAIN_RUN_ID,
-        'ci.retry.attempt': ATTEMPT || 'latest',
+        'ci.retry.attempt': ATTEMPT || 'unknown',
         'ci.retry.event': process.env.WORKFLOW_EVENT || '',
         'ci.retry.failedJobCount': failedJobs.length,
         'ci.retry.retryableCount': retryableCount,
