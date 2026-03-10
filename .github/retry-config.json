@@ -1,6 +1,7 @@
 {
   "$comment": "Configuration for classify-failures.mts — determines whether a failed workflow run should be retried.",
 
+  "$comment:blockerPatterns": "Blockers control cascade logic — if one fails non-transiently, all downstream jobs are marked non-retryable. Each blocker must also appear in a jobClassification category (usually retryableOnTransientError) so it gets proper transient error detection.",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "blockerPatterns": [
     "^Get workflow",
@@ -31,9 +32,12 @@
         "^Lint workflows",
         "^Locales changed",
         "^Prepare dependencies$",
+        "^Publish",
         "^repository-health-checks",
         "^sonarcloud",
+        "^store-benchmark-stats",
         "^Test lint$",
+        "^Trigger Regression",
         "^validate-lavamoat-policies"
       ]
     },
