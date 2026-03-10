@@ -58,6 +58,10 @@ jobs:
       checks: write
     env:
       GH_TOKEN: ${{ github.token }}
+      # TODO: Remove CHECK_RUN_TOKEN — fork-only workaround. On the real repo,
+      # github.token creates checks in the correct suite. Delete this env var
+      # and the corresponding logic in classify-failures.mts.
+      CHECK_RUN_TOKEN: ${{ secrets.CHECK_RUN_TOKEN }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       REPO: ${{ github.repository }}
@@ -109,6 +113,8 @@ jobs:
       pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
+      # TODO: Remove CHECK_RUN_TOKEN — fork-only workaround. See retry-auto.
+      CHECK_RUN_TOKEN: ${{ secrets.CHECK_RUN_TOKEN }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}

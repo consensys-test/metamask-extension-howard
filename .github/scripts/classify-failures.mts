@@ -449,16 +449,35 @@ try {
     ? 'All failures are retryable'
     : 'Non-retryable failures detected';
 
-  ghApiPost(`${repoApi}/check-runs`, {
-    name: 'Failure Classification',
-    head_sha: headSha,
-    status: 'completed',
-    conclusion: shouldRetry ? 'neutral' : 'failure',
-    output: {
-      title: checkTitle,
-      summary: report,
+  // TODO: Remove CHECK_RUN_TOKEN workaround — fork-only. On the real repo,
+  // revert to: ghApiPost(`${repoApi}/check-runs`, { ... })
+  // and delete the checkToken/checkEnv/execFileSync block below.
+  //
+  // Use CHECK_RUN_TOKEN if available — a PAT or GitHub App token with
+  // checks:write that creates check runs in the correct check suite.
+  // Falls back to GH_TOKEN (github.token) which works for non-PR events.
+  const checkToken = process.env.CHECK_RUN_TOKEN || GITHUB_TOKEN;
+  const checkEnv = { ...process.env, GH_TOKEN: checkToken };
+
+  execFileSync(
+    'gh',
+    ['api', `${repoApi}/check-runs`, '--method', 'POST', '--input', '-'],
+    {
+      encoding: 'utf8',
+      input: JSON.stringify({
+        name: 'Failure Classification',
+        head_sha: headSha,
+        status: 'completed',
+        conclusion: shouldRetry ? 'neutral' : 'failure',
+        output: {
+          title: checkTitle,
+          summary: report,
+        },
+      }),
+      maxBuffer: 5 * 1024 * 1024,
+      env: checkEnv,
     },
-  });
+  );
   console.log(`Created 'Failure Classification' check on ${headSha}`);
 } catch (err) {
   // Non-fatal: the check is informational. Log and continue.
