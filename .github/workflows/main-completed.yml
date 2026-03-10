@@ -63,6 +63,7 @@ jobs:
       # and the corresponding logic in classify-failures.mts.
       CHECK_RUN_TOKEN: ${{ secrets.CHECK_RUN_TOKEN }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
@@ -128,6 +129,7 @@ jobs:
       # TODO: Remove CHECK_RUN_TOKEN — fork-only workaround. See retry-auto.
       CHECK_RUN_TOKEN: ${{ secrets.CHECK_RUN_TOKEN }}
       MAIN_RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
