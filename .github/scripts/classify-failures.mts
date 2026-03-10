@@ -26,9 +26,9 @@
  * Outputs (to $GITHUB_OUTPUT):
  *   should-retry=true|false
  *
- * Also writes a markdown report to $GITHUB_STEP_SUMMARY, creates a
- * "Main Workflow Failure Classification" Check Run on the triggering commit, and
- * sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set).
+ * Also writes a markdown report to $GITHUB_STEP_SUMMARY and optionally:
+ *   - Creates a "Main Workflow Failure Classification" Check Run (when CI=true)
+ *   - Sends a structured log to Sentry (when SENTRY_DSN_PERFORMANCE is set)
  */
 
 import { execFileSync } from 'node:child_process';
@@ -497,7 +497,6 @@ if (process.env.CI === 'true') {
 // PR_NUMBER is set by the workflow from workflow_run.pull_requests[0].number.
 const prNumber = process.env.PR_NUMBER ?? '';
 
-// Disable Sentry for now
 const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
 if (SENTRY_DSN) {
