@@ -33,6 +33,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, appendFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -444,45 +445,47 @@ console.log('\n' + report);
 // Create Check Run annotation on the triggering commit
 // ---------------------------------------------------------------------------
 
-try {
-  const headSha = getRunHeadSha();
-  const checkTitle = shouldRetry
-    ? 'All failures are retryable'
-    : 'Non-retryable failures detected';
+if (process.env.CI === 'true') {
+  try {
+    const headSha = getRunHeadSha();
+    const checkTitle = shouldRetry
+      ? 'All failures are retryable'
+      : 'Non-retryable failures detected';
 
-  // TODO: Remove CHECK_RUN_TOKEN workaround — fork-only. On the real repo,
-  // revert to: ghApiPost(`${repoApi}/check-runs`, { ... })
-  // and delete the checkToken/checkEnv/execFileSync block below.
-  //
-  // Use CHECK_RUN_TOKEN if available — a PAT or GitHub App token with
-  // checks:write that creates check runs in the correct check suite.
-  // Falls back to GH_TOKEN (github.token) which works for non-PR events.
-  const checkToken = process.env.CHECK_RUN_TOKEN || GITHUB_TOKEN;
-  const checkEnv = { ...process.env, GH_TOKEN: checkToken };
+    // TODO: Remove CHECK_RUN_TOKEN workaround — fork-only. On the real repo,
+    // revert to: ghApiPost(`${repoApi}/check-runs`, { ... })
+    // and delete the checkToken/checkEnv/execFileSync block below.
+    //
+    // Use CHECK_RUN_TOKEN if available — a PAT or GitHub App token with
+    // checks:write that creates check runs in the correct check suite.
+    // Falls back to GH_TOKEN (github.token) which works for non-PR events.
+    const checkToken = process.env.CHECK_RUN_TOKEN || GITHUB_TOKEN;
+    const checkEnv = { ...process.env, GH_TOKEN: checkToken };
 
-  execFileSync(
-    'gh',
-    ['api', `${repoApi}/check-runs`, '--method', 'POST', '--input', '-'],
-    {
-      encoding: 'utf8',
-      input: JSON.stringify({
-        name: 'Failure Classification',
-        head_sha: headSha,
-        status: 'completed',
-        conclusion: shouldRetry ? 'neutral' : 'failure',
-        output: {
-          title: checkTitle,
-          summary: report,
-        },
-      }),
-      maxBuffer: 5 * 1024 * 1024,
-      env: checkEnv,
-    },
-  );
-  console.log(`Created 'Failure Classification' check on ${headSha}`);
-} catch (err) {
-  // Non-fatal: the check is informational. Log and continue.
-  console.warn('Failed to create check run annotation:', err);
+    execFileSync(
+      'gh',
+      ['api', `${repoApi}/check-runs`, '--method', 'POST', '--input', '-'],
+      {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          name: 'Failure Classification',
+          head_sha: headSha,
+          status: 'completed',
+          conclusion: shouldRetry ? 'neutral' : 'failure',
+          output: {
+            title: checkTitle,
+            summary: report,
+          },
+        }),
+        maxBuffer: 5 * 1024 * 1024,
+        env: checkEnv,
+      },
+    );
+    console.log(`Created 'Failure Classification' check on ${headSha}`);
+  } catch (err) {
+    // Non-fatal: the check is informational. Log and continue.
+    console.warn('Failed to create check run annotation:', err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +515,10 @@ if (SENTRY_DSN) {
       }
     }
 
-    const Sentry = await import('@sentry/node');
+    // Use CJS require — ESM import('@sentry/node') breaks on some
+    // workspace installs due to missing ESM export paths.
+    const require = createRequire(import.meta.url);
+    const Sentry = require('@sentry/node') as typeof import('@sentry/node');
     Sentry.init({
       dsn: SENTRY_DSN,
       enableLogs: true,
@@ -567,9 +573,14 @@ if (SENTRY_DSN) {
     } else {
       console.warn('Sentry flush timed out');
     }
-  } catch (err) {
+  } catch (err: unknown) {
     // Non-fatal: Sentry is optional. Fails gracefully when @sentry/node
-    // is not installed (e.g. local CLI usage).
-    console.warn('Failed to send classification log to Sentry:', err);
+    // is not installed or has broken ESM paths (e.g. local CLI usage).
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+      console.warn('Sentry skipped: @sentry/node not available');
+    } else {
+      console.warn('Failed to send classification log to Sentry:', err);
+    }
   }
 }
