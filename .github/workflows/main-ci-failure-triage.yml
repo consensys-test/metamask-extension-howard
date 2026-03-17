@@ -8,29 +8,31 @@
 #   3. Creates a "Main CI Failure Triage" Check Run (CI only)
 #   4. Sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set)
 #
-# Retry is label-gated for all events that have an originating PR:
+# Retry is label-gated for events that have an originating PR:
 #
-#   - pull_request / merge_group:
-#     Retry only when the `retry-ci` label is present on the PR.
-#     For merge_group, the PR number is extracted from the branch name
-#     (gh-readonly-queue/{base}/pr-{N}-{sha}).
+#   - merge_group (attempt 1 only):
+#     Retry when the `retry-ci` label is present on the PR.
+#     Limited to ONE retry because the merge queue only tolerates a
+#     single `gh run rerun`. Attempt 2+ always produce a check.
+#
+#   - pull_request (unlimited):
+#     Retry when the `retry-ci` label is present on the PR.
+#     No rerun limit — each retry requires a fresh label.
 #
 #   - push to main/stable:
 #     Observation only — no retry (no originating PR to label).
 #
 # Reruns call `gh run rerun --failed`, which triggers a new Main
-# completion → workflow_run fires again. Each retry requires a fresh
-# `retry-ci` label (the label is removed before rerunning).
+# completion → workflow_run fires again.
 #
 # Branch protection / merge queue:
 #   The required check is "All jobs pass" (created via Checks API).
 #   For merge_group events, main.yml owns check creation because only
 #   checks from the same workflow run are visible to the merge queue
-#   after a rerun. main.yml checks for the `retry-ci` label and skips
-#   creating the failure check when the label is present, giving this
-#   workflow a window to trigger the rerun. On the next attempt,
-#   main.yml re-evaluates the label. This allows unlimited retries as
-#   long as a human keeps re-adding the label.
+#   after a rerun. On attempt 1, main.yml checks for the `retry-ci`
+#   label and skips creating the failure check when present, giving
+#   this workflow a window to trigger the rerun. On attempt 2+,
+#   main.yml always creates the check (success or failure).
 #   The native job is named "All jobs pass (initiator)" to avoid collision.
 #   "Do not require status checks on creation" must be enabled so that
 #   events where this workflow skips still pass.
@@ -134,16 +136,19 @@ jobs:
             echo "pr-number=" >> "$GITHUB_OUTPUT"
           fi
 
-      # -- Label-gated retry: requires `retry-ci` label on the originating PR --
+      # -- Label-gated retry --
       #
+      # For merge_group: only retry on attempt 1. The merge queue tolerates
+      # exactly one rerun; retrying on attempt 2+ would hang the queue.
       # Both main.yml and triage read the label for merge_group events.
-      # main.yml reads it to decide whether to defer "All jobs pass" check
-      # creation. Triage reads it to decide whether to rerun. Triage
-      # removes the label before rerunning (so the next attempt starts
-      # fresh). No race: triage always fires after main.yml completes.
+      # main.yml reads it to gate check creation; triage reads it to rerun.
+      # Triage removes the label before rerunning.
+      #
+      # For pull_request: retry on any attempt (unlimited). Only triage
+      # reads the label.
       - name: Retry (if retry-ci label)
         id: retry
-        if: ${{ steps.resolve-pr.outputs.pr-number != '' }}
+        if: ${{ steps.resolve-pr.outputs.pr-number != '' && (github.event.workflow_run.event != 'merge_group' || github.event.workflow_run.run_attempt == 1) }}
         run: |
           PR="${{ steps.resolve-pr.outputs.pr-number }}"
 
