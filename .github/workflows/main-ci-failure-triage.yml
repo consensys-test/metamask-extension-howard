@@ -156,12 +156,17 @@ jobs:
       # For merge_group: main.yml defers the "All jobs pass" check to this
       # workflow. Create it as a failure when we did NOT retry, so the merge
       # queue ejects the PR. If we retried, the next attempt will create it.
+      #
+      # TODO: Remove CHECK_RUN_TOKEN usage — fork-only workaround; same as
+      # in classify-failures.mts. On the real repo, GH_TOKEN should work.
       - name: Create 'All jobs pass' failure check (merge queue)
         if: >-
           ${{
             github.event.workflow_run.event == 'merge_group'
             && steps.retry.outputs.retried != 'true'
           }}
+        env:
+          GH_TOKEN: ${{ secrets.CHECK_RUN_TOKEN || github.token }}
         run: |
           jq -n \
             --arg sha "$HEAD_SHA" \
