@@ -22,12 +22,15 @@
 # completion → workflow_run fires again. Each retry requires a fresh
 # `retry-ci` label (the label is removed before rerunning).
 #
-# Branch protection:
+# Branch protection / merge queue:
 #   The required check is "All jobs pass" (created via Checks API).
-#   For merge_group failures, main.yml defers check creation to this
-#   workflow so we can retry before the merge queue sees a failure.
-#   If this workflow retries, the next attempt creates the check.
-#   If not, this workflow creates the failure check.
+#   For merge_group events, main.yml owns check creation because only
+#   checks from the same workflow run are visible to the merge queue
+#   after a rerun. main.yml checks for the `retry-ci` label and skips
+#   creating the failure check when the label is present, giving this
+#   workflow a window to trigger the rerun. On the next attempt,
+#   main.yml re-evaluates the label. This allows unlimited retries as
+#   long as a human keeps re-adding the label.
 #   The native job is named "All jobs pass (initiator)" to avoid collision.
 #   "Do not require status checks on creation" must be enabled so that
 #   events where this workflow skips still pass.
@@ -47,8 +50,8 @@ jobs:
     # Pseudocode:
     #   if run.conclusion != 'failure'        → skip (nothing to classify)
     #   if run.repo != run.head_repo          → skip (fork — no permissions)
-    #   if run.event == 'merge_group'         → run  (label-gated retry via PR)
-    #   if run.event == 'pull_request'        → run  (label-gated retry via PR)
+    #   if run.event == 'merge_group'         → run  (classify + label-gated retry; check gated in main.yml)
+    #   if run.event == 'pull_request'        → run  (classify + label-gated retry via PR)
     #   if run.event == 'push'
     #     and run.branch in ['main','stable'] → run  (observation only — no retry)
     #   else                                  → skip (release/*, workflow_dispatch, etc.)
@@ -132,6 +135,12 @@ jobs:
           fi
 
       # -- Label-gated retry: requires `retry-ci` label on the originating PR --
+      #
+      # Both main.yml and triage read the label for merge_group events.
+      # main.yml reads it to decide whether to defer "All jobs pass" check
+      # creation. Triage reads it to decide whether to rerun. Triage
+      # removes the label before rerunning (so the next attempt starts
+      # fresh). No race: triage always fires after main.yml completes.
       - name: Retry (if retry-ci label)
         id: retry
         if: ${{ steps.resolve-pr.outputs.pr-number != '' }}
@@ -152,29 +161,3 @@ jobs:
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "Rerun triggered."
-
-      # For merge_group: main.yml defers the "All jobs pass" check on attempt 1
-      # so this workflow can retry first. Create the failure check when we did
-      # NOT retry. Uses the same actions/github-script mechanism as main.yml.
-      # - name: Create 'All jobs pass' failure check (merge queue)
-      #   if: >-
-      #     ${{
-      #       github.event.workflow_run.event == 'merge_group'
-      #       && steps.retry.outputs.retried != 'true'
-      #     }}
-      #   uses: actions/github-script@v8
-      #   with:
-      #     script: |
-      #       const result = await github.rest.checks.create({
-      #         owner: context.repo.owner,
-      #         repo: context.repo.repo,
-      #         name: 'All jobs pass',
-      #         head_sha: process.env.HEAD_SHA,
-      #         status: 'completed',
-      #         conclusion: 'failure',
-      #         output: {
-      #           title: 'Some jobs failed',
-      #           summary: `Main workflow failed. [View run](https://github.com/${process.env.REPO}/actions/runs/${process.env.MAIN_RUN_ID}).`,
-      #         },
-      #       });
-      #       core.info(`Created 'All jobs pass' failure check ${result.data.id} on ${process.env.HEAD_SHA}`);
