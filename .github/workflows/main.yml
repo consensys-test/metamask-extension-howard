@@ -723,6 +723,7 @@ jobs:
     timeout-minutes: 2
     permissions:
       checks: write
+      pull-requests: read
     # We list every job we want to validate in `needs`, because `needs` only contains results for jobs explicitly
     # named here. A failing job can cause downstream jobs to be `skipped`, which can hide the true failure unless
     # the upstream job is also included.
@@ -804,12 +805,43 @@ jobs:
 
           echo "All required jobs either passed or were skipped"
 
+      # On merge_group failures, check if the PR has a `retry-ci` label.
+      # If labelled, we skip creating the failure check so the merge queue
+      # keeps waiting while the Main CI Failure Triage workflow triggers a
+      # rerun. The human can re-add the label for unlimited retries.
+      # Only checks from the same workflow run are visible to the merge
+      # queue after a rerun, so main.yml must own check creation.
+      - name: Check for retry-ci label (merge queue)
+        id: check-retry-label
+        if: ${{ failure() && github.event_name == 'merge_group' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ gh-readonly-queue/[^/]+/pr-([0-9]+)- ]]; then
+            PR="${BASH_REMATCH[1]}"
+            echo "Merge queue PR: #$PR"
+          else
+            echo "Could not extract PR number from ref: $GITHUB_REF_NAME"
+            echo "has-retry-label=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LABELS=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | tr '\n' ',')
+          if [[ "$LABELS" == *"retry-ci"* ]]; then
+            echo "retry-ci label found on PR #$PR — deferring check creation for retry."
+            echo "has-retry-label=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No retry-ci label on PR #$PR — will create failure check."
+            echo "has-retry-label=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Create the required "All jobs pass" check via Checks API.
-      # On merge_group failures, skip — the Main CI Failure Triage workflow
-      # will create this check after deciding whether to retry. This gives
-      # a window for label-gated retry before the merge queue sees a failure.
+      # Skipped when: failure + merge_group + retry-ci label present.
+      # In that case the Main CI Failure Triage workflow will trigger a
+      # rerun (gh run rerun --failed), and this job will run again on the
+      # next attempt, re-evaluating the label.
       - name: Create 'All jobs pass' check
-        if: ${{ !failure() || github.event_name != 'merge_group' || github.run_attempt > 1 }}
+        if: ${{ !failure() || github.event_name != 'merge_group' || steps.check-retry-label.outputs.has-retry-label != 'true' }}
         uses: actions/github-script@v8
         env:
           CHECK_CONCLUSION: ${{ job.status }}
