@@ -831,10 +831,6 @@ jobs:
           NEEDS_JSON: ${{ toJson(needs) }} # This is required for the the job_result lookup and the job_id loop
           BUILDS_FROM_RUN: ${{ needs.get-requirements.outputs.builds-from-run }}
         run: |
-          if (( ${{ github.run_attempt }} < 5 )) && [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            exit 1
-          fi
-
           # Function to ensure a job's result is either 'success' or 'skipped'
           requireJobSuccessOrSkipped() {
             local job_id="$1"
@@ -873,7 +869,7 @@ jobs:
       # will create this check after deciding whether to retry. This gives
       # a window for label-gated retry before the merge queue sees a failure.
       - name: Create 'All jobs pass' check
-        if: ${{ !(failure() && github.event_name == 'merge_group') }}
+        if: ${{ !failure() || github.event_name != 'merge_group' || github.run_attempt > 1 }}
         uses: actions/github-script@v8
         env:
           CHECK_CONCLUSION: ${{ job.status }}
