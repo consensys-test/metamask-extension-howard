@@ -92,6 +92,8 @@ jobs:
       SENTRY_DSN_PERFORMANCE: ${{ vars.SENTRY_DSN_PERFORMANCE }}
       WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
     steps:
+      - run: echo "Classifying failure for event '${WORKFLOW_EVENT}' (attempt ${RUN_ATTEMPT}) on branch '${HEAD_BRANCH}' (${HEAD_SHA})"
+
       - name: Checkout .github/ directory
         uses: actions/checkout@v6
         with:
@@ -148,7 +150,7 @@ jobs:
       # reads the label.
       - name: Retry (if retry-ci label)
         id: retry
-        if: ${{ steps.resolve-pr.outputs.pr-number != '' && (github.event.workflow_run.event != 'merge_group' || github.event.workflow_run.run_attempt == 1) }}
+        if: ${{ steps.resolve-pr.outputs.pr-number != '' && (github.event.workflow_run.event != 'merge_group' || env.RUN_ATTEMPT < 4) }}
         run: |
           PR="${{ steps.resolve-pr.outputs.pr-number }}"
 
