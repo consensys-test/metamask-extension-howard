@@ -53,6 +53,11 @@ jobs:
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false'}}
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false'}}
     steps:
+      - run: |
+          if (( ${{ github.run_attempt }} < 5 )) && [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "502 Bad Gateway"; exit 1
+          fi
+
       - name: Check pull request merge queue status
         id: check-skip-merge-queue
         if: ${{ env.EVENT_NAME == 'merge_group' }}
