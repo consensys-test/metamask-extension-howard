@@ -5,7 +5,7 @@
     // Jobs not matching any pattern use this category. Unmatched jobs trigger
     // a warning in the report and a ci.retry.unmatchedJobCount Sentry
     // attribute — add explicit patterns to avoid this.
-    "unmatchedCategory": "alwaysRetryable"
+    "unmatchedCategory": "retryableOnTransientError"
   },
 
   // Blockers (blockerPatterns) control cascade logic — if one fails
@@ -56,7 +56,10 @@
       "transientErrorPatterns": ["Exceeded timeout of \\d+ ms for a test"]
     },
 
-    // Optional jobs that do not need retry.
+    // Optional jobs — their failure does not influence the retry decision.
+    // Includes "All jobs pass (initiator)" which is the gateway job in main.yml;
+    // it always fails when any upstream job fails, so classifying it separately
+    // would double-count every failure.
     "optional": {
       "patterns": ["^All jobs pass", "^dapp-page-load", "^run-benchmarks"]
     }
