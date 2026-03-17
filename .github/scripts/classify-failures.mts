@@ -23,7 +23,8 @@
  *   GITHUB_STEP_SUMMARY      — Path to GitHub Actions step summary file
  *   HEAD_SHA                 — Commit SHA of the triggering run
  *   HEAD_BRANCH              — Branch name of the triggering run
- *   PR_NUMBER                — PR number (from workflow_run.pull_requests[0])
+ *   PR_NUMBER_FROM_EVENT      — PR number (from workflow_run.pull_requests[0];
+ *                               empty for merge_group/push events)
  *   RUN_ATTEMPT              — Attempt number of the triggering run
  *   VERSION                  — Extension version (from package.json via curl)
  *   WORKFLOW_EVENT           — Triggering event type (e.g. merge_group, push)
@@ -135,7 +136,11 @@ const repoApi = `/repos/${owner}/${repo}`;
 // Config
 // ---------------------------------------------------------------------------
 
-/** Strip // comments and trailing commas from JSONC for JSON.parse(). */
+/**
+ * Strip full-line // comments and trailing commas from JSONC for JSON.parse().
+ * This is a lightweight approach that does NOT handle // inside string values.
+ * Safe for our config file which has no URLs or // in values.
+ */
 function stripJsonComments(jsonc: string): string {
   return jsonc
     .split('\n')
@@ -184,10 +189,12 @@ const blockerRegexes = config.blockerPatterns.map((p) => new RegExp(p, 'i'));
 const ghEnv = { ...process.env, GH_TOKEN: GITHUB_TOKEN };
 
 /** GET a GitHub REST API endpoint via `gh api`. Returns the response body as a string. */
-function ghApi(path: string): string {
-  return execFileSync('gh', ['api', path], {
+function ghApi(path: string, opts?: { paginate?: boolean }): string {
+  const args = ['api', path];
+  if (opts?.paginate) args.push('--paginate');
+  return execFileSync('gh', args, {
     encoding: 'utf8',
-    maxBuffer: 5 * 1024 * 1024,
+    maxBuffer: 10 * 1024 * 1024,
     env: ghEnv,
   });
 }
@@ -212,7 +219,7 @@ function getFailedJobs(): Job[] {
   const jobsPath = ATTEMPT
     ? `${repoApi}/actions/runs/${MAIN_RUN_ID}/attempts/${ATTEMPT}/jobs?per_page=100`
     : `${repoApi}/actions/runs/${MAIN_RUN_ID}/jobs?per_page=100`;
-  const response = JSON.parse(ghApi(jobsPath));
+  const response = JSON.parse(ghApi(jobsPath, { paginate: true }));
   return (response.jobs as Job[]).filter((j) => j.conclusion === 'failure');
 }
 
@@ -541,8 +548,9 @@ if (process.env.CI === 'true') {
 // Send structured log to Sentry
 // ---------------------------------------------------------------------------
 
-// PR_NUMBER is set by the workflow from workflow_run.pull_requests[0].number.
-const prNumber = process.env.PR_NUMBER ?? '';
+// PR_NUMBER_FROM_EVENT is set by the workflow from workflow_run.pull_requests[0].number.
+// Only populated for pull_request events; see the "Resolve PR number" step for merge_group.
+const prNumber = process.env.PR_NUMBER_FROM_EVENT ?? '';
 
 const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 

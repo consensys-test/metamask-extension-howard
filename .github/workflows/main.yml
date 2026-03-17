@@ -873,7 +873,7 @@ jobs:
       # will create this check after deciding whether to retry. This gives
       # a window for label-gated retry before the merge queue sees a failure.
       - name: Create 'All jobs pass' check
-        if: ${{ !failure() || github.event_name != 'merge_group' }}
+        if: ${{ !(failure() && github.event_name == 'merge_group') }}
         uses: actions/github-script@v8
         env:
           CHECK_CONCLUSION: ${{ job.status }}
