@@ -8,19 +8,26 @@
 #   3. Creates a "Main CI Failure Triage" Check Run (CI only)
 #   4. Sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set)
 #
-# Then applies the appropriate retry mode:
+# Retry is label-gated for all events that have an originating PR:
 #
-#   - merge_group / push-to-main/stable (attempt < 3):
-#     Auto-retry if all failures are retryable.
+#   - pull_request / merge_group:
+#     Retry only when the `retry-ci` label is present on the PR.
+#     For merge_group, the PR number is extracted from the branch name
+#     (gh-readonly-queue/{base}/pr-{N}-{sha}).
 #
-#   - pull_request:
-#     Retry only when the `retry-ci` label is present (removes it first).
+#   - push to main/stable:
+#     Observation only — no retry (no originating PR to label).
 #
 # Reruns call `gh run rerun --failed`, which triggers a new Main
-# completion → workflow_run fires again.
+# completion → workflow_run fires again. Each retry requires a fresh
+# `retry-ci` label (the label is removed before rerunning).
 #
 # Branch protection:
-#   The required check is "All jobs pass" (created via Checks API in main.yml).
+#   The required check is "All jobs pass" (created via Checks API).
+#   For merge_group failures, main.yml defers check creation to this
+#   workflow so we can retry before the merge queue sees a failure.
+#   If this workflow retries, the next attempt creates the check.
+#   If not, this workflow creates the failure check.
 #   The native job is named "All jobs pass (initiator)" to avoid collision.
 #   "Do not require status checks on creation" must be enabled so that
 #   events where this workflow skips still pass.
@@ -35,20 +42,16 @@ on:
 jobs:
   classify-and-retry:
     name: Classify & retry
-    # Gate: only spin up a runner for events that have retry logic.
+    # Gate: only spin up a runner for events worth classifying.
     #
     # Pseudocode:
-    #   if run.conclusion != 'failure'        → skip (nothing to retry)
+    #   if run.conclusion != 'failure'        → skip (nothing to classify)
     #   if run.repo != run.head_repo          → skip (fork — no permissions)
-    #   if run.event == 'merge_group'         → run  (auto-retry path)
-    #   if run.event == 'pull_request'        → run  (label-gated retry path)
+    #   if run.event == 'merge_group'         → run  (label-gated retry via PR)
+    #   if run.event == 'pull_request'        → run  (label-gated retry via PR)
     #   if run.event == 'push'
-    #     and run.branch in ['main','stable'] → run  (auto-retry path)
+    #     and run.branch in ['main','stable'] → run  (observation only — no retry)
     #   else                                  → skip (release/*, workflow_dispatch, etc.)
-    #
-    # The attempt cap (< 3) and should-retry check live in the auto-retry
-    # *step* condition, not here, so classification still runs on attempt 3+
-    # for reporting/Sentry even when we won't auto-retry.
     if: >-
       ${{
         github.event.workflow_run.conclusion == 'failure' &&
@@ -111,43 +114,64 @@ jobs:
         id: classify
         run: node .github/scripts/classify-failures.mts
 
-      # -- Auto-retry: merge_group and push-to-main/stable --
-      # The attempt cap (< 3) must stay in sync with the `run_attempt > 2`
-      # threshold in all-jobs-pass's check creation condition in main.yml.
-      - name: Auto-retry (merge queue & push)
-        if: >-
-          ${{
-            steps.classify.outputs.should-retry == 'true' &&
-            github.event.workflow_run.run_attempt < 3 &&
-            (
-              github.event.workflow_run.event == 'merge_group'
-              || (github.event.workflow_run.event == 'push'
-                  && contains(fromJson('["main","stable"]'), github.event.workflow_run.head_branch))
-            )
-          }}
+      # Resolve the originating PR number so the retry step can check
+      # for the retry-ci label. For push events there is no PR.
+      - name: Resolve PR number
+        id: resolve-pr
         run: |
-          echo "Classification: retryable. Rerunning failed jobs..."
-          gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
-          echo "Rerun triggered."
-
-      # -- Label-gated retry: pull requests with retry-ci label --
-      - name: Retry PR (retry-ci label)
-        if: ${{ github.event.workflow_run.event == 'pull_request' }}
-        run: |
-          if [[ -z "$PR_NUMBER" || "$PR_NUMBER" == "null" ]]; then
-            echo "PR_NUMBER not set. Skipping."
-            exit 0
+          if [[ "$WORKFLOW_EVENT" == "pull_request" ]]; then
+            echo "pr-number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          elif [[ "$WORKFLOW_EVENT" == "merge_group" && "$HEAD_BRANCH" =~ gh-readonly-queue/[^/]+/pr-([0-9]+)- ]]; then
+            echo "pr-number=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "No originating PR for event '$WORKFLOW_EVENT'. Retry not available."
+            echo "pr-number=" >> "$GITHUB_OUTPUT"
           fi
 
-          CURRENT_LABELS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name' | tr '\n' ',')
+      # -- Label-gated retry: requires `retry-ci` label on the originating PR --
+      - name: Retry (if retry-ci label)
+        id: retry
+        if: ${{ steps.resolve-pr.outputs.pr-number != '' }}
+        run: |
+          PR="${{ steps.resolve-pr.outputs.pr-number }}"
+
+          CURRENT_LABELS=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '.labels[].name' | tr '\n' ',')
           if [[ "${CURRENT_LABELS}" != *"retry-ci"* ]]; then
-            echo "No retry-ci label on PR #$PR_NUMBER. Skipping."
+            echo "No retry-ci label on PR #$PR. Skipping."
+            echo "retried=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "Found retry-ci label on PR #$PR_NUMBER. Removing label..."
-          gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "retry-ci"
+          echo "Found retry-ci label on PR #$PR. Removing label..."
+          gh pr edit "$PR" --repo "$REPO" --remove-label "retry-ci"
 
           echo "Rerunning failed jobs..."
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
+          echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "Rerun triggered."
+
+      # For merge_group: main.yml defers the "All jobs pass" check to this
+      # workflow. Create it as a failure when we did NOT retry, so the merge
+      # queue ejects the PR. If we retried, the next attempt will create it.
+      - name: Create 'All jobs pass' failure check (merge queue)
+        if: >-
+          ${{
+            github.event.workflow_run.event == 'merge_group'
+            && steps.retry.outputs.retried != 'true'
+          }}
+        run: |
+          jq -n \
+            --arg sha "$HEAD_SHA" \
+            --arg repo "$REPO" \
+            --arg run_id "$MAIN_RUN_ID" \
+            '{
+              name: "All jobs pass",
+              head_sha: $sha,
+              status: "completed",
+              conclusion: "failure",
+              output: {
+                title: "Some jobs failed",
+                summary: "Main workflow failed. [View run](https://github.com/\($repo)/actions/runs/\($run_id))."
+              }
+            }' | gh api "/repos/${REPO}/check-runs" --method POST --input -
+          echo "Created 'All jobs pass' failure check on ${HEAD_SHA}"

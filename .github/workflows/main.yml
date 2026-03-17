@@ -773,7 +773,7 @@ jobs:
 
           echo "Regression validation triggered successfully"
 
-  all-jobs-pass:
+  all-jobs-pass-initiator:
     name: All jobs pass (initiator)
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -869,12 +869,11 @@ jobs:
           echo "All required jobs either passed or were skipped"
 
       # Create the required "All jobs pass" check via Checks API.
-      # On merge_group failures within the retry window, skip — the Main
-      # Completed workflow will rerun failed jobs and a later attempt's
-      # all-jobs-pass will create the check. Once retries are exhausted
-      # (attempt > MAX_RETRIES), always create the check regardless of outcome.
+      # On merge_group failures, skip — the Main CI Failure Triage workflow
+      # will create this check after deciding whether to retry. This gives
+      # a window for label-gated retry before the merge queue sees a failure.
       - name: Create 'All jobs pass' check
-        if: ${{ !failure() || github.event_name != 'merge_group' || github.run_attempt > 2 }}
+        if: ${{ !failure() || github.event_name != 'merge_group' }}
         uses: actions/github-script@v8
         env:
           CHECK_CONCLUSION: ${{ job.status }}
@@ -903,12 +902,3 @@ jobs:
           google-service-account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
           spreadsheet-id: ${{ secrets.GOOGLE_MERGE_QUEUE_SPREADSHEET_ID }}
           sheet-name: ${{ secrets.GOOGLE_MERGE_QUEUE_SHEET_NAME }}
-
-  publish-release:
-    name: Publish release
-    if: ${{ !cancelled() && needs.all-jobs-pass.result == 'success' && github.event_name == 'push' && github.ref_name == 'stable' && needs.get-requirements.outputs.needs-releases == 'true' }}
-    needs:
-      - get-requirements
-      - all-jobs-pass
-    uses: ./.github/workflows/publish-release.yml
-    secrets: inherit
