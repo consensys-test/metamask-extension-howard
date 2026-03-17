@@ -489,6 +489,9 @@ console.log('\n' + report);
 
 // ---------------------------------------------------------------------------
 // Create Check Run on the triggering commit
+//
+// TODO: This is untestable in a fork repo, and we won't really know if this works
+// until we merge it and see it run in the real repo.
 // ---------------------------------------------------------------------------
 
 if (process.env.CI === 'true') {
