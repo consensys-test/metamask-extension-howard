@@ -805,16 +805,15 @@ jobs:
 
           echo "All required jobs either passed or were skipped"
 
-      # On merge_group attempt 1 failures, check if the PR has a `retry-ci`
-      # label. If labelled, we skip creating the failure check so the merge
-      # queue keeps waiting while the triage workflow triggers a rerun.
-      # On attempt 2+, always create the check — the merge queue only
-      # tolerates one rerun, so further deferral would cause it to hang.
+      # On merge_group failures, check if the PR has a `retry-ci` label.
+      # If labelled, we skip creating the failure check so the merge queue
+      # keeps waiting while the Main CI Failure Triage workflow triggers a
+      # rerun. The human can re-add the label for unlimited retries.
       # Only checks from the same workflow run are visible to the merge
       # queue after a rerun, so main.yml must own check creation.
       - name: Check for retry-ci label (merge queue)
         id: check-retry-label
-        if: ${{ failure() && github.event_name == 'merge_group' && github.run_attempt < 4 }}
+        if: ${{ failure() && github.event_name == 'merge_group' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -837,11 +836,10 @@ jobs:
           fi
 
       # Create the required "All jobs pass" check via Checks API.
-      # Skipped only when: failure + merge_group + attempt 1 + retry-ci label.
-      # In that case the triage workflow will trigger a single rerun, and
-      # this job will run again on attempt 2, always creating the check.
-      # The merge queue tolerates exactly one rerun; attempt 2+ must
-      # always produce a check (success or failure) to avoid hanging.
+      # Skipped when: failure + merge_group + retry-ci label present.
+      # In that case the Main CI Failure Triage workflow will trigger a
+      # rerun (gh run rerun --failed), and this job will run again on the
+      # next attempt, re-evaluating the label.
       - name: Create 'All jobs pass' check
         if: ${{ !failure() || github.event_name != 'merge_group' || steps.check-retry-label.outputs.has-retry-label != 'true' }}
         uses: actions/github-script@v8
