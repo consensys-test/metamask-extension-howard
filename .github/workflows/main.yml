@@ -722,6 +722,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
+      pull-requests: read
       statuses: write
     # We list every job we want to validate in `needs`, because `needs` only contains results for jobs explicitly
     # named here. A failing job can cause downstream jobs to be `skipped`, which can hide the true failure unless
@@ -792,10 +793,39 @@ jobs:
 
           echo "result=$( [[ "$all_passed" == "true" ]] && echo success || echo failure )" >> "$GITHUB_OUTPUT"
 
+      # On merge_group attempt 1, if the retry-ci label is present on the
+      # originating PR, skip posting the commit status so the required
+      # "All jobs pass" check stays pending while triage retries the run.
+      # ALLGREEN would eject on suite failure, but the pending required
+      # check prevents ejection until the status is posted.
+      - name: Check retry-ci label (merge queue only)
+        id: retry-gate
+        if: >-
+          ${{
+            github.event_name == 'merge_group'
+            && steps.check.outputs.result == 'failure'
+            && github.run_attempt < 2
+          }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$BRANCH" =~ gh-readonly-queue/[^/]+/pr-([0-9]+)- ]]; then
+            PR="${BASH_REMATCH[1]}"
+            LABELS=$(gh pr view "$PR" --repo "${{ github.repository }}" --json labels --jq '.labels[].name' | tr '\n' ',')
+            if [[ "$LABELS" == *"retry-ci"* ]]; then
+              echo "PR #$PR has retry-ci label — deferring commit status for triage retry"
+              echo "skip-status=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "PR #$PR does not have retry-ci label"
+          fi
+          echo "skip-status=false" >> "$GITHUB_OUTPUT"
+
       # Post a commit status (not a check run) named "All jobs pass".
       # Commit statuses are independent of check suites, so they are immune
       # to the suite-assignment race that can affect checks.create().
       - name: Post commit status
+        if: ${{ steps.retry-gate.outputs.skip-status != 'true' }}
         uses: actions/github-script@v7
         env:
           STATUS_STATE: ${{ steps.check.outputs.result }}
