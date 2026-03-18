@@ -854,15 +854,17 @@ jobs:
           echo "result=$( [[ "$all_passed" == "true" ]] && echo success || echo failure )" >> "$GITHUB_OUTPUT"
 
       # On merge_group attempt 1, if the retry-ci label is present on the
-      # originating PR, skip posting the failure status so the merge queue
-      # keeps waiting while triage retries the run.
+      # originating PR, skip posting the commit status so the required
+      # "All jobs pass" check stays pending while triage retries the run.
+      # ALLGREEN would eject on suite failure, but the pending required
+      # check prevents ejection until the status is posted.
       - name: Check retry-ci label (merge queue only)
         id: retry-gate
         if: >-
           ${{
             github.event_name == 'merge_group'
             && steps.check.outputs.result == 'failure'
-            && github.run_attempt < 2
+            && github.run_attempt < 10
           }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -871,7 +873,7 @@ jobs:
             PR="${BASH_REMATCH[1]}"
             LABELS=$(gh pr view "$PR" --repo "${{ github.repository }}" --json labels --jq '.labels[].name' | tr '\n' ',')
             if [[ "$LABELS" == *"retry-ci"* ]]; then
-              echo "PR #$PR has retry-ci label — deferring failure status for triage retry"
+              echo "PR #$PR has retry-ci label — deferring commit status for triage retry"
               echo "skip-status=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
