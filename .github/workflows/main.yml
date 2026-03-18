@@ -722,7 +722,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
-      checks: write
       pull-requests: read
     # We list every job we want to validate in `needs`, because `needs` only contains results for jobs explicitly
     # named here. A failing job can cause downstream jobs to be `skipped`, which can hide the true failure unless
@@ -804,73 +803,6 @@ jobs:
           fi
 
           echo "All required jobs either passed or were skipped"
-
-      # Publish the required "All jobs pass" check.
-      #
-      # Strategy: rename the native "All jobs pass (initiator)" check run
-      # to "All jobs pass" via checks.update().  Because the native check
-      # already lives in Main's own check-suite, the merge queue always
-      # sees it — avoiding the suite-assignment race that checks.create()
-      # is subject to.
-      #
-      # On merge_group failures this step is SKIPPED: the triage workflow
-      # (main-ci-failure-triage.yml) owns the failure path so it can
-      # retry first, then publish the failure check itself.
-      - name: Publish 'All jobs pass' check
-        if: ${{ !failure() || github.event_name != 'merge_group' }}
-        uses: actions/github-script@v8
-        env:
-          CHECK_CONCLUSION: ${{ job.status }}
-        with:
-          script: |
-            const conclusion = process.env.CHECK_CONCLUSION;
-
-            // Find the native check run for this job in Main's own suite.
-            const run = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            const suiteId = run.data.check_suite_id;
-
-            const checks = await github.rest.checks.listForSuite({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              check_suite_id: suiteId,
-              check_name: 'All jobs pass (initiator)',
-            });
-
-            if (checks.data.total_count > 0) {
-              const checkRunId = checks.data.check_runs[0].id;
-              await github.rest.checks.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                check_run_id: checkRunId,
-                name: 'All jobs pass',
-                status: 'completed',
-                conclusion,
-                output: {
-                  title: conclusion === 'success' ? 'All jobs passed' : 'Some jobs failed',
-                  summary: `Main workflow ${conclusion}. [View run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`,
-                },
-              });
-              core.info(`Updated native check ${checkRunId} → 'All jobs pass': ${conclusion}`);
-            } else {
-              // Fallback: create check if native run not found (shouldn't happen).
-              const result = await github.rest.checks.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name: 'All jobs pass',
-                head_sha: context.sha,
-                status: 'completed',
-                conclusion,
-                output: {
-                  title: conclusion === 'success' ? 'All jobs passed' : 'Some jobs failed',
-                  summary: `Main workflow ${conclusion} (fallback). [View run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`,
-                },
-              });
-              core.warning(`Native check not found; created fallback check ${result.data.id}`);
-            }
 
       - name: Log merge group failure
         if: ${{ github.event_name == 'merge_group' && failure() && !github.event.repository.fork }}
