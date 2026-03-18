@@ -147,5 +147,3 @@ jobs:
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "Rerun triggered."
-
-
