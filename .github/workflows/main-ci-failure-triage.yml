@@ -151,3 +151,66 @@ jobs:
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "Rerun triggered."
+
+      # For merge_group failures: publish the "All jobs pass" failure check
+      # when we did NOT retry. Uses checks.update() to rename the native
+      # "All jobs pass (initiator)" check run (which lives in the Main
+      # workflow's check suite) to "All jobs pass". This avoids the
+      # checks.create() suite race condition — the check stays in the
+      # correct merge_group-triggered suite, visible to the merge queue.
+      - name: Publish 'All jobs pass' failure check (merge queue)
+        if: ${{ github.event.workflow_run.event == 'merge_group' && steps.retry.outputs.retried != 'true' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Get the Main workflow run's check suite ID.
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(process.env.MAIN_RUN_ID),
+            });
+            const suiteId = run.data.check_suite_id;
+            const headSha = process.env.HEAD_SHA;
+
+            // Find the native "All jobs pass (initiator)" check in that suite.
+            const checks = await github.rest.checks.listForSuite({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_suite_id: suiteId,
+              check_name: 'All jobs pass (initiator)',
+            });
+
+            const nativeCheck = checks.data.check_runs[0];
+            if (!nativeCheck) {
+              core.warning('Could not find native check — falling back to checks.create()');
+              const result = await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'All jobs pass',
+                head_sha: headSha,
+                status: 'completed',
+                conclusion: 'failure',
+                output: {
+                  title: 'Some jobs failed',
+                  summary: `Main workflow failed. [View run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.MAIN_RUN_ID}).`,
+                },
+              });
+              core.info(`Created 'All jobs pass' failure check ${result.data.id} on ${headSha}`);
+              return;
+            }
+
+            // Rename the native check to "All jobs pass" with failure.
+            const result = await github.rest.checks.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_run_id: nativeCheck.id,
+              name: 'All jobs pass',
+              status: 'completed',
+              conclusion: 'failure',
+              completed_at: new Date().toISOString(),
+              output: {
+                title: 'Some jobs failed',
+                summary: `Main workflow failed. [View run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.MAIN_RUN_ID}).`,
+              },
+            });
+            core.info(`Updated check ${result.data.id}: 'All jobs pass (initiator)' → 'All jobs pass' (failure)`);
