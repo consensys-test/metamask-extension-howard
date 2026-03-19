@@ -20,14 +20,25 @@
 # Reruns call `gh run rerun --failed`, which triggers a new Main
 # completion → workflow_run fires again.
 #
-# Merge queue (ALLGREEN merging strategy):
-#   The merge queue uses the ALLGREEN strategy ("Require all queue
-#   entries to pass required checks" in the repository ruleset),
-#   which monitors all check suites natively.
-#   When triage retries, `gh run rerun --failed` resets the Main
-#   workflow's check suite to in_progress, so the merge queue keeps
-#   waiting. If retry succeeds, suites pass and the PR merges.
-#   If retry fails (or no retry), suites fail and the PR is ejected.
+# Merge queue interaction:
+#   The merge queue has two rules (configured in the repository ruleset):
+#
+#   1. "Require merge queue" > "Require all queue entries to pass
+#      required checks" (ALLGREEN) — monitors check suites directly.
+#      When Main's suite fails, this rule wants to eject immediately.
+#
+#   2. "Require status checks to pass" > "All jobs pass" — monitors
+#      the commit status posted by ci-status-gate in main.yml.
+#
+#   Both must agree before the queue merges or ejects. ci-status-gate
+#   exploits this: on early merge_group failures, it skips posting
+#   the commit status when retry-ci is present, keeping rule 2 pending.
+#   This blocks rule 1 from ejecting, giving triage time to retry.
+#
+#   When triage calls `gh run rerun --failed`, it resets Main's check
+#   suite to in_progress and triggers a new attempt. On the final
+#   attempt (no retry-ci label), ci-status-gate posts the commit
+#   status, unblocking the queue to merge or eject.
 
 name: Main CI Failure Triage
 

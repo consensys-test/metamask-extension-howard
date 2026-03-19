@@ -853,14 +853,40 @@ jobs:
 
           echo "result=$( [[ "$all_passed" == "true" ]] && echo success || echo failure )" >> "$GITHUB_OUTPUT"
 
-      # On merge_group attempt 1, if the retry-ci label is present on the
-      # originating PR, skip posting the commit status so the required
-      # "All jobs pass" check stays pending while triage retries the run.
-      # The merge queue's ALLGREEN merging strategy ("Require all queue
-      # entries to pass required checks" in the repository ruleset) would
-      # normally eject on suite failure, but the pending required status
-      # check ("Require status checks to pass" > "All jobs pass") prevents
-      # ejection until the commit status is posted.
+      # ── Retry gate (merge queue only) ──────────────────────────────
+      #
+      # When a merge_group run fails, we want the triage workflow
+      # (main-ci-failure-triage.yml) to have a chance to classify the
+      # failure and retry before the merge queue ejects the PR.
+      #
+      # Problem: the merge queue has TWO independent rules that can
+      # trigger ejection, and one of them is very fast:
+      #
+      #   1. "Require merge queue" with "Require all queue entries to
+      #      pass required checks" (ALLGREEN) — monitors check suites
+      #      directly. When Main's suite completes with failure, this
+      #      rule wants to eject *immediately*.
+      #
+      #   2. "Require status checks to pass" with "All jobs pass" —
+      #      monitors the commit status posted by this job.
+      #
+      # Both rules must be satisfied before the queue can merge or
+      # eject. We exploit this: if we *skip posting the commit status*
+      # on early attempts, rule 2 stays pending, which blocks rule 1
+      # from ejecting — even though the suite already failed.
+      #
+      # Timeline of a merge_group retry:
+      #   1. Main attempt 1 fails → suite completes with failure
+      #   2. This step sees retry-ci label → skips commit status
+      #   3. ALLGREEN wants to eject, but "All jobs pass" is pending → blocked
+      #   4. Triage fires (workflow_run completed) → calls gh run rerun
+      #   5. Main attempt 2 starts → suite resets to in_progress
+      #   6. If attempt 2 passes → commit status posted as success → merge
+      #      If attempt 2 fails without retry-ci → commit status posted as failure → eject
+      #
+      # The retry-ci label is removed by triage after each retry, so
+      # the user must re-add it to authorize additional retries.
+      # ────────────────────────────────────────────────────────────────
       - name: Check retry-ci label (merge queue only)
         id: retry-gate
         if: >-
@@ -884,9 +910,14 @@ jobs:
           fi
           echo "skip-status=false" >> "$GITHUB_OUTPUT"
 
-      # Post a commit status (not a check run) named "All jobs pass".
-      # Commit statuses are independent of check suites, so they are immune
-      # to the suite-assignment race that can affect checks.create().
+      # Post a commit status named "All jobs pass".
+      #
+      # Why a commit status instead of a check run?
+      # The Checks API (checks.create) assigns new check runs to a
+      # non-deterministic check suite. On merge_group branches, multiple
+      # suites exist (one per triggered workflow), and the check can land
+      # in the wrong suite — one the merge queue doesn't monitor. Commit
+      # statuses have no suites, so they always work reliably.
       - name: Post commit status
         if: ${{ steps.retry-gate.outputs.skip-status != 'true' }}
         uses: actions/github-script@v7
