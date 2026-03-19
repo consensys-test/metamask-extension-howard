@@ -124,38 +124,18 @@ jobs:
         id: classify
         run: node .github/scripts/classify-failures.mts
 
-      # Resolve the originating PR number so the retry step can check
-      # for the retry-ci label. For push events there is no PR.
-      - name: Resolve PR number
-        id: resolve-pr
-        run: |
-          if [[ "$WORKFLOW_EVENT" == "pull_request" ]]; then
-            echo "pr-number=${PR_NUMBER_FROM_EVENT}" >> "$GITHUB_OUTPUT"
-          elif [[ "$WORKFLOW_EVENT" == "merge_group" && "$HEAD_BRANCH" =~ gh-readonly-queue/[^/]+/pr-([0-9]+)- ]]; then
-            echo "pr-number=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
-          else
-            echo "No originating PR for event '$WORKFLOW_EVENT'. Retry not available."
-            echo "pr-number=" >> "$GITHUB_OUTPUT"
-          fi
-
       # -- Label-gated retry: requires `retry-ci` label on the originating PR --
+      # The classify step already checked for the label and outputs will-retry,
+      # has-retry-label, and pr-number. This step just acts on those outputs.
       - name: Retry (if retry-ci label)
         id: retry
-        if: ${{ steps.resolve-pr.outputs.pr-number != '' }}
+        if: ${{ steps.classify.outputs.will-retry == 'true' }}
         run: |
-          PR="${{ steps.resolve-pr.outputs.pr-number }}"
+          PR="${{ steps.classify.outputs.pr-number }}"
 
-          CURRENT_LABELS=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '.labels[].name' | tr '\n' ',')
-          if [[ "${CURRENT_LABELS}" != *"retry-ci"* ]]; then
-            echo "No retry-ci label on PR #$PR. Skipping."
-            echo "retried=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Found retry-ci label on PR #$PR. Removing label..."
+          echo "Removing retry-ci label from PR #$PR..."
           gh pr edit "$PR" --repo "$REPO" --remove-label "retry-ci"
 
           echo "Rerunning failed jobs..."
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"
-          echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "Rerun triggered."

@@ -33,7 +33,10 @@
  *   SENTRY_DSN_PERFORMANCE   — Sentry DSN; enables structured log delivery
  *
  * Outputs (to $GITHUB_OUTPUT):
- *   should-retry=true|false
+ *   is-retryable=true|false    — whether all failures are retryable
+ *   has-retry-label=true|false — whether the originating PR has retry-ci
+ *   will-retry=true|false      — is-retryable AND has-retry-label
+ *   pr-number=<N>|""           — originating PR number (empty for push)
  *
  * Also writes a markdown report to $GITHUB_STEP_SUMMARY and optionally:
  *   - Creates a "Main CI Failure Triage" Check Run (when CI=true)
@@ -119,6 +122,9 @@ const GITHUB_TOKEN = getGitHubToken();
 const MAIN_RUN_ID = positionals[0] || process.env.MAIN_RUN_ID || '';
 const REPO = flags.repo || process.env.REPO || 'MetaMask/metamask-extension';
 const ATTEMPT = flags.attempt || process.env.RUN_ATTEMPT || '';
+const WORKFLOW_EVENT = process.env.WORKFLOW_EVENT ?? '';
+const HEAD_BRANCH = process.env.HEAD_BRANCH ?? '';
+const PR_NUMBER_FROM_EVENT = process.env.PR_NUMBER_FROM_EVENT ?? '';
 const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT ?? '';
 const GITHUB_STEP_SUMMARY = process.env.GITHUB_STEP_SUMMARY ?? '';
 
@@ -188,24 +194,26 @@ const blockerRegexes = config.blockerPatterns.map((p) => new RegExp(p, 'i'));
 
 const ghEnv = { ...process.env, GH_TOKEN: GITHUB_TOKEN };
 
-/** GET a GitHub REST API endpoint via `gh api`. Returns the response body as a string. */
-function ghApi(path: string, opts?: { paginate?: boolean }): string {
+/** Call a GitHub REST API endpoint via `gh api`. Supports optional POST body and token override. */
+function ghApi(
+  path: string,
+  opts?: {
+    paginate?: boolean;
+    method?: string;
+    body?: Record<string, unknown>;
+    token?: string;
+  },
+): string {
   const args = ['api', path];
   if (opts?.paginate) args.push('--paginate');
+  if (opts?.method) args.push('--method', opts.method);
+  if (opts?.body) args.push('--input', '-');
+  const env = opts?.token ? { ...process.env, GH_TOKEN: opts.token } : ghEnv;
   return execFileSync('gh', args, {
     encoding: 'utf8',
+    ...(opts?.body ? { input: JSON.stringify(opts.body) } : {}),
     maxBuffer: 10 * 1024 * 1024,
-    env: ghEnv,
-  });
-}
-
-/** POST to a GitHub REST API endpoint via `gh api`. */
-function ghApiPost(path: string, body: Record<string, unknown>): string {
-  return execFileSync('gh', ['api', path, '--method', 'POST', '--input', '-'], {
-    encoding: 'utf8',
-    input: JSON.stringify(body),
-    maxBuffer: 5 * 1024 * 1024,
-    env: ghEnv,
+    env,
   });
 }
 
@@ -369,7 +377,10 @@ const failedJobs = getFailedJobs();
 if (failedJobs.length === 0) {
   console.log('No failed jobs found.');
   if (GITHUB_OUTPUT) {
-    appendFileSync(GITHUB_OUTPUT, 'should-retry=false\n');
+    appendFileSync(
+      GITHUB_OUTPUT,
+      'is-retryable=false\nhas-retry-label=false\nwill-retry=false\npr-number=\n',
+    );
   }
   process.exit(0);
 }
@@ -442,16 +453,110 @@ if (blockedBy) {
 
 // Optional failures don't influence the retry decision.
 const nonOptional = classifications.filter((c) => c.category !== 'optional');
-const shouldRetry =
+const isRetryable =
   nonOptional.length > 0 && nonOptional.every((c) => c.retryable);
-console.log(`\nDecision: should-retry=${shouldRetry}`);
+console.log(`\nDecision: is-retryable=${isRetryable}`);
+
+// ---------------------------------------------------------------------------
+// Resolve originating PR and check for retry-ci label
+// ---------------------------------------------------------------------------
+
+function resolvePrNumber(): string {
+  if (WORKFLOW_EVENT === 'pull_request' && PR_NUMBER_FROM_EVENT) {
+    return PR_NUMBER_FROM_EVENT;
+  }
+  const match = HEAD_BRANCH.match(/gh-readonly-queue\/[^/]+\/pr-(\d+)-/);
+  if (WORKFLOW_EVENT === 'merge_group' && match) {
+    return match[1];
+  }
+  return '';
+}
+
+function checkRetryLabel(prNum: string): boolean {
+  if (!prNum) return false;
+  try {
+    const labels = ghApi(`${repoApi}/issues/${prNum}/labels`);
+    return (JSON.parse(labels) as Array<{ name: string }>).some(
+      (l) => l.name === 'retry-ci',
+    );
+  } catch {
+    console.warn(`Could not check labels on PR #${prNum}`);
+    return false;
+  }
+}
+
+const prNumber = resolvePrNumber();
+const hasRetryLabel = checkRetryLabel(prNumber);
+const willRetry = isRetryable && hasRetryLabel;
+const hasPR = Boolean(prNumber);
+
+// The retry decision depends on three independent facts:
+//
+//   isRetryable    — did classification determine all failures are retryable?
+//   hasPR          — is there an originating PR? (false for push events)
+//   hasRetryLabel  — does that PR have the `retry-ci` label?
+//
+// A retry only happens when ALL THREE are true (will-retry). The other
+// combinations produce different reports and Sentry attributes so we can
+// distinguish "retryable but nobody asked for a retry" from "someone asked
+// but the failures aren't retryable."
+//
+// Note: hasRetryLabel implies hasPR (can't have a label without a PR),
+// so *-false-true is impossible. The ?? fallback after the lookup is a
+// defensive guard against that case to avoid a cryptic destructuring crash.
+//
+// The `key` is used in Sentry attributes; `label` is the human-readable
+// line in the step summary and check run report.
+const decisionTable: Record<string, { key: string; label: string }> = {
+  'true-true-true': {
+    key: 'will-retry',
+    label: '♻️ Will retry (retry-ci label present)',
+  },
+  'true-true-false': {
+    key: 'retryable-no-label',
+    label: `⏸️ Retryable, but no retry-ci label on PR #${prNumber}`,
+  },
+  'true-false-false': {
+    key: 'retryable-no-pr',
+    label: '🔇 Retryable, but no originating PR (observation only)',
+  },
+  'false-true-true': {
+    key: 'not-retryable-has-label',
+    label: '⛔ Has retry-ci label but non-retryable failures',
+  },
+  'false-true-false': {
+    key: 'not-retryable-no-label',
+    label: `❌ Non-retryable (PR #${prNumber}, no retry-ci label)`,
+  },
+  'false-false-false': {
+    key: 'not-retryable-no-pr',
+    label: '❌ Non-retryable, no originating PR (observation only)',
+  },
+};
+const { key: decision, label: decisionLabel } = decisionTable[
+  `${isRetryable}-${hasPR}-${hasRetryLabel}`
+] ?? { key: 'unknown', label: '❓ Unexpected state combination' };
+
+console.log(
+  prNumber
+    ? `PR #${prNumber}: retry-ci label ${hasRetryLabel ? 'present' : 'absent'} → will-retry=${willRetry}`
+    : `No originating PR for event '${WORKFLOW_EVENT}' → will-retry=false`,
+);
 
 // ---------------------------------------------------------------------------
 // Write GITHUB_OUTPUT
 // ---------------------------------------------------------------------------
 
 if (GITHUB_OUTPUT) {
-  appendFileSync(GITHUB_OUTPUT, `should-retry=${shouldRetry}\n`);
+  appendFileSync(
+    GITHUB_OUTPUT,
+    [
+      `is-retryable=${isRetryable}`,
+      `has-retry-label=${hasRetryLabel}`,
+      `will-retry=${willRetry}`,
+      `pr-number=${prNumber}`,
+    ].join('\n') + '\n',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -465,7 +570,8 @@ const reportLines = [
   `## Main CI Failure Triage`,
   ``,
   `**Run:** [${MAIN_RUN_ID}](${mainRunUrl})${ATTEMPT ? ` (attempt ${ATTEMPT})` : ''}`,
-  `**Decision:** ${shouldRetry ? '✅ Would retry' : '❌ Would NOT retry'}`,
+  `**Classification:** ${isRetryable ? '✅ All failures retryable' : '❌ Non-retryable failures detected'}`,
+  `**Retry:** ${decisionLabel}`,
   `**Failed jobs:** ${failedJobs.length}`,
   ``,
   `| Job | Category | Retryable | Reason |`,
@@ -504,39 +610,32 @@ console.log('\n' + report);
 if (process.env.CI === 'true') {
   try {
     const headSha = getRunHeadSha();
-    const checkTitle = shouldRetry
+    const checkTitle = isRetryable
       ? 'All failures are retryable'
       : 'Non-retryable failures detected';
 
     // TODO: Remove CHECK_RUN_TOKEN workaround — fork-only. On the real repo,
-    // revert to: ghApiPost(`${repoApi}/check-runs`, { ... })
-    // and delete the checkToken/checkEnv/execFileSync block below.
+    // remove the `token` option below so ghApi uses the default GH_TOKEN.
     //
     // Use CHECK_RUN_TOKEN if available — a PAT or GitHub App token with
     // checks:write that creates check runs in the correct check suite.
     // Falls back to GH_TOKEN (github.token) which works for non-PR events.
     const checkToken = process.env.CHECK_RUN_TOKEN || GITHUB_TOKEN;
-    const checkEnv = { ...process.env, GH_TOKEN: checkToken };
 
-    execFileSync(
-      'gh',
-      ['api', `${repoApi}/check-runs`, '--method', 'POST', '--input', '-'],
-      {
-        encoding: 'utf8',
-        input: JSON.stringify({
-          name: 'Main CI Failure Triage',
-          head_sha: headSha,
-          status: 'completed',
-          conclusion: shouldRetry ? 'neutral' : 'failure',
-          output: {
-            title: checkTitle,
-            summary: report,
-          },
-        }),
-        maxBuffer: 5 * 1024 * 1024,
-        env: checkEnv,
+    ghApi(`${repoApi}/check-runs`, {
+      method: 'POST',
+      body: {
+        name: 'Main CI Failure Triage',
+        head_sha: headSha,
+        status: 'completed',
+        conclusion: isRetryable ? 'neutral' : 'failure',
+        output: {
+          title: checkTitle,
+          summary: report,
+        },
       },
-    );
+      token: checkToken,
+    });
     console.log(`Created 'Main CI Failure Triage' check on ${headSha}`);
   } catch (err) {
     // Non-fatal: the check is informational. Log and continue.
@@ -547,10 +646,6 @@ if (process.env.CI === 'true') {
 // ---------------------------------------------------------------------------
 // Send structured log to Sentry
 // ---------------------------------------------------------------------------
-
-// PR_NUMBER_FROM_EVENT is set by the workflow from workflow_run.pull_requests[0].number.
-// Only populated for pull_request events; see the "Resolve PR number" step for merge_group.
-const prNumber = process.env.PR_NUMBER_FROM_EVENT ?? '';
 
 const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
@@ -600,29 +695,28 @@ if (SENTRY_DSN) {
       jobAttrs['ci.retry.jobs.truncated'] = true;
     }
 
-    Sentry.logger.info(
-      `Main CI Failure Triage: ${shouldRetry ? 'retry' : 'no-retry'}`,
-      {
-        'ci.branch': process.env.HEAD_BRANCH || '',
-        'ci.commitHash': process.env.HEAD_SHA || '',
-        'ci.prNumber': prNumber || 'none',
-        'ci.repo': REPO,
-        'ci.retry.decision': shouldRetry ? 'retry' : 'no-retry',
-        'ci.retry.shouldRetry': shouldRetry,
-        'ci.retry.runId': MAIN_RUN_ID,
-        'ci.retry.attempt': ATTEMPT || 'unknown',
-        'ci.retry.event': process.env.WORKFLOW_EVENT || '',
-        'ci.retry.failedJobCount': failedJobs.length,
-        'ci.retry.retryableCount': retryableCount,
-        'ci.retry.nonRetryableCount': classifications.length - retryableCount,
-        'ci.retry.unmatchedJobCount': unmatchedJobs.length,
-        'ci.retry.mainRunUrl': mainRunUrl,
-        'ci.retry.triageRunUrl': triageRunUrl,
-        'ci.retry.report': report,
-        ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
-        ...jobAttrs,
-      },
-    );
+    Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
+      'ci.branch': HEAD_BRANCH || '',
+      'ci.commitHash': process.env.HEAD_SHA || '',
+      'ci.prNumber': prNumber || 'none',
+      'ci.repo': REPO,
+      'ci.retry.decision': decision,
+      'ci.retry.isRetryable': isRetryable,
+      'ci.retry.hasRetryLabel': hasRetryLabel,
+      'ci.retry.willRetry': willRetry,
+      'ci.retry.runId': MAIN_RUN_ID,
+      'ci.retry.attempt': ATTEMPT || 'unknown',
+      'ci.retry.event': WORKFLOW_EVENT || '',
+      'ci.retry.failedJobCount': failedJobs.length,
+      'ci.retry.retryableCount': retryableCount,
+      'ci.retry.nonRetryableCount': classifications.length - retryableCount,
+      'ci.retry.unmatchedJobCount': unmatchedJobs.length,
+      'ci.retry.mainRunUrl': mainRunUrl,
+      'ci.retry.triageRunUrl': triageRunUrl,
+      'ci.retry.report': report,
+      ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
+      ...jobAttrs,
+    });
 
     const flushed = await Sentry.flush(5000);
     if (flushed) {
