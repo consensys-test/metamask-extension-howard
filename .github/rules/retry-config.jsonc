@@ -9,7 +9,7 @@
   },
 
   // Blockers (blockerPatterns) control cascade logic — if one fails
-  // non-transiently, all downstream jobs are marked non-retryable. Each blocker
+  // non-transiently, all downstream jobs are marked jobRetryable=false. Each blocker
   // must also appear in a jobClassification category (usually
   // retryableOnTransientError) so it gets proper transient error detection.
   "blockerPatterns": [
@@ -67,7 +67,7 @@
 
   // Patterns to detect transient errors in job logs. If a job classified as
   // retryableOnTransientError fails and its logs match any of these patterns,
-  // it will be marked retryable. Jobs in other categories will not be retried
+  // it will be marked jobRetryable=true. Jobs in other categories will not be retried
   // even if they match these patterns, but the patterns can be used for reporting and debugging.
   "transientErrorPatterns": [
     "429 Too Many Requests",

@@ -3,7 +3,8 @@
 # Triggered by `workflow_run` on every Main completion. Skips successes
 # and fork runs at the job level. For failures, it:
 #
-#   1. Classifies each failed job as retryable or non-retryable
+#   1. Classifies each failed job (jobRetryable) and derives an overall
+#      is-retryable decision
 #   2. Writes a markdown report to the step summary
 #   3. Sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set)
 #

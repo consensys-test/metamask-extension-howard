@@ -2,8 +2,8 @@
  * classify-failures.mts
  *
  * Analyzes failed jobs in a GitHub Actions workflow run and classifies each
- * failure as retryable or non-retryable based on job name patterns and
- * transient error detection.
+ * failure (jobRetryable) based on job name patterns and transient error
+ * detection. Derives an overall is-retryable decision from individual results.
  *
  * Uses the `gh` CLI for GitHub API calls — no workspace dependencies required.
  * The workflow installs @sentry/node separately for optional logging.
@@ -76,7 +76,7 @@ interface JobClassification {
   jobName: string;
   jobId: number;
   category: Category;
-  retryable: boolean;
+  jobRetryable: boolean;
   reason: string;
   errorSnippet?: string;
   unmatched?: boolean;
@@ -302,7 +302,7 @@ function classifyJob(job: Job): JobClassification {
       jobName,
       jobId,
       category,
-      retryable: true,
+      jobRetryable: true,
       reason: 'Job is in the always-retryable category',
       unmatched,
     };
@@ -313,7 +313,7 @@ function classifyJob(job: Job): JobClassification {
       jobName,
       jobId,
       category,
-      retryable: false,
+      jobRetryable: false,
       reason: 'Optional job — no retry needed',
       unmatched,
     };
@@ -331,7 +331,7 @@ function classifyJob(job: Job): JobClassification {
       jobName,
       jobId,
       category,
-      retryable: true,
+      jobRetryable: true,
       reason: `Transient error in annotations: ${transientMatch}`,
       errorSnippet: transientMatch,
       unmatched,
@@ -348,7 +348,7 @@ function classifyJob(job: Job): JobClassification {
         jobName,
         jobId,
         category,
-        retryable: true,
+        jobRetryable: true,
         reason: `Transient error in logs: ${transientMatch}`,
         errorSnippet: transientMatch,
         unmatched,
@@ -360,7 +360,7 @@ function classifyJob(job: Job): JobClassification {
     jobName,
     jobId,
     category,
-    retryable: false,
+    jobRetryable: false,
     reason: 'No transient error pattern detected',
     unmatched,
   };
@@ -402,22 +402,22 @@ for (const job of blockerJobs) {
   const result = classifyJob(job);
   classifications.push(result);
   console.log(
-    `    → ${result.retryable ? '✅ retryable' : '❌ non-retryable'}: ${result.reason}`,
+    `    → ${result.jobRetryable ? '✅ retryable' : '❌ non-retryable'}: ${result.reason}`,
   );
-  if (!result.retryable) {
+  if (!result.jobRetryable) {
     blockedBy = job.name;
     break; // No point checking further
   }
 }
 
-function tagCascade(jobs: Job[], retryable: boolean, reason: string): void {
+function tagCascade(jobs: Job[], jobRetryable: boolean, reason: string): void {
   for (const job of jobs) {
     const { category, unmatched } = matchCategory(job.name);
     classifications.push({
       jobName: job.name,
       jobId: job.id,
       category,
-      retryable,
+      jobRetryable,
       reason,
       unmatched,
     });
@@ -446,7 +446,7 @@ if (blockedBy) {
     const result = classifyJob(job);
     classifications.push(result);
     console.log(
-      `    → ${result.retryable ? '✅ retryable' : '❌ non-retryable'}: ${result.reason}`,
+      `    → ${result.jobRetryable ? '✅ retryable' : '❌ non-retryable'}: ${result.reason}`,
     );
   }
 }
@@ -454,7 +454,7 @@ if (blockedBy) {
 // Optional failures don't influence the retry decision.
 const nonOptional = classifications.filter((c) => c.category !== 'optional');
 const isRetryable =
-  nonOptional.length > 0 && nonOptional.every((c) => c.retryable);
+  nonOptional.length > 0 && nonOptional.every((c) => c.jobRetryable);
 console.log(`\nDecision: is-retryable=${isRetryable}`);
 
 // ---------------------------------------------------------------------------
@@ -574,11 +574,11 @@ const reportLines = [
   `**Retry:** ${decisionLabel}`,
   `**Failed jobs:** ${failedJobs.length}`,
   ``,
-  `| Job | Category | Retryable | Reason |`,
-  `|-----|----------|-----------|--------|`,
+  `| Job | Category | Job Retryable | Reason |`,
+  `|-----|----------|---------------|--------|`,
   ...classifications.map(
     (c) =>
-      `| ${c.jobName} | ${c.unmatched ? '⚠️ ' : ''}${c.category} | ${c.retryable ? '✅' : '❌'} | ${c.reason} |`,
+      `| ${c.jobName} | ${c.unmatched ? '⚠️ ' : ''}${c.category} | ${c.jobRetryable ? '✅' : '❌'} | ${c.reason} |`,
   ),
 ];
 
@@ -676,7 +676,7 @@ if (SENTRY_DSN) {
       release: `metamask-extension@${version}`,
     });
 
-    const retryableCount = classifications.filter((c) => c.retryable).length;
+    const retryableCount = classifications.filter((c) => c.jobRetryable).length;
 
     // Per-job structured attributes, capped to stay under Sentry's
     // 100-attribute limit (~16 top-level + 4 per job → max 20 jobs).
@@ -688,7 +688,7 @@ if (SENTRY_DSN) {
       const p = `ci.retry.jobs.${i}`;
       jobAttrs[`${p}.name`] = c.jobName;
       jobAttrs[`${p}.category`] = c.category;
-      jobAttrs[`${p}.retryable`] = c.retryable;
+      jobAttrs[`${p}.jobRetryable`] = c.jobRetryable;
       jobAttrs[`${p}.reason`] = c.reason;
     }
     if (classifications.length > MAX_JOB_ATTRS) {
