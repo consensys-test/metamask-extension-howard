@@ -20,9 +20,10 @@
 # Reruns call `gh run rerun --failed`, which triggers a new Main
 # completion → workflow_run fires again.
 #
-# Merge queue (ALLGREEN):
-#   The merge queue uses the ALLGREEN strategy, monitoring all check
-#   suites natively. No explicit "All jobs pass" check is needed.
+# Merge queue (ALLGREEN merging strategy):
+#   The merge queue uses the ALLGREEN strategy ("Require all queue
+#   entries to pass required checks" in the repository ruleset),
+#   which monitors all check suites natively.
 #   When triage retries, `gh run rerun --failed` resets the Main
 #   workflow's check suite to in_progress, so the merge queue keeps
 #   waiting. If retry succeeds, suites pass and the PR merges.

@@ -769,8 +769,8 @@ jobs:
 
           echo "Regression validation triggered successfully"
 
-  all-jobs-pass-initiator:
-    name: All jobs pass (initiator)
+  ci-status-gate:
+    name: CI status gate (controls all-jobs-pass)
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -785,7 +785,7 @@ jobs:
     #
     # Jobs intentionally excluded:
     # - Publish jobs (not required for CI pass)
-    # - Jobs that depend on all-jobs-pass (e.g., log-merge-group-failure) cannot be included here
+    # - Jobs that depend on ci-status-gate (e.g., log-merge-group-failure) cannot be included here
     needs:
       - get-requirements
       - locales-changed-only
@@ -856,8 +856,11 @@ jobs:
       # On merge_group attempt 1, if the retry-ci label is present on the
       # originating PR, skip posting the commit status so the required
       # "All jobs pass" check stays pending while triage retries the run.
-      # ALLGREEN would eject on suite failure, but the pending required
-      # check prevents ejection until the status is posted.
+      # The merge queue's ALLGREEN merging strategy ("Require all queue
+      # entries to pass required checks" in the repository ruleset) would
+      # normally eject on suite failure, but the pending required status
+      # check ("Require status checks to pass" > "All jobs pass") prevents
+      # ejection until the commit status is posted.
       - name: Check retry-ci label (merge queue only)
         id: retry-gate
         if: >-
