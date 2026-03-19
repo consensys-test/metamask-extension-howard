@@ -584,11 +584,7 @@ if (!isRetryable && prNumber) {
 // eject, and auto-merge re-queues the PR in an infinite loop.
 // ---------------------------------------------------------------------------
 
-if (
-  WORKFLOW_EVENT === 'merge_group' &&
-  !willRetry &&
-  hasRetryLabel
-) {
+if (WORKFLOW_EVENT === 'merge_group' && !willRetry && hasRetryLabel) {
   const headSha = getRunHeadSha();
   try {
     ghApi(`${repoApi}/statuses/${headSha}`, {
@@ -599,9 +595,7 @@ if (
         description: 'Non-retryable failures detected',
       },
     });
-    console.log(
-      `Posted deferred failure commit status on ${headSha}`,
-    );
+    console.log(`Posted deferred failure commit status on ${headSha}`);
   } catch (err) {
     console.warn('Failed to post deferred failure commit status:', err);
   }
@@ -747,7 +741,9 @@ if (SENTRY_DSN) {
       release: `metamask-extension@${version}`,
     });
 
-    const jobRetryableCount = classifications.filter((c) => c.jobRetryable).length;
+    const jobRetryableCount = classifications.filter(
+      (c) => c.jobRetryable,
+    ).length;
 
     // Per-job structured attributes, capped to stay under Sentry's
     // 100-attribute limit (~16 top-level + 4 per job → max 20 jobs).
@@ -780,7 +776,8 @@ if (SENTRY_DSN) {
       'ci.retry.event': WORKFLOW_EVENT || '',
       'ci.retry.failedJobCount': failedJobs.length,
       'ci.retry.jobRetryableCount': jobRetryableCount,
-      'ci.retry.jobNonRetryableCount': classifications.length - jobRetryableCount,
+      'ci.retry.jobNonRetryableCount':
+        classifications.length - jobRetryableCount,
       'ci.retry.unmatchedJobCount': unmatchedJobs.length,
       'ci.retry.mainRunUrl': mainRunUrl,
       'ci.retry.triageRunUrl': triageRunUrl,
