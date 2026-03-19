@@ -40,6 +40,13 @@
 #   suite to in_progress and triggers a new attempt. On the final
 #   attempt (no retry-ci label), ci-status-gate posts the commit
 #   status, unblocking the queue to merge or eject.
+#
+#   Edge case: if retry-ci is present but triage classifies the
+#   failure as non-retryable, ci-status-gate has already deferred
+#   (skipped) the commit status. This workflow must post the failure
+#   status itself to unblock the queue for ejection. Without this,
+#   "All jobs pass" stays pending forever and auto-merge re-queues
+#   the PR in an infinite loop.
 
 name: Main CI Failure Triage
 
@@ -77,6 +84,7 @@ jobs:
     permissions:
       actions: write
       pull-requests: write
+      statuses: write
     env:
       GH_TOKEN: ${{ github.token }}
       # TODO: Remove CHECK_RUN_TOKEN — fork-only workaround. On the real repo,
