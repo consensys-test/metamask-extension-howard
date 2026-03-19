@@ -55,7 +55,7 @@ jobs:
     steps:
       - run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "502 Bad Gateway"; exit 1
+            echo "Assertion failed: expected 42 but got 0"; exit 1
           fi
 
       - name: Check pull request merge queue status
