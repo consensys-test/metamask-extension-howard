@@ -573,6 +573,41 @@ if (!isRetryable && prNumber) {
 }
 
 // ---------------------------------------------------------------------------
+// Post deferred failure commit status (merge queue only)
+//
+// When ci-status-gate in main.yml sees retry-ci, it defers the "All jobs
+// pass" commit status to give triage time to retry. If we decide NOT to
+// retry (non-retryable failures), we must post the failure status here
+// to unblock the merge queue for ejection.
+//
+// Without this, "All jobs pass" stays pending forever, the queue can't
+// eject, and auto-merge re-queues the PR in an infinite loop.
+// ---------------------------------------------------------------------------
+
+if (
+  WORKFLOW_EVENT === 'merge_group' &&
+  !willRetry &&
+  hasRetryLabel
+) {
+  const headSha = getRunHeadSha();
+  try {
+    ghApi(`${repoApi}/statuses/${headSha}`, {
+      method: 'POST',
+      body: {
+        state: 'failure',
+        context: 'All jobs pass',
+        description: 'Non-retryable failures detected',
+      },
+    });
+    console.log(
+      `Posted deferred failure commit status on ${headSha}`,
+    );
+  } catch (err) {
+    console.warn('Failed to post deferred failure commit status:', err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Write GITHUB_OUTPUT
 // ---------------------------------------------------------------------------
 
