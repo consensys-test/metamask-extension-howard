@@ -8,17 +8,17 @@ This PR introduces a **"Main CI Failure Triage" system** that replaces the inlin
 
 ## Files Changed
 
-| File | Description |
-|------|-------------|
-| `.github/workflows/main.yml` | Renamed `all-jobs-pass` → `all-jobs-pass-initiator`, added Checks API step, removed inline `check-retry-ci` job, added `checks: write` permission. **Also contains test scaffolding: injected `exit 1`s, commented-out conditions, disabled schedule.** |
-| `.github/workflows/main-ci-failure-triage.yml` | **New.** `workflow_run` workflow that classifies failures, label-gates retry, and creates deferred check for merge queue. |
-| `.github/scripts/classify-failures.mts` | **New.** TypeScript script that classifies failed jobs by pattern matching + transient-error detection, writes report, creates Check Run, logs to Sentry. |
-| `.github/scripts/github-token.mts` | **New.** Helper to resolve GitHub token from env vars or `gh auth token`. |
-| `.github/rules/retry-config.jsonc` | **New.** JSONC config for job classification patterns, transient error patterns, and blocker definitions. |
-| `.github/workflows/get-requirements.yml` | **Test scaffolding:** injected `exit 1`, force `skip-everything=true`, commented-out condition. |
-| `.github/workflows/build-ts-migration-dashboard.yml` | **Test scaffolding:** injected `exit 1` with "502 Bad Gateway". |
-| `.github/workflows/main-retry.yml` | **Deleted.** No longer needed (retry is handled by triage workflow). |
-| 6 other workflows | **Deleted for testing:** `check-feature-flag-registry.yml`, `check-pr-labels.yml`, `check-pr-max-lines.yml`, `check-template-and-add-labels.yml`, `cla.yml`, `security-code-scanner.yml` |
+| File                                                 | Description                                                                                                                                                                                                                                         |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/main.yml`                         | Renamed `all-jobs-pass` → `ci-status-gate`, added commit status step, removed inline `check-retry-ci` job, added `statuses: write` permission. **Also contains test scaffolding: injected `exit 1`s, commented-out conditions, disabled schedule.** |
+| `.github/workflows/main-ci-failure-triage.yml`       | **New.** `workflow_run` workflow that classifies failures, label-gates retry, and creates deferred check for merge queue.                                                                                                                           |
+| `.github/scripts/classify-failures.mts`              | **New.** TypeScript script that classifies failed jobs by pattern matching + transient-error detection, writes report, creates Check Run, logs to Sentry.                                                                                           |
+| `.github/scripts/github-token.mts`                   | **New.** Helper to resolve GitHub token from env vars or `gh auth token`.                                                                                                                                                                           |
+| `.github/rules/retry-config.jsonc`                   | **New.** JSONC config for job classification patterns, transient error patterns, and blocker definitions.                                                                                                                                           |
+| `.github/workflows/get-requirements.yml`             | **Test scaffolding:** injected `exit 1`, force `skip-everything=true`, commented-out condition.                                                                                                                                                     |
+| `.github/workflows/build-ts-migration-dashboard.yml` | **Test scaffolding:** injected `exit 1` with "502 Bad Gateway".                                                                                                                                                                                     |
+| `.github/workflows/main-retry.yml`                   | **Deleted.** No longer needed (retry is handled by triage workflow).                                                                                                                                                                                |
+| 6 other workflows                                    | **Deleted for testing:** `check-feature-flag-registry.yml`, `check-pr-labels.yml`, `check-pr-max-lines.yml`, `check-template-and-add-labels.yml`, `cla.yml`, `security-code-scanner.yml`                                                            |
 
 ## Issues Found
 
@@ -42,7 +42,7 @@ Same pattern — `echo "502 Bad Gateway"; exit 1` for testing transient error cl
 
 **5. Forced `skip-everything=true` in `get-requirements` (get-requirements.yml)**
 
-The `if:` condition on the "Compute skip-everything flag" step is commented out, so `skip-everything=true` is *always* emitted. This skips almost every job in the workflow regardless of what changed.
+The `if:` condition on the "Compute skip-everything flag" step is commented out, so `skip-everything=true` is _always_ emitted. This skips almost every job in the workflow regardless of what changed.
 
 **6. Commented-out `if` conditions on `build-ts-migration-dashboard` and `build-lavamoat-viz` (main.yml)**
 
@@ -72,7 +72,7 @@ For `merge_group` and `push` events, `pull_requests` is often an empty array, ma
 
 **11. Race condition: merge queue may evaluate before triage creates the check**
 
-For merge_group failures, `main.yml` skips check creation, deferring to the triage workflow. But `workflow_run` is asynchronous — there's a gap between main.yml completion and the triage workflow running. During this gap, the merge queue might evaluate and see **no** "All jobs pass" check. The comment says _"Do not require status checks on creation" must be enabled_, which means missing checks don't fail. But this creates a window where the merge queue could *pass* a failing PR if it evaluates during this gap and no prior "All jobs pass" check exists for that SHA.
+For merge*group failures, `main.yml` skips check creation, deferring to the triage workflow. But `workflow_run` is asynchronous — there's a gap between main.yml completion and the triage workflow running. During this gap, the merge queue might evaluate and see **no** "All jobs pass" check. The comment says *"Do not require status checks on creation" must be enabled\_, which means missing checks don't fail. But this creates a window where the merge queue could _pass_ a failing PR if it evaluates during this gap and no prior "All jobs pass" check exists for that SHA.
 
 **12. `getFailedJobs` doesn't handle pagination (classify-failures.mts)**
 
@@ -99,14 +99,17 @@ The TODO comments are clear, but there's no tracking issue referenced. Once merg
 **16. Rewrite the main.yml check condition for readability**
 
 Truth table is correct:
+
 - Success + any event → runs ✓
 - Failure + merge_group → **skipped** (delegated to triage) ✓
 - Failure + non-merge_group → runs ✓
 
 But `!failure() || github.event_name != 'merge_group'` reads unnaturally. Consider rewriting:
+
 ```yaml
 if: ${{ !(failure() && github.event_name == 'merge_group') }}
 ```
+
 This is logically equivalent (De Morgan's law) and reads as "skip only when failing in merge_group."
 
 **17. `stripJsonComments` is fragile (classify-failures.mts)**
@@ -119,7 +122,7 @@ Instead of fetching all 100 jobs and filtering client-side, reducing payload siz
 
 **19. The "optional" category in retry-config includes `^All jobs pass`**
 
-This matches the renamed `All jobs pass (initiator)` job. Since the triage workflow runs on the *previous* run, the "All jobs pass (initiator)" job would show as failed in the jobs list. Marking it optional means its failure doesn't influence the retry decision, which is correct. But the comment should explain this — it's not intuitive that the gateway job is "optional."
+This matches the renamed `CI status gate (controls all-jobs-pass)` job. Since the triage workflow runs on the _previous_ run, the "CI status gate" job would show as failed in the jobs list. Marking it optional means its failure doesn't influence the retry decision, which is correct. But the comment should explain this — it's not intuitive that the gateway job is "optional."
 
 **20. Consider `retryableOnTransientError` as default instead of `alwaysRetryable`**
 
@@ -164,6 +167,7 @@ The architectural design — a dedicated triage workflow with configurable class
 However, **the branch is not merge-ready due to extensive test scaffolding mixed in with production changes**. There are at least 9 critical items (injected failures, commented-out guards, deleted unrelated workflows) that would break CI for every PR if merged. These need to be removed and the branch rebased/cleaned before review of the actual production changes can proceed.
 
 Recommended next steps:
+
 1. Remove all injected `exit 1` statements and restore commented-out conditions
 2. Restore the six deleted unrelated workflows (or split their removal into a separate PR with justification)
 3. Re-enable the schedule trigger and `BUILDS_FROM_RUN` guard (or justify their removal)

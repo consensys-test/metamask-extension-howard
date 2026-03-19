@@ -57,11 +57,11 @@
     },
 
     // Optional jobs — their failure does not influence the retry decision.
-    // Includes "All jobs pass (initiator)" which is the gateway job in main.yml;
+    // Includes "CI status gate" which is the gateway job in main.yml;
     // it always fails when any upstream job fails, so classifying it separately
     // would double-count every failure.
     "optional": {
-      "patterns": ["^All jobs pass", "^dapp-page-load", "^run-benchmarks"]
+      "patterns": ["^CI status gate", "^dapp-page-load", "^run-benchmarks"]
     }
   },
 
