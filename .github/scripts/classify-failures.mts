@@ -676,7 +676,7 @@ if (SENTRY_DSN) {
       release: `metamask-extension@${version}`,
     });
 
-    const retryableCount = classifications.filter((c) => c.jobRetryable).length;
+    const jobRetryableCount = classifications.filter((c) => c.jobRetryable).length;
 
     // Per-job structured attributes, capped to stay under Sentry's
     // 100-attribute limit (~16 top-level + 4 per job → max 20 jobs).
@@ -708,8 +708,8 @@ if (SENTRY_DSN) {
       'ci.retry.attempt': ATTEMPT || 'unknown',
       'ci.retry.event': WORKFLOW_EVENT || '',
       'ci.retry.failedJobCount': failedJobs.length,
-      'ci.retry.retryableCount': retryableCount,
-      'ci.retry.nonRetryableCount': classifications.length - retryableCount,
+      'ci.retry.jobRetryableCount': jobRetryableCount,
+      'ci.retry.jobNonRetryableCount': classifications.length - jobRetryableCount,
       'ci.retry.unmatchedJobCount': unmatchedJobs.length,
       'ci.retry.mainRunUrl': mainRunUrl,
       'ci.retry.triageRunUrl': triageRunUrl,
