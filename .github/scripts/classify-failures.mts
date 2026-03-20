@@ -746,22 +746,18 @@ if (SENTRY_DSN) {
       (c) => c.jobRetryable,
     ).length;
 
-    const sentryOrg = process.env.SENTRY_ORG || 'metamask';
-    const sentryBaseUrl = (process.env.SENTRY_BASE_URL || 'https://sentry.io').replace(
-      /\/+$/,
-      '',
-    );
-    const sentryProjectId =
-      process.env.SENTRY_PROJECT_ID || SENTRY_DSN.split('/').pop() || '';
     const drilldownQuery = `message:"Main CI Failure Triage Job" ci.retry.runId:${MAIN_RUN_ID}`;
-    const drilldownBase = `${sentryBaseUrl}/organizations/${sentryOrg}/explore/logs/`;
+    const sentryBaseUrl = (
+      process.env.SENTRY_BASE_URL || 'https://metamask.sentry.io'
+    ).replace(/\/+$/, '');
+    const drilldownBase = `${sentryBaseUrl}/explore/logs/`;
     const drilldownParams = new URLSearchParams({
-      query: drilldownQuery,
-      statsPeriod: '14d',
+      logsQuery: drilldownQuery,
+      logsSortBys: '-timestamp',
+      statsPeriod: '14dh',
     });
-    if (sentryProjectId) {
-      drilldownParams.set('project', sentryProjectId);
-    }
+    drilldownParams.append('logsFields', 'timestamp');
+    drilldownParams.append('logsFields', 'message');
     const jobDrilldownUrl = `${drilldownBase}?${drilldownParams.toString()}`;
 
     Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
@@ -809,7 +805,9 @@ if (SENTRY_DSN) {
         'ci.job.category': job.category,
         'ci.job.retryable': job.jobRetryable,
         'ci.job.reason': job.reason,
-        ...(job.errorSnippet ? { 'ci.job.errorSnippet': job.errorSnippet } : {}),
+        ...(job.errorSnippet
+          ? { 'ci.job.errorSnippet': job.errorSnippet }
+          : {}),
         ...(job.unmatched ? { 'ci.job.unmatched': true } : {}),
         ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
       });
