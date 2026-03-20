@@ -54,8 +54,8 @@ jobs:
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false'}}
     steps:
       - run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "Assertion failed: expected 42 but got 0"; exit 1
+          if (( ${{ github.run_attempt }} < 4 )) && [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "502 Bad Gateway"; exit 1
           fi
 
       - name: Check pull request merge queue status
