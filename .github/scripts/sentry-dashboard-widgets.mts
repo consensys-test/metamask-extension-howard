@@ -13,7 +13,7 @@ export interface SentryDashboardQuery {
 export interface SentryDashboardWidget {
   title: string;
   displayType: 'table' | 'line' | 'area' | 'bar' | 'categorical_bar';
-  interval: '5m';
+  interval: '5m' | '15m' | '1h' | '1d';
   limit?: number;
   datasetSource: 'user';
   widgetType: 'logs';
@@ -41,6 +41,7 @@ interface WidgetSpec {
   title: string;
   conditions: string;
   displayType?: SentryDashboardWidget['displayType'];
+  interval?: SentryDashboardWidget['interval'];
   orderby?: string;
   columns?: string[];
   fieldAliases?: string[];
@@ -54,6 +55,7 @@ interface WidgetSpec {
 function logWidget({
   title,
   displayType = 'table',
+  interval = '5m',
   conditions,
   orderby = '-count()',
   columns = ['count()'],
@@ -67,7 +69,7 @@ function logWidget({
   return {
     title,
     displayType,
-    interval: '5m',
+    interval,
     ...(limit !== undefined ? { limit } : {}),
     datasetSource: 'user',
     widgetType: 'logs',
@@ -103,9 +105,45 @@ function tableWidget(spec: WidgetSpec): SentryDashboardWidget {
 
 function graphWidget(spec: WidgetSpec): SentryDashboardWidget {
   return logWidget({
+    interval: '1d',
     ...spec,
     limit: spec.limit ?? 10,
   });
+}
+
+function stackedBarWidget({
+  title,
+  queries,
+  y,
+  x = 0,
+  w = 6,
+  h = 2,
+}: {
+  title: string;
+  queries: { name: string; conditions: string }[];
+  y: number;
+  x?: number;
+  w?: number;
+  h?: number;
+}): SentryDashboardWidget {
+  return {
+    title,
+    displayType: 'area',
+    interval: '1d',
+    datasetSource: 'user',
+    widgetType: 'logs',
+    queries: queries.map(({ name, conditions }) => ({
+      name,
+      fields: ['count_unique(ci.retry.runId)'],
+      aggregates: ['count_unique(ci.retry.runId)'],
+      columns: [],
+      fieldAliases: [''],
+      conditions,
+      orderby: '-count_unique(ci.retry.runId)',
+      isHidden: false,
+    })),
+    layout: { w, h, x, y, minH: 2 },
+  };
 }
 
 function categoricalDistributionWidget({
@@ -131,9 +169,9 @@ export function buildCiRetryDashboardPayload({
   projectId: number;
   period?: string;
 }): SentryDashboardPayload {
-  const baseCondition = 'has:ci.retry.runId';
+  const baseCondition = 'has:ci.retry.runId has:ci.retry.date';
   const jobCondition =
-    'has:ci.retry.runId has:ci.job.name !ci.job.name:"CI status gate (controls all-jobs-pass)"';
+    'has:ci.retry.runId has:ci.retry.date has:ci.job.name !ci.job.name:"CI status gate (controls all-jobs-pass)"';
 
   return {
     title,
@@ -153,13 +191,9 @@ export function buildCiRetryDashboardPayload({
         x: 0,
       }),
       tableWidget({
-        title: 'Retry Usage (Label-Gated, includes false states)',
-        conditions: `${baseCondition} has:ci.retry.willRetryState has:ci.retry.hasRetryLabelState`,
-        columns: [
-          'count()',
-          'ci.retry.willRetryState',
-          'ci.retry.hasRetryLabelState',
-        ],
+        title: 'Retry Usage (Label-Gated)',
+        conditions: `${baseCondition} has:ci.retry.willRetry has:ci.retry.hasRetryLabel`,
+        columns: ['count()', 'ci.retry.willRetry', 'ci.retry.hasRetryLabel'],
         fieldAliases: ['Count', 'Will Retry', 'Has Retry Label'],
         orderby: '-count()',
         y: 0,
@@ -176,7 +210,7 @@ export function buildCiRetryDashboardPayload({
       }),
       tableWidget({
         title: 'Flakiest Jobs (Retryable)',
-        conditions: `${jobCondition} ci.job.retryableState:true`,
+        conditions: `${jobCondition} ci.job.retryable:true`,
         columns: ['count()', 'ci.job.name', 'ci.job.category'],
         fieldAliases: ['Count', 'Job Name', 'Job Category'],
         orderby: '-count()',
@@ -185,7 +219,7 @@ export function buildCiRetryDashboardPayload({
       }),
       tableWidget({
         title: 'Deterministic Failures (Non-Retryable)',
-        conditions: `${jobCondition} ci.job.retryableState:false`,
+        conditions: `${jobCondition} ci.job.retryable:false`,
         columns: ['count()', 'ci.job.name', 'ci.job.category', 'ci.job.reason'],
         fieldAliases: ['Count', 'Job Name', 'Job Category', 'Failure Reason'],
         orderby: '-count()',
@@ -235,7 +269,7 @@ export function buildCiRetryDashboardPayload({
           'ci.retry.runId',
           'ci.retry.jobDrilldownUrl',
           'ci.prNumber',
-          'ci.branch',
+          'ci.targetBranch',
         ],
         fieldAliases: [
           'Timestamp',
@@ -244,7 +278,7 @@ export function buildCiRetryDashboardPayload({
           'Run ID',
           'Job Drilldown URL',
           'PR Number',
-          'Branch',
+          'Target Branch',
         ],
         orderby: '-timestamp',
         y: 6,
@@ -253,48 +287,58 @@ export function buildCiRetryDashboardPayload({
         h: 3,
       }),
       graphWidget({
-        title: 'Decision Trend (Graph Pack v1)',
-        displayType: 'area',
-        conditions: `${baseCondition} has:ci.retry.decision`,
-        columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
-        orderby: '-count_unique(ci.retry.runId)',
-        y: 9,
-        x: 0,
-        w: 3,
-      }),
-      graphWidget({
-        title: 'Retry Label vs Will-Retry Trend (Graph Pack v1)',
-        displayType: 'bar',
-        conditions: `${baseCondition} has:ci.retry.willRetryState has:ci.retry.hasRetryLabelState`,
-        columns: [
-          'count()',
-          'ci.retry.willRetryState',
-          'ci.retry.hasRetryLabelState',
-        ],
-        orderby: '-count()',
-        y: 9,
-        x: 3,
-        w: 3,
-      }),
-      graphWidget({
-        title: 'Attempt Depth Trend (Graph Pack v1)',
+        title: 'Unmatched Runs Trend',
         displayType: 'line',
-        conditions: `${baseCondition} has:ci.retry.attempt`,
-        columns: ['count_unique(ci.retry.runId)', 'ci.retry.attempt'],
+        conditions: `${baseCondition} ci.retry.hasUnmatched:true`,
+        columns: ['count_unique(ci.retry.runId)'],
         orderby: '-count_unique(ci.retry.runId)',
-        y: 11,
+        y: 9,
         x: 0,
         w: 3,
       }),
       graphWidget({
-        title: 'Workflow Event Trend (Graph Pack v1)',
-        displayType: 'bar',
-        conditions: `${baseCondition} has:ci.retry.event`,
-        columns: ['count_unique(ci.retry.runId)', 'ci.retry.event'],
+        title: 'Cascade Blocker Runs Trend',
+        displayType: 'line',
+        conditions: `${baseCondition} has:ci.blockedBy`,
+        columns: ['count_unique(ci.retry.runId)'],
         orderby: '-count_unique(ci.retry.runId)',
-        y: 11,
+        y: 9,
         x: 3,
         w: 3,
+      }),
+      stackedBarWidget({
+        title: 'Decision Actionability Trend',
+        queries: [
+          'will-retry',
+          'retryable-no-label',
+          'not-retryable-has-label',
+          'not-retryable-no-label',
+        ].map((decision) => ({
+          name: decision,
+          conditions: `${baseCondition} ci.retry.decision:${decision}`,
+        })),
+        y: 11,
+        x: 0,
+        w: 6,
+        h: 2,
+      }),
+      stackedBarWidget({
+        title: 'Decision Trend (Stacked)',
+        queries: [
+          'will-retry',
+          'retryable-no-label',
+          'retryable-no-pr',
+          'not-retryable-has-label',
+          'not-retryable-no-label',
+          'not-retryable-no-pr',
+        ].map((decision) => ({
+          name: decision,
+          conditions: `${baseCondition} ci.retry.decision:${decision}`,
+        })),
+        y: 13,
+        x: 0,
+        w: 6,
+        h: 3,
       }),
     ],
   };

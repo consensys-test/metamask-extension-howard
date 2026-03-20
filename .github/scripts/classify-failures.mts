@@ -472,6 +472,23 @@ function resolvePrNumber(): string {
   return '';
 }
 
+/**
+ * Resolves the target branch name from HEAD_BRANCH.
+ *
+ * For merge_group events HEAD_BRANCH is the temporary merge queue branch,
+ * e.g. `gh-readonly-queue/main/pr-12345-abc123`. Extract the target branch
+ * (`main`) so the dashboard field shows something meaningful.
+ *
+ * For push and pull_request events HEAD_BRANCH is already the real name.
+ */
+function resolveTargetBranch(): string {
+  const match = HEAD_BRANCH.match(/^gh-readonly-queue\/([^/]+)\//);
+  if (WORKFLOW_EVENT === 'merge_group' && match) {
+    return match[1];
+  }
+  return HEAD_BRANCH;
+}
+
 function checkRetryLabel(prNum: string): boolean {
   if (!prNum) return false;
   try {
@@ -486,6 +503,7 @@ function checkRetryLabel(prNum: string): boolean {
 }
 
 const prNumber = resolvePrNumber();
+const targetBranch = resolveTargetBranch();
 const hasRetryLabel = checkRetryLabel(prNumber);
 const willRetry = isRetryable && hasRetryLabel;
 const hasPR = Boolean(prNumber);
@@ -767,17 +785,15 @@ if (SENTRY_DSN) {
     const parentTriageLink = `${drilldownBase}?${parentTriageParams.toString()}`;
 
     Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
-      'ci.branch': HEAD_BRANCH || '',
+      'ci.targetBranch': targetBranch || '',
       'ci.commitHash': process.env.HEAD_SHA || '',
       'ci.prNumber': prNumber || 'none',
       'ci.repo': REPO,
+      'ci.retry.date': new Date().toISOString().slice(0, 10),
       'ci.retry.decision': decision,
-      'ci.retry.isRetryable': isRetryable,
-      'ci.retry.isRetryableState': String(isRetryable),
-      'ci.retry.hasRetryLabel': hasRetryLabel,
-      'ci.retry.hasRetryLabelState': String(hasRetryLabel),
-      'ci.retry.willRetry': willRetry,
-      'ci.retry.willRetryState': String(willRetry),
+      'ci.retry.isRetryable': String(isRetryable),
+      'ci.retry.hasRetryLabel': String(hasRetryLabel),
+      'ci.retry.willRetry': String(willRetry),
       'ci.retry.runId': MAIN_RUN_ID,
       'ci.retry.attempt': ATTEMPT || 'unknown',
       'ci.retry.event': WORKFLOW_EVENT || '',
@@ -799,6 +815,7 @@ if (SENTRY_DSN) {
     for (const job of jobEvents) {
       Sentry.logger.info('Main CI Failure Triage Job', {
         'ci.retry.runId': MAIN_RUN_ID,
+        'ci.retry.date': new Date().toISOString().slice(0, 10),
         'ci.retry.decision': decision,
         'ci.retry.attempt': ATTEMPT || 'unknown',
         'ci.retry.event': WORKFLOW_EVENT || '',
@@ -806,7 +823,7 @@ if (SENTRY_DSN) {
         'ci.job.id': String(job.jobId),
         'ci.job.name': job.jobName,
         'ci.job.category': job.category,
-        'ci.job.retryableState': String(job.jobRetryable),
+        'ci.job.retryable': String(job.jobRetryable),
         'ci.job.reason': job.reason,
         ...(job.errorSnippet
           ? { 'ci.job.errorSnippet': job.errorSnippet }
