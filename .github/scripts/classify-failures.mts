@@ -760,6 +760,12 @@ if (SENTRY_DSN) {
     drilldownParams.append('logsFields', 'message');
     const jobDrilldownUrl = `${drilldownBase}?${drilldownParams.toString()}`;
 
+    const parentTriageParams = new URLSearchParams({
+      logsQuery: `ci.retry.runId:${MAIN_RUN_ID} has:ci.retry.failedJobCount`,
+      statsPeriod: '14dh',
+    });
+    const parentTriageLink = `${drilldownBase}?${parentTriageParams.toString()}`;
+
     Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
       'ci.branch': HEAD_BRANCH || '',
       'ci.commitHash': process.env.HEAD_SHA || '',
@@ -792,31 +798,20 @@ if (SENTRY_DSN) {
 
     for (const job of jobEvents) {
       Sentry.logger.info('Main CI Failure Triage Job', {
-        'ci.branch': HEAD_BRANCH || '',
-        'ci.commitHash': process.env.HEAD_SHA || '',
-        'ci.prNumber': prNumber || 'none',
-        'ci.repo': REPO,
-        'ci.retry.decision': decision,
-        'ci.retry.isRetryable': isRetryable,
-        'ci.retry.isRetryableState': String(isRetryable),
-        'ci.retry.hasRetryLabel': hasRetryLabel,
-        'ci.retry.hasRetryLabelState': String(hasRetryLabel),
-        'ci.retry.willRetry': willRetry,
-        'ci.retry.willRetryState': String(willRetry),
         'ci.retry.runId': MAIN_RUN_ID,
+        'ci.retry.decision': decision,
         'ci.retry.attempt': ATTEMPT || 'unknown',
         'ci.retry.event': WORKFLOW_EVENT || '',
+        'ci.retry.parentTriageLink': parentTriageLink,
         'ci.job.id': String(job.jobId),
         'ci.job.name': job.jobName,
         'ci.job.category': job.category,
-        'ci.job.retryable': job.jobRetryable,
         'ci.job.retryableState': String(job.jobRetryable),
         'ci.job.reason': job.reason,
         ...(job.errorSnippet
           ? { 'ci.job.errorSnippet': job.errorSnippet }
           : {}),
         ...(job.unmatched ? { 'ci.job.unmatched': true } : {}),
-        ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
       });
     }
 

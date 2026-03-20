@@ -6,13 +6,15 @@ export interface SentryDashboardQuery {
   fieldAliases: string[];
   conditions: string;
   orderby: string;
+  limit?: number;
   isHidden: boolean;
 }
 
 export interface SentryDashboardWidget {
   title: string;
-  displayType: 'table';
+  displayType: 'table' | 'line' | 'area' | 'bar';
   interval: '5m';
+  limit?: number;
   datasetSource: 'user';
   widgetType: 'logs';
   queries: SentryDashboardQuery[];
@@ -38,19 +40,23 @@ export interface SentryDashboardPayload {
 interface WidgetSpec {
   title: string;
   conditions: string;
+  displayType?: SentryDashboardWidget['displayType'];
   orderby?: string;
   columns?: string[];
+  limit?: number;
   y: number;
   x?: number;
   w?: number;
   h?: number;
 }
 
-function tableWidget({
+function logWidget({
   title,
+  displayType = 'table',
   conditions,
   orderby = '-count()',
   columns = ['count()'],
+  limit,
   y,
   x = 0,
   w = 2,
@@ -58,8 +64,9 @@ function tableWidget({
 }: WidgetSpec): SentryDashboardWidget {
   return {
     title,
-    displayType: 'table',
+    displayType,
     interval: '5m',
+    ...(limit !== undefined ? { limit } : {}),
     datasetSource: 'user',
     widgetType: 'logs',
     queries: [
@@ -71,6 +78,7 @@ function tableWidget({
         fieldAliases: columns.map(() => ''),
         conditions,
         orderby,
+        ...(limit !== undefined ? { limit } : {}),
         isHidden: false,
       },
     ],
@@ -84,6 +92,20 @@ function tableWidget({
   };
 }
 
+function tableWidget(spec: WidgetSpec): SentryDashboardWidget {
+  return logWidget({
+    ...spec,
+    displayType: 'table',
+  });
+}
+
+function graphWidget(spec: WidgetSpec): SentryDashboardWidget {
+  return logWidget({
+    ...spec,
+    limit: spec.limit ?? 10,
+  });
+}
+
 export function buildCiRetryDashboardPayload({
   title,
   projectId,
@@ -93,7 +115,7 @@ export function buildCiRetryDashboardPayload({
   projectId: number;
   period?: string;
 }): SentryDashboardPayload {
-  const baseCondition = 'has:ci.retry.runId';
+  const baseCondition = 'has:ci.retry.runId has:ci.retry.failedJobCount';
   const jobCondition = 'has:ci.retry.runId has:ci.job.name';
 
   return {
@@ -113,8 +135,8 @@ export function buildCiRetryDashboardPayload({
         x: 0,
       }),
       tableWidget({
-        title: 'Retry Usage (Label-Gated)',
-        conditions: `${baseCondition} has:ci.retry.willRetry`,
+        title: 'Retry Usage (Label-Gated, includes false states)',
+        conditions: `${baseCondition} has:ci.retry.willRetryState has:ci.retry.hasRetryLabelState`,
         columns: [
           'count()',
           'ci.retry.willRetryState',
@@ -125,8 +147,8 @@ export function buildCiRetryDashboardPayload({
         x: 2,
       }),
       tableWidget({
-        title: 'Unmatched Job Signals',
-        conditions: `${baseCondition} ci.retry.unmatchedJobCount:>0`,
+        title: 'Unmatched Failures ("No results" = healthy)',
+        conditions: `${baseCondition} has:ci.retry.unmatchedJobCount`,
         columns: ['count()', 'ci.retry.unmatchedJobCount', 'ci.retry.runId'],
         orderby: '-ci.retry.unmatchedJobCount',
         y: 0,
@@ -197,6 +219,50 @@ export function buildCiRetryDashboardPayload({
         x: 0,
         w: 6,
         h: 3,
+      }),
+      graphWidget({
+        title: 'Decision Trend (Graph Pack v1)',
+        displayType: 'area',
+        conditions: `${baseCondition} has:ci.retry.decision`,
+        columns: ['count()', 'ci.retry.decision'],
+        orderby: '-count()',
+        y: 9,
+        x: 0,
+        w: 3,
+      }),
+      graphWidget({
+        title: 'Retry Label vs Will-Retry Trend (Graph Pack v1)',
+        displayType: 'bar',
+        conditions: `${baseCondition} has:ci.retry.willRetryState has:ci.retry.hasRetryLabelState`,
+        columns: [
+          'count()',
+          'ci.retry.willRetryState',
+          'ci.retry.hasRetryLabelState',
+        ],
+        orderby: '-count()',
+        y: 9,
+        x: 3,
+        w: 3,
+      }),
+      graphWidget({
+        title: 'Attempt Depth Trend (Graph Pack v1)',
+        displayType: 'line',
+        conditions: `${baseCondition} has:ci.retry.attempt`,
+        columns: ['count()', 'ci.retry.attempt'],
+        orderby: '-count()',
+        y: 11,
+        x: 0,
+        w: 3,
+      }),
+      graphWidget({
+        title: 'Workflow Event Trend (Graph Pack v1)',
+        displayType: 'bar',
+        conditions: `${baseCondition} has:ci.retry.event`,
+        columns: ['count()', 'ci.retry.event'],
+        orderby: '-count()',
+        y: 11,
+        x: 3,
+        w: 3,
       }),
     ],
   };
