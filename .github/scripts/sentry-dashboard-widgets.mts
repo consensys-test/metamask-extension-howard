@@ -12,7 +12,7 @@ export interface SentryDashboardQuery {
 
 export interface SentryDashboardWidget {
   title: string;
-  displayType: 'table' | 'line' | 'area' | 'bar';
+  displayType: 'table' | 'line' | 'area' | 'bar' | 'categorical_bar';
   interval: '5m';
   limit?: number;
   datasetSource: 'user';
@@ -43,6 +43,7 @@ interface WidgetSpec {
   displayType?: SentryDashboardWidget['displayType'];
   orderby?: string;
   columns?: string[];
+  fieldAliases?: string[];
   limit?: number;
   y: number;
   x?: number;
@@ -56,6 +57,7 @@ function logWidget({
   conditions,
   orderby = '-count()',
   columns = ['count()'],
+  fieldAliases,
   limit,
   y,
   x = 0,
@@ -75,7 +77,7 @@ function logWidget({
         fields: columns,
         aggregates: columns.filter((column) => column.includes('(')),
         columns: columns.filter((column) => !column.includes('(')),
-        fieldAliases: columns.map(() => ''),
+        fieldAliases: fieldAliases ?? columns.map(() => ''),
         conditions,
         orderby,
         ...(limit !== undefined ? { limit } : {}),
@@ -106,6 +108,20 @@ function graphWidget(spec: WidgetSpec): SentryDashboardWidget {
   });
 }
 
+function categoricalDistributionWidget({
+  groupBy,
+  orderby = `-${groupBy}`,
+  ...spec
+}: WidgetSpec & { groupBy: string }): SentryDashboardWidget {
+  return logWidget({
+    ...spec,
+    displayType: 'categorical_bar',
+    columns: [groupBy, 'count_unique(ci.retry.runId)'],
+    orderby,
+    limit: spec.limit ?? 10,
+  });
+}
+
 export function buildCiRetryDashboardPayload({
   title,
   projectId,
@@ -115,8 +131,9 @@ export function buildCiRetryDashboardPayload({
   projectId: number;
   period?: string;
 }): SentryDashboardPayload {
-  const baseCondition = 'has:ci.retry.runId has:ci.retry.failedJobCount';
-  const jobCondition = 'has:ci.retry.runId has:ci.job.name';
+  const baseCondition = 'has:ci.retry.runId';
+  const jobCondition =
+    'has:ci.retry.runId has:ci.job.name !ci.job.name:"CI status gate (controls all-jobs-pass)"';
 
   return {
     title,
@@ -129,8 +146,9 @@ export function buildCiRetryDashboardPayload({
       tableWidget({
         title: 'Decision Distribution',
         conditions: `${baseCondition} has:ci.retry.decision`,
-        columns: ['count()', 'ci.retry.decision'],
-        orderby: '-count()',
+        columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
+        fieldAliases: ['Count', 'Decision'],
+        orderby: 'ci.retry.decision',
         y: 0,
         x: 0,
       }),
@@ -142,6 +160,7 @@ export function buildCiRetryDashboardPayload({
           'ci.retry.willRetryState',
           'ci.retry.hasRetryLabelState',
         ],
+        fieldAliases: ['Count', 'Will Retry', 'Has Retry Label'],
         orderby: '-count()',
         y: 0,
         x: 2,
@@ -150,6 +169,7 @@ export function buildCiRetryDashboardPayload({
         title: 'Unmatched Failures ("No results" = healthy)',
         conditions: `${baseCondition} has:ci.retry.unmatchedJobCount`,
         columns: ['count()', 'ci.retry.unmatchedJobCount', 'ci.retry.runId'],
+        fieldAliases: ['Count', 'Unmatched Job Count', 'Run ID'],
         orderby: '-ci.retry.unmatchedJobCount',
         y: 0,
         x: 4,
@@ -158,6 +178,7 @@ export function buildCiRetryDashboardPayload({
         title: 'Flakiest Jobs (Retryable)',
         conditions: `${jobCondition} ci.job.retryableState:true`,
         columns: ['count()', 'ci.job.name', 'ci.job.category'],
+        fieldAliases: ['Count', 'Job Name', 'Job Category'],
         orderby: '-count()',
         y: 2,
         x: 0,
@@ -166,6 +187,7 @@ export function buildCiRetryDashboardPayload({
         title: 'Deterministic Failures (Non-Retryable)',
         conditions: `${jobCondition} ci.job.retryableState:false`,
         columns: ['count()', 'ci.job.name', 'ci.job.category', 'ci.job.reason'],
+        fieldAliases: ['Count', 'Job Name', 'Job Category', 'Failure Reason'],
         orderby: '-count()',
         y: 2,
         x: 2,
@@ -174,23 +196,23 @@ export function buildCiRetryDashboardPayload({
         title: 'Failure Categories',
         conditions: `${jobCondition} has:ci.job.category`,
         columns: ['count()', 'ci.job.category'],
+        fieldAliases: ['Count', 'Job Category'],
         orderby: '-count()',
         y: 2,
         x: 4,
       }),
-      tableWidget({
+      categoricalDistributionWidget({
         title: 'Failures by Workflow Event',
+        groupBy: 'ci.retry.event',
         conditions: `${baseCondition} has:ci.retry.event`,
-        columns: ['count()', 'ci.retry.event'],
-        orderby: '-count()',
         y: 4,
         x: 0,
       }),
-      tableWidget({
+      categoricalDistributionWidget({
         title: 'Attempt Depth Distribution',
+        groupBy: 'ci.retry.attempt',
         conditions: `${baseCondition} has:ci.retry.attempt`,
-        columns: ['count()', 'ci.retry.attempt'],
-        orderby: '-count()',
+        orderby: '-count_unique(ci.retry.runId)',
         y: 4,
         x: 2,
       }),
@@ -198,13 +220,14 @@ export function buildCiRetryDashboardPayload({
         title: 'Cascade Blockers',
         conditions: `${baseCondition} has:ci.blockedBy`,
         columns: ['count()', 'ci.blockedBy'],
+        fieldAliases: ['Count', 'Blocked By'],
         orderby: '-count()',
         y: 4,
         x: 4,
       }),
       tableWidget({
         title: 'Most Recent Decisions',
-        conditions: `${baseCondition} has:ci.retry.decision`,
+        conditions: `${baseCondition} has:ci.retry.decision has:ci.retry.jobDrilldownUrl`,
         columns: [
           'timestamp',
           'ci.retry.decision',
@@ -213,6 +236,15 @@ export function buildCiRetryDashboardPayload({
           'ci.retry.jobDrilldownUrl',
           'ci.prNumber',
           'ci.branch',
+        ],
+        fieldAliases: [
+          'Timestamp',
+          'Decision',
+          'Workflow Event',
+          'Run ID',
+          'Job Drilldown URL',
+          'PR Number',
+          'Branch',
         ],
         orderby: '-timestamp',
         y: 6,
@@ -224,8 +256,8 @@ export function buildCiRetryDashboardPayload({
         title: 'Decision Trend (Graph Pack v1)',
         displayType: 'area',
         conditions: `${baseCondition} has:ci.retry.decision`,
-        columns: ['count()', 'ci.retry.decision'],
-        orderby: '-count()',
+        columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
+        orderby: '-count_unique(ci.retry.runId)',
         y: 9,
         x: 0,
         w: 3,
@@ -248,8 +280,8 @@ export function buildCiRetryDashboardPayload({
         title: 'Attempt Depth Trend (Graph Pack v1)',
         displayType: 'line',
         conditions: `${baseCondition} has:ci.retry.attempt`,
-        columns: ['count()', 'ci.retry.attempt'],
-        orderby: '-count()',
+        columns: ['count_unique(ci.retry.runId)', 'ci.retry.attempt'],
+        orderby: '-count_unique(ci.retry.runId)',
         y: 11,
         x: 0,
         w: 3,
@@ -258,8 +290,8 @@ export function buildCiRetryDashboardPayload({
         title: 'Workflow Event Trend (Graph Pack v1)',
         displayType: 'bar',
         conditions: `${baseCondition} has:ci.retry.event`,
-        columns: ['count()', 'ci.retry.event'],
-        orderby: '-count()',
+        columns: ['count_unique(ci.retry.runId)', 'ci.retry.event'],
+        orderby: '-count_unique(ci.retry.runId)',
         y: 11,
         x: 3,
         w: 3,

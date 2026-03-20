@@ -761,7 +761,7 @@ if (SENTRY_DSN) {
     const jobDrilldownUrl = `${drilldownBase}?${drilldownParams.toString()}`;
 
     const parentTriageParams = new URLSearchParams({
-      logsQuery: `ci.retry.runId:${MAIN_RUN_ID} has:ci.retry.failedJobCount`,
+      logsQuery: `message:"Main CI Failure Triage:" ci.retry.runId:${MAIN_RUN_ID}`,
       statsPeriod: '14dh',
     });
     const parentTriageLink = `${drilldownBase}?${parentTriageParams.toString()}`;
