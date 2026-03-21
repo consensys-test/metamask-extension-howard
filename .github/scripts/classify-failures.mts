@@ -137,6 +137,51 @@ if (!MAIN_RUN_ID) {
 
 const [owner, repo] = REPO.split('/');
 const repoApi = `/repos/${owner}/${repo}`;
+const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
+
+// ---------------------------------------------------------------------------
+// Sentry helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Dynamically load and initialize @sentry/node. Returns the Sentry namespace
+ * on success, or null if the SDK isn't installed or the DSN is missing.
+ *
+ * Uses CJS require — ESM import('@sentry/node') breaks on some workspace
+ * installs due to missing ESM export paths.
+ */
+function initSentry(): typeof import('@sentry/node') | null {
+  if (!SENTRY_DSN) return null;
+  try {
+    const require = createRequire(import.meta.url);
+    const Sentry = require('@sentry/node') as typeof import('@sentry/node');
+    let version = process.env.VERSION ?? '';
+    if (!version) {
+      try {
+        const pkgPath = join(scriptDir, '..', '..', 'package.json');
+        version = (
+          JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
+        ).version;
+      } catch {
+        version = 'unknown';
+      }
+    }
+    Sentry.init({
+      dsn: SENTRY_DSN,
+      enableLogs: true,
+      release: `metamask-extension@${version}`,
+    } as Parameters<typeof Sentry.init>[0]);
+    return Sentry;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+      console.warn('Sentry skipped: @sentry/node not available');
+    } else {
+      console.warn('Failed to initialize Sentry:', err);
+    }
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -389,8 +434,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
     );
   }
 
-  const SENTRY_DSN_CANCELLED = process.env.SENTRY_DSN_PERFORMANCE ?? '';
-  if (SENTRY_DSN_CANCELLED) {
+  if (SENTRY_DSN) {
     try {
       const require = createRequire(import.meta.url);
       const Sentry = require('@sentry/node') as typeof import('@sentry/node');
@@ -406,7 +450,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
         }
       }
       Sentry.init({
-        dsn: SENTRY_DSN_CANCELLED,
+        dsn: SENTRY_DSN,
         enableLogs: true,
         release: `metamask-extension@${version}`,
       } as Parameters<typeof Sentry.init>[0]);
@@ -802,8 +846,6 @@ if (process.env.CI === 'true') {
 // ---------------------------------------------------------------------------
 // Send structured log to Sentry
 // ---------------------------------------------------------------------------
-
-const SENTRY_DSN = process.env.SENTRY_DSN_PERFORMANCE ?? '';
 
 if (SENTRY_DSN) {
   try {
