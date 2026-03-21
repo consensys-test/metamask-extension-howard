@@ -1,12 +1,17 @@
 # Classify and retry failed Main workflow runs.
 #
 # Triggered by `workflow_run` on every Main completion. Skips successes
-# and fork runs at the job level. For failures, it:
+# and fork runs at the job level.
 #
+# For failures, it:
 #   1. Classifies each failed job (jobRetryable) and derives an overall
 #      is-retryable decision
 #   2. Writes a markdown report to the step summary
 #   3. Sends a structured log to Sentry (if SENTRY_DSN_PERFORMANCE is set)
+#
+# For cancelled runs on attempt > 1 (preempted retries), it:
+#   1. Emits a lightweight "cancelled" event to Sentry and exits
+#      (no full classification needed)
 #
 # Retry is label-gated for all events that have an originating PR:
 #
@@ -61,16 +66,20 @@ jobs:
     # Gate: only spin up a runner for events worth classifying.
     #
     # Pseudocode:
-    #   if run.conclusion != 'failure'        → skip (nothing to classify)
+    #   if run.conclusion not in ['failure','cancelled'] → skip
     #   if run.repo != run.head_repo          → skip (fork — no permissions)
     #   if run.event == 'merge_group'         → run  (label-gated retry via PR)
     #   if run.event == 'pull_request'        → run  (label-gated retry via PR)
     #   if run.event == 'push'
     #     and run.branch in ['main','stable'] → run  (observation only — no retry)
     #   else                                  → skip (release/*, workflow_dispatch, etc.)
+    #
+    # Cancelled runs are included so that preempted retries (attempt > 1,
+    # cancelled before completion) can emit a lightweight Sentry event.
+    # The classifier handles cancelled runs with an early exit.
     if: >-
       ${{
-        github.event.workflow_run.conclusion == 'failure' &&
+        contains(fromJson('["failure","cancelled"]'), github.event.workflow_run.conclusion) &&
         github.event.workflow_run.head_repository.full_name == github.event.workflow_run.repository.full_name &&
         (
           github.event.workflow_run.event == 'merge_group'
@@ -101,6 +110,7 @@ jobs:
       PR_NUMBER_FROM_EVENT: ${{ github.event.workflow_run.pull_requests[0].number }}
       REPO: ${{ github.repository }}
       SENTRY_DSN_PERFORMANCE: ${{ vars.SENTRY_DSN_PERFORMANCE }}
+      WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
       WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
     steps:
       - name: Checkout .github/ directory

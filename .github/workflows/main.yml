@@ -960,6 +960,7 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN_PERFORMANCE }}
           ATTEMPT: ${{ github.run_attempt }}
+          TRIGGER_EVENT: ${{ github.event_name }}
         with:
           script: |
             const dsn = process.env.SENTRY_DSN;
@@ -995,6 +996,7 @@ jobs:
                 'ci.retry.runId':             { value: process.env.RUN_ID, type: 'string' },
                 'ci.retry.date':              { value: today,      type: 'string' },
                 'ci.targetBranch':            { value: branch,     type: 'string' },
+                'ci.retry.triggerEvent':       { value: process.env.TRIGGER_EVENT, type: 'string' },
                 'sentry.severity_text':       { value: 'info',     type: 'string' },
               },
             }]});

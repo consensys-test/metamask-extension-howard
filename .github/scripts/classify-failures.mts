@@ -370,6 +370,79 @@ function classifyJob(job: Job): JobClassification {
 // Main
 // ---------------------------------------------------------------------------
 
+const WORKFLOW_CONCLUSION = process.env.WORKFLOW_CONCLUSION ?? '';
+
+// ---------------------------------------------------------------------------
+// Cancelled-run early exit
+// ---------------------------------------------------------------------------
+// When a retried run is cancelled before completing (e.g. preempted by a new
+// merge-queue entry), emit a lightweight Sentry event so the retry success
+// rate widget can count it as "did not resolve". No classification is needed.
+if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
+  console.log(
+    `Run ${MAIN_RUN_ID} was cancelled on attempt ${ATTEMPT} — emitting cancelled event.`,
+  );
+  if (GITHUB_OUTPUT) {
+    appendFileSync(
+      GITHUB_OUTPUT,
+      'is-retryable=false\nhas-retry-label=false\nwill-retry=false\npr-number=\n',
+    );
+  }
+
+  const SENTRY_DSN_CANCELLED = process.env.SENTRY_DSN_PERFORMANCE ?? '';
+  if (SENTRY_DSN_CANCELLED) {
+    try {
+      const require = createRequire(import.meta.url);
+      const Sentry = require('@sentry/node') as typeof import('@sentry/node');
+      let version = process.env.VERSION ?? '';
+      if (!version) {
+        try {
+          const pkgPath = join(scriptDir, '..', '..', 'package.json');
+          version = (
+            JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
+          ).version;
+        } catch {
+          version = 'unknown';
+        }
+      }
+      Sentry.init({
+        dsn: SENTRY_DSN_CANCELLED,
+        enableLogs: true,
+        release: `metamask-extension@${version}`,
+      } as Parameters<typeof Sentry.init>[0]);
+
+      const branch = HEAD_BRANCH.replace(
+        /^gh-readonly-queue\/([^/]+)\/.*/,
+        '$1',
+      );
+      Sentry.logger.info('Main CI Failure Triage: cancelled', {
+        'ci.targetBranch': branch,
+        'ci.retry.date': new Date().toISOString().slice(0, 10),
+        'ci.retry.decision': 'cancelled',
+        'ci.retry.runId': MAIN_RUN_ID,
+        'ci.retry.attempt': ATTEMPT || 'unknown',
+        'ci.retry.event': WORKFLOW_EVENT || '',
+      });
+
+      const flushed = await Sentry.flush(5000);
+      if (flushed) {
+        console.log('Sent cancelled event to Sentry');
+      } else {
+        console.warn('Sentry flush timed out');
+      }
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+        console.warn('Sentry skipped: @sentry/node not available');
+      } else {
+        console.warn('Failed to send cancelled event to Sentry:', err);
+      }
+    }
+  }
+
+  process.exit(0);
+}
+
 console.log(`Classifying failures for run ${MAIN_RUN_ID}...`);
 
 const failedJobs = getFailedJobs();
@@ -808,9 +881,9 @@ if (SENTRY_DSN) {
       'ci.retry.runId': MAIN_RUN_ID,
       'ci.retry.attempt': ATTEMPT || 'unknown',
       'ci.retry.event': WORKFLOW_EVENT || '',
-      'ci.retry.failedJobCount': failedJobs.length,
-      'ci.retry.jobRetryableCount': jobRetryableCount,
-      'ci.retry.jobNonRetryableCount': jobNonRetryableCount,
+      'ci.retry.failedJobCount': String(failedJobs.length),
+      'ci.retry.jobRetryableCount': String(jobRetryableCount),
+      'ci.retry.jobNonRetryableCount': String(jobNonRetryableCount),
       'ci.retry.retryableRatio': retryableRatio,
       'ci.retry.nonRetryableRatio': nonRetryableRatio,
       'ci.retry.unmatchedJobCount': unmatchedJobs.length,

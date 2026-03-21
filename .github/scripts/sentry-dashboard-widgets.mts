@@ -12,6 +12,7 @@ export interface SentryDashboardQuery {
 
 export interface SentryDashboardWidget {
   title: string;
+  description?: string;
   displayType: 'table' | 'line' | 'area' | 'bar' | 'categorical_bar';
   interval: '5m' | '15m' | '1h' | '1d';
   limit?: number;
@@ -38,6 +39,7 @@ export interface SentryDashboardPayload {
 
 interface WidgetSpec {
   title: string;
+  description?: string;
   conditions: string;
   displayType?: SentryDashboardWidget['displayType'];
   interval?: SentryDashboardWidget['interval'];
@@ -53,6 +55,7 @@ interface WidgetSpec {
 
 function logWidget({
   title,
+  description,
   displayType = 'table',
   interval = '5m',
   conditions,
@@ -67,6 +70,7 @@ function logWidget({
 }: WidgetSpec): SentryDashboardWidget {
   return {
     title,
+    ...(description ? { description } : {}),
     displayType,
     interval,
     ...(limit !== undefined ? { limit } : {}),
@@ -112,6 +116,7 @@ function graphWidget(spec: WidgetSpec): SentryDashboardWidget {
 
 function stackedBarWidget({
   title,
+  description,
   queries,
   y,
   x = 0,
@@ -119,6 +124,7 @@ function stackedBarWidget({
   h = 2,
 }: {
   title: string;
+  description?: string;
   queries: { name: string; conditions: string }[];
   y: number;
   x?: number;
@@ -127,6 +133,7 @@ function stackedBarWidget({
 }): SentryDashboardWidget {
   return {
     title,
+    ...(description ? { description } : {}),
     displayType: 'area',
     interval: '1d',
     datasetSource: 'user',
@@ -147,6 +154,7 @@ function stackedBarWidget({
 
 function multiSeriesMetricGraphWidget({
   title,
+  description,
   queries,
   y,
   x = 0,
@@ -155,6 +163,7 @@ function multiSeriesMetricGraphWidget({
   displayType = 'line',
 }: {
   title: string;
+  description?: string;
   queries: { name: string; conditions: string; metric: string }[];
   y: number;
   x?: number;
@@ -164,6 +173,7 @@ function multiSeriesMetricGraphWidget({
 }): SentryDashboardWidget {
   return {
     title,
+    ...(description ? { description } : {}),
     displayType,
     interval: '1d',
     datasetSource: 'user',
@@ -220,6 +230,8 @@ export function buildCiRetryDashboardPayload({
       // ── Row 0: Hero metric ────────────────────────────────────────
       {
         title: 'What ratio of failed workflows are retryable?',
+        description:
+          'Each failed workflow run is classified: what fraction of its failed jobs are retryable (flakes) vs non-retryable (real failures)? Lines converging at 1.0 means most failures are flakes.',
         displayType: 'line' as const,
         interval: '1d',
         datasetSource: 'user' as const,
@@ -306,6 +318,8 @@ export function buildCiRetryDashboardPayload({
       // ── Row 7: Retry attempts trend ───────────────────────────────
       stackedBarWidget({
         title: 'When we retried, how many tries did it take?',
+        description:
+          'Only counts runs that eventually succeeded (resolved). Attempt 2 = fixed on first retry. Attempt 3+ = needed multiple retries. Emitted by ci-status-gate when run_attempt > 1 and all jobs pass.',
         queries: ['2', '3', '4'].map((attempt) => ({
           name: `Attempt ${attempt}`,
           conditions: `${baseCondition} ci.retry.event:resolved ci.retry.resolvedAtAttempt:${attempt}`,
@@ -318,6 +332,8 @@ export function buildCiRetryDashboardPayload({
       // ── Row 9: Unmatched + blocker trends ─────────────────────────
       graphWidget({
         title: 'How many workflows hit an unmatched error type?',
+        description:
+          "Unmatched = a job failed but didn't match any known category in retry-config.jsonc. Rising trend means new failure patterns need to be added to the classifier.",
         displayType: 'line',
         conditions: `${baseCondition} tags[ci.retry.unmatchedJobCount,number]:>0`,
         columns: ['count_unique(ci.retry.runId)'],
@@ -328,6 +344,8 @@ export function buildCiRetryDashboardPayload({
       }),
       tableWidget({
         title: 'Unmatched Failures ("No results" = healthy)',
+        description:
+          "Jobs that failed but didn't match any category in retry-config.jsonc. Empty table means every failure type is accounted for. New entries here mean you need to add a pattern to the classifier.",
         conditions: `${jobCondition} ci.job.unmatched:true`,
         columns: ['count()', 'ci.job.name', 'ci.job.reason', 'ci.retry.runId'],
         fieldAliases: ['Count', 'Job Name', 'Reason', 'Run ID'],
@@ -339,6 +357,8 @@ export function buildCiRetryDashboardPayload({
       // ── Row 11: Cascade blockers ──────────────────────────────────
       graphWidget({
         title: 'How many workflows hit a cascade retry blocker?',
+        description:
+          'Blocker jobs (Get workflow, Prepare dependencies, etc.) gate all downstream jobs. If a blocker fails non-transiently, the entire run is marked non-retryable regardless of other jobs.',
         displayType: 'line',
         conditions: `${baseCondition} has:ci.blockedBy`,
         columns: ['count_unique(ci.retry.runId)'],
@@ -401,6 +421,81 @@ export function buildCiRetryDashboardPayload({
         x: 0,
         w: 6,
         h: 3,
+      }),
+      // ── Row 18: Failed job count trend ────────────────────────────
+      graphWidget({
+        title: 'How many jobs failed per workflow run?',
+        description:
+          'Average failed jobs per run. Low (1-2) = isolated flakes. High (5+) = infra outage or blocker cascade. Helps decide whether retry strategy should target individual jobs vs whole workflows.',
+        displayType: 'line',
+        conditions: `${baseCondition} has:ci.retry.decision`,
+        columns: ['avg(tags[ci.retry.failedJobCount,number])'],
+        fieldAliases: ['Avg failed jobs'],
+        orderby: '-avg(tags[ci.retry.failedJobCount,number])',
+        y: 18,
+        x: 0,
+        w: 6,
+      }),
+      // ── Row 20: Branch targets ────────────────────────────────────
+      multiSeriesMetricGraphWidget({
+        title: 'Which branch targets are failing?',
+        description:
+          'Breaks down failures by branch and trigger event. main gets three series (PRs, merge queue, pushes) since they have different retry policies. stable and release/* are separate tracks.',
+        displayType: 'area',
+        queries: [
+          {
+            name: 'PRs → main',
+            conditions: `${baseCondition} ci.targetBranch:main ci.retry.event:pull_request`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'Merge Queue → main',
+            conditions: `${baseCondition} ci.targetBranch:main ci.retry.event:merge_group`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'Pushes → main',
+            conditions: `${baseCondition} ci.targetBranch:main ci.retry.event:push`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'stable',
+            conditions: `${baseCondition} ci.targetBranch:stable`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'release/*',
+            conditions: `${baseCondition} ci.targetBranch:release/*`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+        ],
+        y: 20,
+        x: 0,
+        w: 6,
+      }),
+      // ── Row 22: Retry outcomes ────────────────────────────────────
+      // The gap between "Retried" and "Resolved" = runs that retried
+      // but didn't succeed (still failing or cancelled).
+      multiSeriesMetricGraphWidget({
+        title: 'Did retries actually fix things?',
+        description:
+          "Retried = auto-retried by triage (will-retry). Resolved = later attempt succeeded (includes manual reruns). Gap = retries that didn't help. Resolved > Retried means manual retries outside the system.",
+        displayType: 'line',
+        queries: [
+          {
+            name: 'Retried',
+            conditions: `${baseCondition} ci.retry.decision:will-retry`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'Resolved',
+            conditions: `${baseCondition} ci.retry.event:resolved`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+        ],
+        y: 22,
+        x: 0,
+        w: 6,
       }),
     ],
   };
