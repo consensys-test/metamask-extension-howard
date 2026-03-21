@@ -763,6 +763,17 @@ if (SENTRY_DSN) {
     const jobRetryableCount = classifications.filter(
       (c) => c.jobRetryable,
     ).length;
+    const jobNonRetryableCount = classifications.length - jobRetryableCount;
+    const retryableRatio =
+      classifications.length > 0
+        ? Math.round((jobRetryableCount / classifications.length) * 10000) /
+          10000
+        : 0;
+    const nonRetryableRatio =
+      classifications.length > 0
+        ? Math.round((jobNonRetryableCount / classifications.length) * 10000) /
+          10000
+        : 0;
 
     const drilldownQuery = `message:"Main CI Failure Triage Job" ci.retry.runId:${MAIN_RUN_ID}`;
     const sentryBaseUrl = (
@@ -799,8 +810,9 @@ if (SENTRY_DSN) {
       'ci.retry.event': WORKFLOW_EVENT || '',
       'ci.retry.failedJobCount': failedJobs.length,
       'ci.retry.jobRetryableCount': jobRetryableCount,
-      'ci.retry.jobNonRetryableCount':
-        classifications.length - jobRetryableCount,
+      'ci.retry.jobNonRetryableCount': jobNonRetryableCount,
+      'ci.retry.retryableRatio': retryableRatio,
+      'ci.retry.nonRetryableRatio': nonRetryableRatio,
       'ci.retry.unmatchedJobCount': unmatchedJobs.length,
       'ci.retry.mainRunUrl': mainRunUrl,
       'ci.retry.triageRunUrl': triageRunUrl,

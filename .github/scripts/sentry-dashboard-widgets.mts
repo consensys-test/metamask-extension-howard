@@ -31,7 +31,6 @@ export interface SentryDashboardPayload {
   title: string;
   widgets: SentryDashboardWidget[];
   projects: number[];
-  period: string;
   environment: string[];
   filters: Record<string, string>;
   utc: boolean;
@@ -146,6 +145,43 @@ function stackedBarWidget({
   };
 }
 
+function multiSeriesMetricGraphWidget({
+  title,
+  queries,
+  y,
+  x = 0,
+  w = 6,
+  h = 2,
+  displayType = 'line',
+}: {
+  title: string;
+  queries: { name: string; conditions: string; metric: string }[];
+  y: number;
+  x?: number;
+  w?: number;
+  h?: number;
+  displayType?: SentryDashboardWidget['displayType'];
+}): SentryDashboardWidget {
+  return {
+    title,
+    displayType,
+    interval: '1d',
+    datasetSource: 'user',
+    widgetType: 'logs',
+    queries: queries.map(({ name, conditions, metric }) => ({
+      name,
+      fields: [metric],
+      aggregates: [metric],
+      columns: [],
+      fieldAliases: [''],
+      conditions,
+      orderby: `-${metric}`,
+      isHidden: false,
+    })),
+    layout: { w, h, x, y, minH: 2 },
+  };
+}
+
 function categoricalDistributionWidget({
   groupBy,
   orderby = `-${groupBy}`,
@@ -169,7 +205,7 @@ export function buildCiRetryDashboardPayload({
   projectId: number;
   period?: string;
 }): SentryDashboardPayload {
-  const baseCondition = 'has:ci.retry.runId has:ci.retry.date';
+  const baseCondition = '';
   const jobCondition =
     'has:ci.retry.runId has:ci.retry.date has:ci.job.name !ci.job.name:"CI status gate (controls all-jobs-pass)"';
 
@@ -181,49 +217,81 @@ export function buildCiRetryDashboardPayload({
     filters: {},
     utc: true,
     widgets: [
-      tableWidget({
-        title: 'Decision Distribution',
-        conditions: `${baseCondition} has:ci.retry.decision`,
-        columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
-        fieldAliases: ['Count', 'Decision'],
-        orderby: 'ci.retry.decision',
-        y: 0,
+      // ── Row 0: Hero metric ────────────────────────────────────────
+      {
+        title: 'What ratio of failed workflows are retryable?',
+        displayType: 'line' as const,
+        interval: '1d',
+        datasetSource: 'user' as const,
+        widgetType: 'logs' as const,
+        queries: [
+          {
+            name: '',
+            fields: [
+              'avg(tags[ci.retry.retryableRatio,number])',
+              'avg(tags[ci.retry.nonRetryableRatio,number])',
+            ],
+            aggregates: [
+              'avg(tags[ci.retry.retryableRatio,number])',
+              'avg(tags[ci.retry.nonRetryableRatio,number])',
+            ],
+            columns: [],
+            fieldAliases: ['retryable', 'non-retryable'],
+            conditions: '', // no filter needed — ratio fields only exist on summary events
+            orderby: '-avg(tags[ci.retry.retryableRatio,number])',
+            isHidden: false,
+          },
+        ],
+        layout: { w: 6, h: 2, x: 0, y: 0, minH: 2 },
+      },
+      // ── Row 2: Decision breakdown charts ──────────────────────────
+      stackedBarWidget({
+        title: 'Were retryable runs retried?',
+        queries: [
+          { decision: 'will-retry', name: 'Auto-retried' },
+          { decision: 'retryable-no-label', name: 'Retryable (but no label)' },
+          { decision: 'retryable-no-pr', name: 'Retryable (but no PR)' },
+        ].map(({ decision, name }) => ({
+          name,
+          conditions: `${baseCondition} ci.retry.decision:${decision}`,
+        })),
+        y: 2,
         x: 0,
+        w: 3,
+        h: 3,
       }),
-      tableWidget({
-        title: 'Retry Usage (Label-Gated)',
-        conditions: `${baseCondition} has:ci.retry.willRetry has:ci.retry.hasRetryLabel`,
-        columns: ['count()', 'ci.retry.willRetry', 'ci.retry.hasRetryLabel'],
-        fieldAliases: ['Count', 'Will Retry', 'Has Retry Label'],
-        orderby: '-count()',
-        y: 0,
-        x: 2,
+      stackedBarWidget({
+        title: 'Did people put the label on non-retryable runs?',
+        queries: [
+          { decision: 'not-retryable-has-label', name: 'Has label' },
+          { decision: 'not-retryable-no-label', name: 'No label' },
+          { decision: 'not-retryable-no-pr', name: 'No PR' },
+        ].map(({ decision, name }) => ({
+          name,
+          conditions: `${baseCondition} ci.retry.decision:${decision}`,
+        })),
+        y: 2,
+        x: 3,
+        w: 3,
+        h: 3,
       }),
-      tableWidget({
-        title: 'Unmatched Failures ("No results" = healthy)',
-        conditions: `${baseCondition} has:ci.retry.unmatchedJobCount`,
-        columns: ['count()', 'ci.retry.unmatchedJobCount', 'ci.retry.runId'],
-        fieldAliases: ['Count', 'Unmatched Job Count', 'Run ID'],
-        orderby: '-ci.retry.unmatchedJobCount',
-        y: 0,
-        x: 4,
-      }),
+      // ── Row 5: Job-level tables ───────────────────────────────────
       tableWidget({
         title: 'Flakiest Jobs (Retryable)',
         conditions: `${jobCondition} ci.job.retryable:true`,
         columns: ['count()', 'ci.job.name', 'ci.job.category'],
         fieldAliases: ['Count', 'Job Name', 'Job Category'],
         orderby: '-count()',
-        y: 2,
+        y: 5,
         x: 0,
       }),
       tableWidget({
-        title: 'Deterministic Failures (Non-Retryable)',
+        title: 'Frequent Deterministic Failures (Non-Retryable)',
         conditions: `${jobCondition} ci.job.retryable:false`,
         columns: ['count()', 'ci.job.name', 'ci.job.category', 'ci.job.reason'],
         fieldAliases: ['Count', 'Job Name', 'Job Category', 'Failure Reason'],
         orderby: '-count()',
-        y: 2,
+        y: 5,
         x: 2,
       }),
       tableWidget({
@@ -232,33 +300,81 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.job.category'],
         fieldAliases: ['Count', 'Job Category'],
         orderby: '-count()',
-        y: 2,
+        y: 5,
         x: 4,
+      }),
+      // ── Row 7: Retry attempts trend ───────────────────────────────
+      stackedBarWidget({
+        title: 'When we retried, how many tries did it take?',
+        queries: ['2', '3', '4'].map((attempt) => ({
+          name: `Attempt ${attempt}`,
+          conditions: `${baseCondition} ci.retry.event:resolved ci.retry.resolvedAtAttempt:${attempt}`,
+        })),
+        y: 7,
+        x: 0,
+        w: 6,
+        h: 2,
+      }),
+      // ── Row 9: Unmatched + blocker trends ─────────────────────────
+      graphWidget({
+        title: 'How many workflows hit an unmatched error type?',
+        displayType: 'line',
+        conditions: `${baseCondition} tags[ci.retry.unmatchedJobCount,number]:>0`,
+        columns: ['count_unique(ci.retry.runId)'],
+        orderby: '-count_unique(ci.retry.runId)',
+        y: 9,
+        x: 0,
+        w: 3,
+      }),
+      tableWidget({
+        title: 'Unmatched Failures ("No results" = healthy)',
+        conditions: `${jobCondition} ci.job.unmatched:true`,
+        columns: ['count()', 'ci.job.name', 'ci.job.reason', 'ci.retry.runId'],
+        fieldAliases: ['Count', 'Job Name', 'Reason', 'Run ID'],
+        orderby: '-count()',
+        y: 9,
+        x: 3,
+        w: 3,
+      }),
+      // ── Row 11: Cascade blockers ──────────────────────────────────
+      graphWidget({
+        title: 'How many workflows hit a cascade retry blocker?',
+        displayType: 'line',
+        conditions: `${baseCondition} has:ci.blockedBy`,
+        columns: ['count_unique(ci.retry.runId)'],
+        orderby: '-count_unique(ci.retry.runId)',
+        y: 11,
+        x: 0,
+        w: 3,
+      }),
+      tableWidget({
+        title: 'Most frequent Cascade Blockers',
+        conditions: `${baseCondition} has:ci.blockedBy`,
+        columns: ['count()', 'ci.blockedBy'],
+        fieldAliases: ['Count', 'Blocker'],
+        orderby: '-count()',
+        y: 11,
+        x: 3,
+        w: 3,
+      }),
+      // ── Row 13: Reference tables ──────────────────────────────────
+      tableWidget({
+        title: 'Decision Distribution',
+        conditions: `${baseCondition} has:ci.retry.decision`,
+        columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
+        fieldAliases: ['Count', 'Decision'],
+        orderby: 'ci.retry.decision',
+        y: 13,
+        x: 0,
       }),
       categoricalDistributionWidget({
         title: 'Failures by Workflow Event',
         groupBy: 'ci.retry.event',
         conditions: `${baseCondition} has:ci.retry.event`,
-        y: 4,
-        x: 0,
-      }),
-      categoricalDistributionWidget({
-        title: 'Attempt Depth Distribution',
-        groupBy: 'ci.retry.attempt',
-        conditions: `${baseCondition} has:ci.retry.attempt`,
-        orderby: '-count_unique(ci.retry.runId)',
-        y: 4,
+        y: 13,
         x: 2,
       }),
-      tableWidget({
-        title: 'Cascade Blockers',
-        conditions: `${baseCondition} has:ci.blockedBy`,
-        columns: ['count()', 'ci.blockedBy'],
-        fieldAliases: ['Count', 'Blocked By'],
-        orderby: '-count()',
-        y: 4,
-        x: 4,
-      }),
+      // ── Row 15: Recent decisions log ──────────────────────────────
       tableWidget({
         title: 'Most Recent Decisions',
         conditions: `${baseCondition} has:ci.retry.decision has:ci.retry.jobDrilldownUrl`,
@@ -281,61 +397,7 @@ export function buildCiRetryDashboardPayload({
           'Target Branch',
         ],
         orderby: '-timestamp',
-        y: 6,
-        x: 0,
-        w: 6,
-        h: 3,
-      }),
-      graphWidget({
-        title: 'Unmatched Runs Trend',
-        displayType: 'line',
-        conditions: `${baseCondition} ci.retry.hasUnmatched:true`,
-        columns: ['count_unique(ci.retry.runId)'],
-        orderby: '-count_unique(ci.retry.runId)',
-        y: 9,
-        x: 0,
-        w: 3,
-      }),
-      graphWidget({
-        title: 'Cascade Blocker Runs Trend',
-        displayType: 'line',
-        conditions: `${baseCondition} has:ci.blockedBy`,
-        columns: ['count_unique(ci.retry.runId)'],
-        orderby: '-count_unique(ci.retry.runId)',
-        y: 9,
-        x: 3,
-        w: 3,
-      }),
-      stackedBarWidget({
-        title: 'Decision Actionability Trend',
-        queries: [
-          'will-retry',
-          'retryable-no-label',
-          'not-retryable-has-label',
-          'not-retryable-no-label',
-        ].map((decision) => ({
-          name: decision,
-          conditions: `${baseCondition} ci.retry.decision:${decision}`,
-        })),
-        y: 11,
-        x: 0,
-        w: 6,
-        h: 2,
-      }),
-      stackedBarWidget({
-        title: 'Decision Trend (Stacked)',
-        queries: [
-          'will-retry',
-          'retryable-no-label',
-          'retryable-no-pr',
-          'not-retryable-has-label',
-          'not-retryable-no-label',
-          'not-retryable-no-pr',
-        ].map((decision) => ({
-          name: decision,
-          conditions: `${baseCondition} ci.retry.decision:${decision}`,
-        })),
-        y: 13,
+        y: 15,
         x: 0,
         w: 6,
         h: 3,
