@@ -434,53 +434,23 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
     );
   }
 
-  if (SENTRY_DSN) {
-    try {
-      const require = createRequire(import.meta.url);
-      const Sentry = require('@sentry/node') as typeof import('@sentry/node');
-      let version = process.env.VERSION ?? '';
-      if (!version) {
-        try {
-          const pkgPath = join(scriptDir, '..', '..', 'package.json');
-          version = (
-            JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
-          ).version;
-        } catch {
-          version = 'unknown';
-        }
-      }
-      Sentry.init({
-        dsn: SENTRY_DSN,
-        enableLogs: true,
-        release: `metamask-extension@${version}`,
-      } as Parameters<typeof Sentry.init>[0]);
+  const Sentry = initSentry();
+  if (Sentry) {
+    const branch = HEAD_BRANCH.replace(/^gh-readonly-queue\/([^/]+)\/.*/, '$1');
+    Sentry.logger.info('Main CI Failure Triage: cancelled', {
+      'ci.targetBranch': branch,
+      'ci.retry.date': new Date().toISOString().slice(0, 10),
+      'ci.retry.decision': 'cancelled',
+      'ci.retry.runId': MAIN_RUN_ID,
+      'ci.retry.attempt': ATTEMPT || 'unknown',
+      'ci.retry.event': WORKFLOW_EVENT || '',
+    });
 
-      const branch = HEAD_BRANCH.replace(
-        /^gh-readonly-queue\/([^/]+)\/.*/,
-        '$1',
-      );
-      Sentry.logger.info('Main CI Failure Triage: cancelled', {
-        'ci.targetBranch': branch,
-        'ci.retry.date': new Date().toISOString().slice(0, 10),
-        'ci.retry.decision': 'cancelled',
-        'ci.retry.runId': MAIN_RUN_ID,
-        'ci.retry.attempt': ATTEMPT || 'unknown',
-        'ci.retry.event': WORKFLOW_EVENT || '',
-      });
-
-      const flushed = await Sentry.flush(5000);
-      if (flushed) {
-        console.log('Sent cancelled event to Sentry');
-      } else {
-        console.warn('Sentry flush timed out');
-      }
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException)?.code;
-      if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
-        console.warn('Sentry skipped: @sentry/node not available');
-      } else {
-        console.warn('Failed to send cancelled event to Sentry:', err);
-      }
+    const flushed = await Sentry.flush(5000);
+    if (flushed) {
+      console.log('Sent cancelled event to Sentry');
+    } else {
+      console.warn('Sentry flush timed out');
     }
   }
 
@@ -847,140 +817,101 @@ if (process.env.CI === 'true') {
 // Send structured log to Sentry
 // ---------------------------------------------------------------------------
 
-if (SENTRY_DSN) {
-  try {
-    // VERSION env var is set by the workflow (via curl + node -p) since
-    // the sparse checkout doesn't include package.json.
-    // Falls back to reading package.json from disk (for CLI use).
-    let version = process.env.VERSION ?? '';
-    if (!version) {
-      try {
-        const pkgPath = join(scriptDir, '..', '..', 'package.json');
-        version = (
-          JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
-        ).version;
-      } catch {
-        version = 'unknown';
-      }
-    }
+const Sentry = initSentry();
+if (Sentry) {
+  const jobRetryableCount = classifications.filter(
+    (c) => c.jobRetryable,
+  ).length;
+  const jobNonRetryableCount = classifications.length - jobRetryableCount;
+  const retryableRatio =
+    classifications.length > 0
+      ? Math.round((jobRetryableCount / classifications.length) * 10000) / 10000
+      : 0;
+  const nonRetryableRatio =
+    classifications.length > 0
+      ? Math.round((jobNonRetryableCount / classifications.length) * 10000) /
+        10000
+      : 0;
 
-    // Use CJS require — ESM import('@sentry/node') breaks on some
-    // workspace installs due to missing ESM export paths.
-    const require = createRequire(import.meta.url);
-    const Sentry = require('@sentry/node') as typeof import('@sentry/node');
-    const sentryInitOptions = {
-      dsn: SENTRY_DSN,
-      enableLogs: true,
-      release: `metamask-extension@${version}`,
-    } as Parameters<typeof Sentry.init>[0];
-    Sentry.init(sentryInitOptions);
+  const drilldownQuery = `message:"Main CI Failure Triage Job" ci.retry.runId:${MAIN_RUN_ID}`;
+  const sentryBaseUrl = (
+    process.env.SENTRY_BASE_URL || 'https://metamask.sentry.io'
+  ).replace(/\/+$/, '');
+  const drilldownBase = `${sentryBaseUrl}/explore/logs/`;
+  const drilldownParams = new URLSearchParams({
+    logsQuery: drilldownQuery,
+    logsSortBys: '-timestamp',
+    statsPeriod: '14dh',
+  });
+  drilldownParams.append('logsFields', 'timestamp');
+  drilldownParams.append('logsFields', 'message');
+  const jobDrilldownUrl = `${drilldownBase}?${drilldownParams.toString()}`;
 
-    const jobRetryableCount = classifications.filter(
-      (c) => c.jobRetryable,
-    ).length;
-    const jobNonRetryableCount = classifications.length - jobRetryableCount;
-    const retryableRatio =
-      classifications.length > 0
-        ? Math.round((jobRetryableCount / classifications.length) * 10000) /
-          10000
-        : 0;
-    const nonRetryableRatio =
-      classifications.length > 0
-        ? Math.round((jobNonRetryableCount / classifications.length) * 10000) /
-          10000
-        : 0;
+  const parentTriageParams = new URLSearchParams({
+    logsQuery: `message:"Main CI Failure Triage:" ci.retry.runId:${MAIN_RUN_ID}`,
+    statsPeriod: '14dh',
+  });
+  const parentTriageLink = `${drilldownBase}?${parentTriageParams.toString()}`;
 
-    const drilldownQuery = `message:"Main CI Failure Triage Job" ci.retry.runId:${MAIN_RUN_ID}`;
-    const sentryBaseUrl = (
-      process.env.SENTRY_BASE_URL || 'https://metamask.sentry.io'
-    ).replace(/\/+$/, '');
-    const drilldownBase = `${sentryBaseUrl}/explore/logs/`;
-    const drilldownParams = new URLSearchParams({
-      logsQuery: drilldownQuery,
-      logsSortBys: '-timestamp',
-      statsPeriod: '14dh',
-    });
-    drilldownParams.append('logsFields', 'timestamp');
-    drilldownParams.append('logsFields', 'message');
-    const jobDrilldownUrl = `${drilldownBase}?${drilldownParams.toString()}`;
+  Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
+    'ci.targetBranch': targetBranch || '',
+    'ci.commitHash': process.env.HEAD_SHA || '',
+    'ci.prNumber': prNumber || 'none',
+    'ci.repo': REPO,
+    'ci.retry.date': new Date().toISOString().slice(0, 10),
+    'ci.retry.decision': decision,
+    'ci.retry.isRetryable': String(isRetryable),
+    'ci.retry.hasRetryLabel': String(hasRetryLabel),
+    'ci.retry.willRetry': String(willRetry),
+    'ci.retry.runId': MAIN_RUN_ID,
+    'ci.retry.attempt': ATTEMPT || 'unknown',
+    'ci.retry.event': WORKFLOW_EVENT || '',
+    'ci.retry.failedJobCount': String(failedJobs.length),
+    'ci.retry.jobRetryableCount': String(jobRetryableCount),
+    'ci.retry.jobNonRetryableCount': String(jobNonRetryableCount),
+    'ci.retry.retryableRatio': retryableRatio,
+    'ci.retry.nonRetryableRatio': nonRetryableRatio,
+    'ci.retry.unmatchedJobCount': unmatchedJobs.length,
+    'ci.retry.mainRunUrl': mainRunUrl,
+    'ci.retry.triageRunUrl': triageRunUrl,
+    'ci.retry.jobDrilldownUrl': jobDrilldownUrl,
+    'ci.retry.report': report,
+    ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
+  });
 
-    const parentTriageParams = new URLSearchParams({
-      logsQuery: `message:"Main CI Failure Triage:" ci.retry.runId:${MAIN_RUN_ID}`,
-      statsPeriod: '14dh',
-    });
-    const parentTriageLink = `${drilldownBase}?${parentTriageParams.toString()}`;
+  const MAX_PER_JOB_EVENTS = 200;
+  const jobEvents = classifications.slice(0, MAX_PER_JOB_EVENTS);
 
-    Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
-      'ci.targetBranch': targetBranch || '',
-      'ci.commitHash': process.env.HEAD_SHA || '',
-      'ci.prNumber': prNumber || 'none',
-      'ci.repo': REPO,
+  for (const job of jobEvents) {
+    Sentry.logger.info('Main CI Failure Triage Job', {
+      'ci.retry.runId': MAIN_RUN_ID,
       'ci.retry.date': new Date().toISOString().slice(0, 10),
       'ci.retry.decision': decision,
-      'ci.retry.isRetryable': String(isRetryable),
-      'ci.retry.hasRetryLabel': String(hasRetryLabel),
-      'ci.retry.willRetry': String(willRetry),
-      'ci.retry.runId': MAIN_RUN_ID,
       'ci.retry.attempt': ATTEMPT || 'unknown',
       'ci.retry.event': WORKFLOW_EVENT || '',
-      'ci.retry.failedJobCount': String(failedJobs.length),
-      'ci.retry.jobRetryableCount': String(jobRetryableCount),
-      'ci.retry.jobNonRetryableCount': String(jobNonRetryableCount),
-      'ci.retry.retryableRatio': retryableRatio,
-      'ci.retry.nonRetryableRatio': nonRetryableRatio,
-      'ci.retry.unmatchedJobCount': unmatchedJobs.length,
-      'ci.retry.mainRunUrl': mainRunUrl,
-      'ci.retry.triageRunUrl': triageRunUrl,
-      'ci.retry.jobDrilldownUrl': jobDrilldownUrl,
-      'ci.retry.report': report,
-      ...(blockedBy ? { 'ci.blockedBy': blockedBy } : {}),
+      'ci.retry.parentTriageLink': parentTriageLink,
+      'ci.job.id': String(job.jobId),
+      'ci.job.name': job.jobName,
+      'ci.job.category': job.category,
+      'ci.job.retryable': String(job.jobRetryable),
+      'ci.job.reason': job.reason,
+      ...(job.errorSnippet ? { 'ci.job.errorSnippet': job.errorSnippet } : {}),
+      ...(job.unmatched ? { 'ci.job.unmatched': true } : {}),
     });
+  }
 
-    const MAX_PER_JOB_EVENTS = 200;
-    const jobEvents = classifications.slice(0, MAX_PER_JOB_EVENTS);
+  if (classifications.length > MAX_PER_JOB_EVENTS) {
+    Sentry.logger.info('Main CI Failure Triage Job events truncated', {
+      'ci.retry.runId': MAIN_RUN_ID,
+      'ci.retry.jobEventLimit': MAX_PER_JOB_EVENTS,
+      'ci.retry.jobEventCount': classifications.length,
+    });
+  }
 
-    for (const job of jobEvents) {
-      Sentry.logger.info('Main CI Failure Triage Job', {
-        'ci.retry.runId': MAIN_RUN_ID,
-        'ci.retry.date': new Date().toISOString().slice(0, 10),
-        'ci.retry.decision': decision,
-        'ci.retry.attempt': ATTEMPT || 'unknown',
-        'ci.retry.event': WORKFLOW_EVENT || '',
-        'ci.retry.parentTriageLink': parentTriageLink,
-        'ci.job.id': String(job.jobId),
-        'ci.job.name': job.jobName,
-        'ci.job.category': job.category,
-        'ci.job.retryable': String(job.jobRetryable),
-        'ci.job.reason': job.reason,
-        ...(job.errorSnippet
-          ? { 'ci.job.errorSnippet': job.errorSnippet }
-          : {}),
-        ...(job.unmatched ? { 'ci.job.unmatched': true } : {}),
-      });
-    }
-
-    if (classifications.length > MAX_PER_JOB_EVENTS) {
-      Sentry.logger.info('Main CI Failure Triage Job events truncated', {
-        'ci.retry.runId': MAIN_RUN_ID,
-        'ci.retry.jobEventLimit': MAX_PER_JOB_EVENTS,
-        'ci.retry.jobEventCount': classifications.length,
-      });
-    }
-
-    const flushed = await Sentry.flush(5000);
-    if (flushed) {
-      console.log('Sent classification log to Sentry');
-    } else {
-      console.warn('Sentry flush timed out');
-    }
-  } catch (err: unknown) {
-    // Non-fatal: Sentry is optional. Fails gracefully when @sentry/node
-    // is not installed (e.g. local CLI usage without `npm install @sentry/node`).
-    const code = (err as NodeJS.ErrnoException)?.code;
-    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
-      console.warn('Sentry skipped: @sentry/node not available');
-    } else {
-      console.warn('Failed to send classification log to Sentry:', err);
-    }
+  const flushed = await Sentry.flush(5000);
+  if (flushed) {
+    console.log('Sent classification log to Sentry');
+  } else {
+    console.warn('Sentry flush timed out');
   }
 }
