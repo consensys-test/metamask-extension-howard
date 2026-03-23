@@ -1,6 +1,10 @@
 /**
  * classify-failures.mts
  *
+ * REVIEWER FOCUS: The classification logic and retry decision tree are the
+ * most important things to verify. See retry-config.jsonc for the pattern
+ * definitions that drive classification.
+ *
  * Analyzes failed jobs in a GitHub Actions workflow run and classifies each
  * failure (jobRetryable) based on job name patterns and transient error
  * detection. Derives an overall is-retryable decision from individual results.
@@ -127,6 +131,7 @@ const HEAD_BRANCH = process.env.HEAD_BRANCH ?? '';
 const PR_NUMBER_FROM_EVENT = process.env.PR_NUMBER_FROM_EVENT ?? '';
 const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT ?? '';
 const GITHUB_STEP_SUMMARY = process.env.GITHUB_STEP_SUMMARY ?? '';
+const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID ?? '';
 
 if (!MAIN_RUN_ID) {
   console.error(
@@ -180,6 +185,19 @@ function initSentry(): typeof import('@sentry/node') | null {
       console.warn('Failed to initialize Sentry:', err);
     }
     return null;
+  }
+}
+
+/** Flush Sentry and log outcome. */
+async function flushSentry(
+  sentry: typeof import('@sentry/node'),
+  label: string,
+): Promise<void> {
+  const flushed = await sentry.flush(5000);
+  if (flushed) {
+    console.log(`Sent ${label} to Sentry`);
+  } else {
+    console.warn('Sentry flush timed out');
   }
 }
 
@@ -262,10 +280,16 @@ function ghApi(
   });
 }
 
+let _headShaCache: string | undefined;
 function getRunHeadSha(): string {
-  if (process.env.HEAD_SHA) return process.env.HEAD_SHA;
-  const run = JSON.parse(ghApi(`${repoApi}/actions/runs/${MAIN_RUN_ID}`));
-  return run.head_sha;
+  if (_headShaCache !== undefined) return _headShaCache;
+  if (process.env.HEAD_SHA) {
+    _headShaCache = process.env.HEAD_SHA;
+  } else {
+    const run = JSON.parse(ghApi(`${repoApi}/actions/runs/${MAIN_RUN_ID}`));
+    _headShaCache = run.head_sha as string;
+  }
+  return _headShaCache;
 }
 
 function getFailedJobs(): Job[] {
@@ -436,7 +460,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
 
   const Sentry = initSentry();
   if (Sentry) {
-    const branch = HEAD_BRANCH.replace(/^gh-readonly-queue\/([^/]+)\/.*/, '$1');
+    const branch = resolveTargetBranch();
     Sentry.logger.info('Main CI Failure Triage: cancelled', {
       'ci.targetBranch': branch,
       'ci.retry.date': new Date().toISOString().slice(0, 10),
@@ -446,12 +470,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
       'ci.retry.event': WORKFLOW_EVENT || '',
     });
 
-    const flushed = await Sentry.flush(5000);
-    if (flushed) {
-      console.log('Sent cancelled event to Sentry');
-    } else {
-      console.warn('Sentry flush timed out');
-    }
+    await flushSentry(Sentry, 'cancelled event');
   }
 
   process.exit(0);
@@ -607,40 +626,54 @@ const hasPR = Boolean(prNumber);
 // but the failures aren't retryable."
 //
 // Note: hasRetryLabel implies hasPR (can't have a label without a PR),
-// so *-false-true is impossible. The ?? fallback after the lookup is a
-// defensive guard against that case to avoid a cryptic destructuring crash.
+// so the retryable=*,hasPR=false,hasLabel=true combination never occurs.
 //
-// The `key` is used in Sentry attributes; `label` is the human-readable
-// line in the step summary and check run report.
-const decisionTable: Record<string, { key: string; label: string }> = {
-  'true-true-true': {
-    key: 'will-retry',
-    label: '♻️ Will retry (retry-ci label present)',
-  },
-  'true-true-false': {
-    key: 'retryable-no-label',
-    label: `⏸️ Retryable, but no retry-ci label on PR #${prNumber}`,
-  },
-  'true-false-false': {
-    key: 'retryable-no-pr',
-    label: '🔇 Retryable, but no originating PR (observation only)',
-  },
-  'false-true-true': {
-    key: 'not-retryable-has-label',
-    label: '⛔ Has retry-ci label but non-retryable failures',
-  },
-  'false-true-false': {
-    key: 'not-retryable-no-label',
-    label: `❌ Non-retryable (PR #${prNumber}, no retry-ci label)`,
-  },
-  'false-false-false': {
+// resolveDecision() returns:
+//   key   — Sentry attribute value for ci.retry.decision
+//   label — human-readable line in the step summary / check run report
+function resolveDecision(
+  retryable: boolean,
+  hasPr: boolean,
+  hasLabel: boolean,
+  pr: string,
+): { key: string; label: string } {
+  if (retryable) {
+    if (hasPr && hasLabel)
+      return {
+        key: 'will-retry',
+        label: '♻️ Will retry (retry-ci label present)',
+      };
+    if (hasPr)
+      return {
+        key: 'retryable-no-label',
+        label: `⏸️ Retryable, but no retry-ci label on PR #${pr}`,
+      };
+    return {
+      key: 'retryable-no-pr',
+      label: '🔇 Retryable, but no originating PR (observation only)',
+    };
+  }
+  if (hasPr && hasLabel)
+    return {
+      key: 'not-retryable-has-label',
+      label: '⛔ Has retry-ci label but non-retryable failures',
+    };
+  if (hasPr)
+    return {
+      key: 'not-retryable-no-label',
+      label: `❌ Non-retryable (PR #${pr}, no retry-ci label)`,
+    };
+  return {
     key: 'not-retryable-no-pr',
     label: '❌ Non-retryable, no originating PR (observation only)',
-  },
-};
-const { key: decision, label: decisionLabel } = decisionTable[
-  `${isRetryable}-${hasPR}-${hasRetryLabel}`
-] ?? { key: 'unknown', label: '❓ Unexpected state combination' };
+  };
+}
+const { key: decision, label: decisionLabel } = resolveDecision(
+  isRetryable,
+  hasPR,
+  hasRetryLabel,
+  prNumber,
+);
 
 console.log(
   prNumber
@@ -727,7 +760,7 @@ if (GITHUB_OUTPUT) {
 // ---------------------------------------------------------------------------
 
 const mainRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${MAIN_RUN_ID}`;
-const triageRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+const triageRunUrl = `https://github.com/${owner}/${repo}/actions/runs/${GITHUB_RUN_ID}`;
 
 const reportLines = [
   `## Main CI Failure Triage`,
@@ -855,7 +888,7 @@ if (Sentry) {
 
   Sentry.logger.info(`Main CI Failure Triage: ${decision}`, {
     'ci.targetBranch': targetBranch || '',
-    'ci.commitHash': process.env.HEAD_SHA || '',
+    'ci.commitHash': getRunHeadSha(),
     'ci.prNumber': prNumber || 'none',
     'ci.repo': REPO,
     'ci.retry.date': new Date().toISOString().slice(0, 10),
@@ -869,9 +902,9 @@ if (Sentry) {
     'ci.retry.failedJobCount': String(failedJobs.length),
     'ci.retry.jobRetryableCount': String(jobRetryableCount),
     'ci.retry.jobNonRetryableCount': String(jobNonRetryableCount),
-    'ci.retry.retryableRatio': retryableRatio,
-    'ci.retry.nonRetryableRatio': nonRetryableRatio,
-    'ci.retry.unmatchedJobCount': unmatchedJobs.length,
+    'ci.retry.retryableRatio': String(retryableRatio),
+    'ci.retry.nonRetryableRatio': String(nonRetryableRatio),
+    'ci.retry.unmatchedJobCount': String(unmatchedJobs.length),
     'ci.retry.mainRunUrl': mainRunUrl,
     'ci.retry.triageRunUrl': triageRunUrl,
     'ci.retry.jobDrilldownUrl': jobDrilldownUrl,
@@ -903,15 +936,10 @@ if (Sentry) {
   if (classifications.length > MAX_PER_JOB_EVENTS) {
     Sentry.logger.info('Main CI Failure Triage Job events truncated', {
       'ci.retry.runId': MAIN_RUN_ID,
-      'ci.retry.jobEventLimit': MAX_PER_JOB_EVENTS,
-      'ci.retry.jobEventCount': classifications.length,
+      'ci.retry.jobEventLimit': String(MAX_PER_JOB_EVENTS),
+      'ci.retry.jobEventCount': String(classifications.length),
     });
   }
 
-  const flushed = await Sentry.flush(5000);
-  if (flushed) {
-    console.log('Sent classification log to Sentry');
-  } else {
-    console.warn('Sentry flush timed out');
-  }
+  await flushSentry(Sentry, 'classification log');
 }
