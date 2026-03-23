@@ -531,6 +531,28 @@ export function buildCiRetryDashboardPayload({
         x: 0,
         w: 6,
       }),
+      // ── Row 26: Merge queue throughput ────────────────────────────
+      multiSeriesMetricGraphWidget({
+        title: 'Merge queue: merged vs ejected',
+        description:
+          'Every merge_group entry on attempt 1. Merged = all jobs passed. Ejected = one or more jobs failed. Ejected includes both flakes and real failures.',
+        displayType: 'area',
+        queries: [
+          {
+            name: 'Merged',
+            conditions: `${baseCondition} ci.mergeQueue.event:outcome ci.mergeQueue.outcome:merged`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'Ejected',
+            conditions: `${baseCondition} ci.mergeQueue.event:outcome ci.mergeQueue.outcome:ejected`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+        ],
+        y: 26,
+        x: 0,
+        w: 6,
+      }),
     ],
   };
 }

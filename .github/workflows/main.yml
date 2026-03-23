@@ -961,6 +961,7 @@ jobs:
           SENTRY_DSN: ${{ vars.SENTRY_DSN_PERFORMANCE }}
           ATTEMPT: ${{ github.run_attempt }}
           TRIGGER_EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
         with:
           script: |
             const dsn = process.env.SENTRY_DSN;
@@ -977,7 +978,14 @@ jobs:
             const [, sentryKey, sentryHost, sentryProject] = match;
 
             // Strip merge-queue prefix: gh-readonly-queue/main/pr-123-... → main
-            const branch = process.env.BRANCH.replace(/^gh-readonly-queue\/([^/]+)\/.*/, '$1');
+            const rawBranch = process.env.BRANCH;
+            const branch = rawBranch.replace(/^gh-readonly-queue\/([^/]+)\/.*/, '$1');
+
+            // Extract PR number: from event context (pull_request) or branch name (merge_group)
+            const prNumber = process.env.PR_NUMBER
+              || (rawBranch.match(/gh-readonly-queue\/[^/]+\/pr-(\d+)-/) || [])[1]
+              || '';
+
             const attempt = Number(process.env.ATTEMPT);
             const now = new Date();
             const today = now.toISOString().slice(0, 10);
@@ -997,6 +1005,7 @@ jobs:
                 'ci.retry.date':              { value: today,      type: 'string' },
                 'ci.targetBranch':            { value: branch,     type: 'string' },
                 'ci.retry.triggerEvent':       { value: process.env.TRIGGER_EVENT, type: 'string' },
+                ...(prNumber ? { 'ci.prNumber': { value: prNumber, type: 'string' } } : {}),
                 'sentry.severity_text':       { value: 'info',     type: 'string' },
               },
             }]});
@@ -1020,6 +1029,80 @@ jobs:
       - name: Fail job if checks failed
         if: ${{ steps.check.outputs.result == 'failure' }}
         run: exit 1
+
+      # ── Emit merge queue outcome to Sentry Logs ──────────────────
+      #
+      # Fires for every merge_group run whose outcome is FINAL —
+      # i.e. when the commit status is actually being posted.
+      # If retry-ci deferred the status (skip-status=true), this
+      # step is skipped because the outcome isn't determined yet.
+      # On the later attempt that IS final, it fires correctly.
+      # ─────────────────────────────────────────────────────────────
+      - name: Emit merge queue outcome to Sentry
+        if: >-
+          ${{
+            always()
+            && github.event_name == 'merge_group'
+            && steps.retry-gate.outputs.skip-status != 'true'
+          }}
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN_PERFORMANCE }}
+          CI_RESULT: ${{ steps.check.outputs.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        with:
+          script: |
+            const dsn = process.env.SENTRY_DSN;
+            if (!dsn) return;
+
+            const match = dsn.match(/^https:\/\/([^@]+)@([^/]+)\/(.+)$/);
+            if (!match) return;
+            const [, sentryKey, sentryHost, sentryProject] = match;
+
+            const rawBranch = process.env.BRANCH;
+            const branch = rawBranch.replace(/^gh-readonly-queue\/([^/]+)\/.*/, '$1');
+            const prNumber = process.env.PR_NUMBER
+              || (rawBranch.match(/gh-readonly-queue\/[^/]+\/pr-(\d+)-/) || [])[1]
+              || '';
+
+            const outcome = process.env.CI_RESULT === 'success' ? 'merged' : 'ejected';
+            const now = new Date();
+            const traceId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+              .map(b => b.toString(16).padStart(2, '0')).join('');
+
+            const payload = JSON.stringify({ items: [{
+              timestamp: Math.floor(now.getTime() / 1000),
+              level: 'info',
+              body: `Merge queue ${outcome}`,
+              severity_number: 9,
+              trace_id: traceId,
+              attributes: {
+                'ci.mergeQueue.event':   { value: 'outcome',  type: 'string' },
+                'ci.mergeQueue.outcome': { value: outcome,    type: 'string' },
+                'ci.retry.runId':        { value: process.env.RUN_ID, type: 'string' },
+                'ci.retry.date':         { value: now.toISOString().slice(0, 10), type: 'string' },
+                'ci.targetBranch':       { value: branch,     type: 'string' },
+                ...(prNumber ? { 'ci.prNumber': { value: prNumber, type: 'string' } } : {}),
+                'sentry.severity_text':  { value: 'info',     type: 'string' },
+              },
+            }]});
+
+            const envelope = [
+              JSON.stringify({ dsn, sent_at: now.toISOString() }),
+              '{"type":"log","item_count":1}',
+              payload,
+            ].join('\n');
+
+            const res = await fetch(`https://${sentryHost}/api/${sentryProject}/envelope/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-sentry-envelope',
+                'X-Sentry-Auth': `Sentry sentry_version=7, sentry_key=${sentryKey}, sentry_client=github-script/1.0`,
+              },
+              body: envelope,
+            });
+            core.info(`Merge queue ${outcome}: Sentry ${res.status}`);
 
       - name: Log merge group failure
         if: ${{ github.event_name == 'merge_group' && failure() && !github.event.repository.fork }}

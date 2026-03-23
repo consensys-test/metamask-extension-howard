@@ -472,6 +472,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
   const Sentry = initSentry();
   if (Sentry) {
     const branch = resolveTargetBranch();
+    const prNum = resolvePrNumber();
     Sentry.logger.info('Main CI Failure Triage: cancelled', {
       'ci.targetBranch': branch,
       'ci.retry.date': new Date().toISOString().slice(0, 10),
@@ -479,6 +480,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
       'ci.retry.runId': MAIN_RUN_ID,
       'ci.retry.attempt': ATTEMPT || 'unknown',
       'ci.retry.event': WORKFLOW_EVENT || '',
+      'ci.prNumber': prNum || 'none',
     });
 
     await flushSentry(Sentry, 'cancelled event');
