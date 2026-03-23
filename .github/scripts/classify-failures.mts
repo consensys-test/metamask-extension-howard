@@ -425,12 +425,23 @@ function classifyJob(job: Job): JobClassification {
     }
   }
 
+  // No transient pattern matched. Capture the first annotation message or
+  // the last few log lines so the dashboard can surface what the actual
+  // error was — useful for identifying new patterns to add.
+  const firstAnnotation = annotations.find((a) => a.message?.trim());
+  const fallbackSnippet = firstAnnotation
+    ? firstAnnotation.message!.trim().slice(0, 200)
+    : logs
+      ? logs.trim().split('\n').slice(-3).join(' | ').slice(0, 200)
+      : undefined;
+
   return {
     jobName,
     jobId,
     category,
     jobRetryable: false,
     reason: 'No transient error pattern detected',
+    errorSnippet: fallbackSnippet,
     unmatched,
   };
 }
@@ -852,18 +863,17 @@ if (process.env.CI === 'true') {
 
 const Sentry = initSentry();
 if (Sentry) {
-  const jobRetryableCount = classifications.filter(
-    (c) => c.jobRetryable,
-  ).length;
-  const jobNonRetryableCount = classifications.length - jobRetryableCount;
+  // Exclude optional jobs (e.g. ci-status-gate) from counts and ratios —
+  // they don't influence the retry decision and inflate the numbers.
+  const jobRetryableCount = nonOptional.filter((c) => c.jobRetryable).length;
+  const jobNonRetryableCount = nonOptional.length - jobRetryableCount;
   const retryableRatio =
-    classifications.length > 0
-      ? Math.round((jobRetryableCount / classifications.length) * 10000) / 10000
+    nonOptional.length > 0
+      ? Math.round((jobRetryableCount / nonOptional.length) * 10000) / 10000
       : 0;
   const nonRetryableRatio =
-    classifications.length > 0
-      ? Math.round((jobNonRetryableCount / classifications.length) * 10000) /
-        10000
+    nonOptional.length > 0
+      ? Math.round((jobNonRetryableCount / nonOptional.length) * 10000) / 10000
       : 0;
 
   const drilldownQuery = `message:"Main CI Failure Triage Job" ci.retry.runId:${MAIN_RUN_ID}`;
@@ -899,7 +909,7 @@ if (Sentry) {
     'ci.retry.runId': MAIN_RUN_ID,
     'ci.retry.attempt': ATTEMPT || 'unknown',
     'ci.retry.event': WORKFLOW_EVENT || '',
-    'ci.retry.failedJobCount': String(failedJobs.length),
+    'ci.retry.failedJobCount': String(nonOptional.length),
     'ci.retry.jobRetryableCount': String(jobRetryableCount),
     'ci.retry.jobNonRetryableCount': String(jobNonRetryableCount),
     'ci.retry.retryableRatio': String(retryableRatio),

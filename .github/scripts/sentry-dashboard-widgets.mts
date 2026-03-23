@@ -291,15 +291,20 @@ export function buildCiRetryDashboardPayload({
       tableWidget({
         title: 'Flakiest Jobs (Retryable)',
         conditions: `${jobCondition} ci.job.retryable:true`,
-        columns: ['count()', 'ci.job.name', 'ci.job.category'],
-        fieldAliases: ['Count', 'Job Name', 'Job Category'],
+        columns: [
+          'count()',
+          'ci.job.name',
+          'ci.job.category',
+          'ci.job.errorSnippet',
+        ],
+        fieldAliases: ['Count', 'Job Name', 'Job Category', 'Error Snippet'],
         orderby: '-count()',
         y: 5,
         x: 0,
       }),
       tableWidget({
         title: 'Frequent Deterministic Failures (Non-Retryable)',
-        conditions: `${jobCondition} ci.job.retryable:false`,
+        conditions: `${jobCondition} ci.job.retryable:false !ci.job.category:optional`,
         columns: ['count()', 'ci.job.name', 'ci.job.category', 'ci.job.reason'],
         fieldAliases: ['Count', 'Job Name', 'Job Category', 'Failure Reason'],
         orderby: '-count()',
@@ -329,7 +334,7 @@ export function buildCiRetryDashboardPayload({
         w: 6,
         h: 2,
       }),
-      // ── Row 9: Unmatched + blocker trends ─────────────────────────
+      // ── Row 9: Unmatched + pattern gap trends ────────────────────
       graphWidget({
         title: 'How many workflows hit an unmatched error type?',
         description:
@@ -354,7 +359,19 @@ export function buildCiRetryDashboardPayload({
         x: 3,
         w: 3,
       }),
-      // ── Row 11: Cascade blockers ──────────────────────────────────
+      tableWidget({
+        title: 'Pattern Gap: Errors to Consider Adding',
+        description:
+          'Jobs in the retryableOnTransientError category that failed without matching any transient pattern. These are candidates for new entries in retry-config.jsonc transientErrorPatterns.',
+        conditions: `${jobCondition} ci.job.category:retryableOnTransientError ci.job.retryable:false`,
+        columns: ['count()', 'ci.job.name', 'ci.job.errorSnippet'],
+        fieldAliases: ['Count', 'Job Name', 'Error Snippet'],
+        orderby: '-count()',
+        y: 11,
+        x: 0,
+        w: 6,
+      }),
+      // ── Row 13: Cascade blockers ──────────────────────────────────
       graphWidget({
         title: 'How many workflows hit a cascade retry blocker?',
         description:
@@ -363,7 +380,7 @@ export function buildCiRetryDashboardPayload({
         conditions: `${baseCondition} has:ci.blockedBy`,
         columns: ['count_unique(ci.retry.runId)'],
         orderby: '-count_unique(ci.retry.runId)',
-        y: 11,
+        y: 13,
         x: 0,
         w: 3,
       }),
@@ -373,28 +390,28 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.blockedBy'],
         fieldAliases: ['Count', 'Blocker'],
         orderby: '-count()',
-        y: 11,
+        y: 13,
         x: 3,
         w: 3,
       }),
-      // ── Row 13: Reference tables ──────────────────────────────────
+      // ── Row 15: Reference tables ──────────────────────────────────
       tableWidget({
         title: 'Decision Distribution',
         conditions: `${baseCondition} has:ci.retry.decision`,
         columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
         fieldAliases: ['Count', 'Decision'],
         orderby: 'ci.retry.decision',
-        y: 13,
+        y: 15,
         x: 0,
       }),
       categoricalDistributionWidget({
         title: 'Failures by Workflow Event',
         groupBy: 'ci.retry.event',
         conditions: `${baseCondition} has:ci.retry.event`,
-        y: 13,
+        y: 15,
         x: 2,
       }),
-      // ── Row 15: Recent decisions log ──────────────────────────────
+      // ── Row 17: Recent decisions log ──────────────────────────────
       tableWidget({
         title: 'Most Recent Decisions',
         conditions: `${baseCondition} has:ci.retry.decision has:ci.retry.jobDrilldownUrl`,
@@ -417,26 +434,38 @@ export function buildCiRetryDashboardPayload({
           'Target Branch',
         ],
         orderby: '-timestamp',
-        y: 15,
+        y: 17,
         x: 0,
         w: 6,
         h: 3,
       }),
-      // ── Row 18: Failed job count trend ────────────────────────────
+      // ── Row 20: Failed job count trend ────────────────────────────
       graphWidget({
         title: 'How many jobs failed per workflow run?',
         description:
           'Average failed jobs per run. Low (1-2) = isolated flakes. High (5+) = infra outage or blocker cascade. Helps decide whether retry strategy should target individual jobs vs whole workflows.',
         displayType: 'line',
-        conditions: `${baseCondition} has:ci.retry.decision`,
+        conditions: `${baseCondition} has:ci.retry.failedJobCount`,
         columns: ['avg(tags[ci.retry.failedJobCount,number])'],
         fieldAliases: ['Avg failed jobs'],
         orderby: '-avg(tags[ci.retry.failedJobCount,number])',
-        y: 18,
+        y: 20,
         x: 0,
-        w: 6,
+        w: 3,
       }),
-      // ── Row 20: Branch targets ────────────────────────────────────
+      // ── Row 20 (right): Failed job count distribution ─────────────
+      categoricalDistributionWidget({
+        title: 'How many jobs fail per run?',
+        description:
+          'Distribution of failed job counts across runs. Mostly 1 = isolated flakes. Spikes at 5+ = infra outage or blocker cascade.',
+        groupBy: 'ci.retry.failedJobCount',
+        conditions: `${baseCondition} has:ci.retry.failedJobCount`,
+        orderby: 'ci.retry.failedJobCount',
+        y: 20,
+        x: 3,
+        w: 3,
+      }),
+      // ── Row 22: Branch targets ────────────────────────────────────
       multiSeriesMetricGraphWidget({
         title: 'Which branch targets are failing?',
         description:
@@ -469,17 +498,17 @@ export function buildCiRetryDashboardPayload({
             metric: 'count_unique(ci.retry.runId)',
           },
         ],
-        y: 20,
+        y: 22,
         x: 0,
         w: 6,
       }),
-      // ── Row 22: Retry outcomes ────────────────────────────────────
-      // The gap between "Retried" and "Resolved" = runs that retried
-      // but didn't succeed (still failing or cancelled).
+      // ── Row 24: Retry outcomes ────────────────────────────────────
+      // The gap between "Retried" and "Resolved+Cancelled" = runs
+      // still in-flight or stuck.
       multiSeriesMetricGraphWidget({
         title: 'Did retries actually fix things?',
         description:
-          "Retried = auto-retried by triage (will-retry). Resolved = later attempt succeeded (includes manual reruns). Gap = retries that didn't help. Resolved > Retried means manual retries outside the system.",
+          'Retried = auto-retried by triage (will-retry). Resolved = later attempt succeeded. Cancelled = retry was preempted (e.g. new merge-queue entry). Gap = retries still in-flight or stuck.',
         displayType: 'line',
         queries: [
           {
@@ -492,8 +521,13 @@ export function buildCiRetryDashboardPayload({
             conditions: `${baseCondition} ci.retry.event:resolved`,
             metric: 'count_unique(ci.retry.runId)',
           },
+          {
+            name: 'Cancelled',
+            conditions: `${baseCondition} ci.retry.decision:cancelled`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
         ],
-        y: 22,
+        y: 24,
         x: 0,
         w: 6,
       }),
