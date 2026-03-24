@@ -36,7 +36,7 @@ if (values.help) {
       '  -t, --token      Sentry personal token (or SENTRY_AUTH_TOKEN env var)',
       '  -o, --org        Sentry organization slug (default: metamask)',
       '  -p, --projectId  Sentry project ID (default: 4510302346608640)',
-      '      --title      Dashboard title (default: Main CI Retry Triage)',
+      '      --title      Dashboard title (default: Main CI Failure Triage)',
       '      --period     Relative period for dashboard (default: 14d)',
       '      --baseUrl    Sentry base URL (default: https://sentry.io)',
       '      --dryRun     Print payload only; do not call API',
@@ -49,7 +49,7 @@ const token = values.token || process.env.SENTRY_AUTH_TOKEN || '';
 const org = values.org || process.env.SENTRY_ORG || 'metamask';
 const projectIdRaw =
   values.projectId || process.env.SENTRY_PROJECT_ID || '4510302346608640';
-const dashboardTitle = values.title || 'Main CI Retry Triage';
+const dashboardTitle = values.title || 'Main CI Failure Triage';
 const period = values.period || '14d';
 const baseUrl = (values.baseUrl || 'https://sentry.io').replace(/\/+$/, '');
 const dryRun = values.dryRun ?? false;
