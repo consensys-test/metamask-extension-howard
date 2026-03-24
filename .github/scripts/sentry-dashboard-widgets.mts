@@ -227,7 +227,29 @@ export function buildCiRetryDashboardPayload({
     filters: {},
     utc: true,
     widgets: [
-      // ── Row 0: Hero metric ────────────────────────────────────────
+      // ── Row 0: Hero metric ────────────────────────────────────
+      multiSeriesMetricGraphWidget({
+        title: 'Merge queue: merged vs ejected',
+        description:
+          'Every merge_group entry on attempt 1. Merged = all jobs passed. Ejected = one or more jobs failed. Ejected includes both flakes and real failures.',
+        displayType: 'area',
+        queries: [
+          {
+            name: 'Merged',
+            conditions: `${baseCondition} ci.mergeQueue.event:outcome ci.mergeQueue.outcome:merged`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+          {
+            name: 'Ejected',
+            conditions: `${baseCondition} ci.mergeQueue.event:outcome ci.mergeQueue.outcome:ejected`,
+            metric: 'count_unique(ci.retry.runId)',
+          },
+        ],
+        y: 0,
+        x: 0,
+        w: 6,
+      }),
+      // ── Row 2: Retryable ratio ────────────────────────────────────────
       {
         title: 'What ratio of failed workflows are retryable?',
         description:
@@ -254,9 +276,9 @@ export function buildCiRetryDashboardPayload({
             isHidden: false,
           },
         ],
-        layout: { w: 6, h: 2, x: 0, y: 0, minH: 2 },
+        layout: { w: 6, h: 2, x: 0, y: 2, minH: 2 },
       },
-      // ── Row 2: Decision breakdown charts ──────────────────────────
+      // ── Row 4: Decision breakdown charts ──────────────────────────
       stackedBarWidget({
         title: 'Were retryable runs retried?',
         queries: [
@@ -267,7 +289,7 @@ export function buildCiRetryDashboardPayload({
           name,
           conditions: `${baseCondition} ci.retry.decision:${decision}`,
         })),
-        y: 2,
+        y: 4,
         x: 0,
         w: 3,
         h: 3,
@@ -282,12 +304,12 @@ export function buildCiRetryDashboardPayload({
           name,
           conditions: `${baseCondition} ci.retry.decision:${decision}`,
         })),
-        y: 2,
+        y: 4,
         x: 3,
         w: 3,
         h: 3,
       }),
-      // ── Row 5: Job-level tables ───────────────────────────────────
+      // ── Row 7: Job-level tables ───────────────────────────────────
       tableWidget({
         title: 'Flakiest Jobs (Retryable)',
         conditions: `${jobCondition} ci.job.retryable:true`,
@@ -299,7 +321,7 @@ export function buildCiRetryDashboardPayload({
         ],
         fieldAliases: ['Count', 'Job Name', 'Job Category', 'Error Snippet'],
         orderby: '-count()',
-        y: 5,
+        y: 7,
         x: 0,
       }),
       tableWidget({
@@ -308,7 +330,7 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.job.name', 'ci.job.category', 'ci.job.reason'],
         fieldAliases: ['Count', 'Job Name', 'Job Category', 'Failure Reason'],
         orderby: '-count()',
-        y: 5,
+        y: 7,
         x: 2,
       }),
       tableWidget({
@@ -317,10 +339,10 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.job.category'],
         fieldAliases: ['Count', 'Job Category'],
         orderby: '-count()',
-        y: 5,
+        y: 7,
         x: 4,
       }),
-      // ── Row 7: Retry attempts trend ───────────────────────────────
+      // ── Row 9: Retry attempts trend ───────────────────────────────
       stackedBarWidget({
         title: 'When we retried, how many tries did it take?',
         description:
@@ -329,12 +351,12 @@ export function buildCiRetryDashboardPayload({
           name: `Attempt ${attempt}`,
           conditions: `${baseCondition} ci.retry.event:resolved ci.retry.resolvedAtAttempt:${attempt}`,
         })),
-        y: 7,
+        y: 9,
         x: 0,
         w: 6,
         h: 2,
       }),
-      // ── Row 9: Unmatched + pattern gap trends ────────────────────
+      // ── Row 11: Unmatched + pattern gap trends ────────────────────
       graphWidget({
         title: 'How many workflows hit an unmatched error type?',
         description:
@@ -343,7 +365,7 @@ export function buildCiRetryDashboardPayload({
         conditions: `${baseCondition} tags[ci.retry.unmatchedJobCount,number]:>0`,
         columns: ['count_unique(ci.retry.runId)'],
         orderby: '-count_unique(ci.retry.runId)',
-        y: 9,
+        y: 11,
         x: 0,
         w: 3,
       }),
@@ -355,7 +377,7 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.job.name', 'ci.job.reason', 'ci.retry.runId'],
         fieldAliases: ['Count', 'Job Name', 'Reason', 'Run ID'],
         orderby: '-count()',
-        y: 9,
+        y: 11,
         x: 3,
         w: 3,
       }),
@@ -367,11 +389,11 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.job.name', 'ci.job.errorSnippet'],
         fieldAliases: ['Count', 'Job Name', 'Error Snippet'],
         orderby: '-count()',
-        y: 11,
+        y: 13,
         x: 0,
         w: 6,
       }),
-      // ── Row 13: Cascade blockers ──────────────────────────────────
+      // ── Row 15: Cascade blockers ──────────────────────────────────
       graphWidget({
         title: 'How many workflows hit a cascade retry blocker?',
         description:
@@ -380,7 +402,7 @@ export function buildCiRetryDashboardPayload({
         conditions: `${baseCondition} has:ci.blockedBy`,
         columns: ['count_unique(ci.retry.runId)'],
         orderby: '-count_unique(ci.retry.runId)',
-        y: 13,
+        y: 15,
         x: 0,
         w: 3,
       }),
@@ -390,28 +412,28 @@ export function buildCiRetryDashboardPayload({
         columns: ['count()', 'ci.blockedBy'],
         fieldAliases: ['Count', 'Blocker'],
         orderby: '-count()',
-        y: 13,
+        y: 15,
         x: 3,
         w: 3,
       }),
-      // ── Row 15: Reference tables ──────────────────────────────────
+      // ── Row 17: Reference tables ──────────────────────────────────
       tableWidget({
         title: 'Decision Distribution',
         conditions: `${baseCondition} has:ci.retry.decision`,
         columns: ['count_unique(ci.retry.runId)', 'ci.retry.decision'],
         fieldAliases: ['Count', 'Decision'],
         orderby: 'ci.retry.decision',
-        y: 15,
+        y: 17,
         x: 0,
       }),
       categoricalDistributionWidget({
         title: 'Failures by Workflow Event',
         groupBy: 'ci.retry.event',
         conditions: `${baseCondition} has:ci.retry.event`,
-        y: 15,
+        y: 17,
         x: 2,
       }),
-      // ── Row 17: Recent decisions log ──────────────────────────────
+      // ── Row 19: Recent decisions log ──────────────────────────────
       tableWidget({
         title: 'Most Recent Decisions',
         conditions: `${baseCondition} has:ci.retry.decision has:ci.retry.jobDrilldownUrl`,
@@ -434,12 +456,12 @@ export function buildCiRetryDashboardPayload({
           'Target Branch',
         ],
         orderby: '-timestamp',
-        y: 17,
+        y: 19,
         x: 0,
         w: 6,
         h: 3,
       }),
-      // ── Row 20: Failed job count trend ────────────────────────────
+      // ── Row 22: Failed job count trend ────────────────────────────
       graphWidget({
         title: 'How many jobs failed per workflow run?',
         description:
@@ -449,11 +471,11 @@ export function buildCiRetryDashboardPayload({
         columns: ['avg(tags[ci.retry.failedJobCount,number])'],
         fieldAliases: ['Avg failed jobs'],
         orderby: '-avg(tags[ci.retry.failedJobCount,number])',
-        y: 20,
+        y: 22,
         x: 0,
         w: 3,
       }),
-      // ── Row 20 (right): Failed job count distribution ─────────────
+      // ── Row 22 (right): Failed job count distribution ─────────────
       categoricalDistributionWidget({
         title: 'How many jobs fail per run?',
         description:
@@ -461,11 +483,11 @@ export function buildCiRetryDashboardPayload({
         groupBy: 'ci.retry.failedJobCount',
         conditions: `${baseCondition} has:ci.retry.failedJobCount`,
         orderby: 'ci.retry.failedJobCount',
-        y: 20,
+        y: 22,
         x: 3,
         w: 3,
       }),
-      // ── Row 22: Branch targets ────────────────────────────────────
+      // ── Row 24: Branch targets ────────────────────────────────────
       multiSeriesMetricGraphWidget({
         title: 'Which branch targets are failing?',
         description:
@@ -498,11 +520,11 @@ export function buildCiRetryDashboardPayload({
             metric: 'count_unique(ci.retry.runId)',
           },
         ],
-        y: 22,
+        y: 24,
         x: 0,
         w: 6,
       }),
-      // ── Row 24: Retry outcomes ────────────────────────────────────
+      // ── Row 26: Retry outcomes ────────────────────────────────────
       // The gap between "Retried" and "Resolved+Cancelled" = runs
       // still in-flight or stuck.
       multiSeriesMetricGraphWidget({
@@ -527,29 +549,7 @@ export function buildCiRetryDashboardPayload({
             metric: 'count_unique(ci.retry.runId)',
           },
         ],
-        y: 24,
-        x: 0,
-        w: 6,
-      }),
-      // ── Row 26: Merge queue throughput ────────────────────────────
-      multiSeriesMetricGraphWidget({
-        title: 'Merge queue: merged vs ejected',
-        description:
-          'Every merge_group entry on attempt 1. Merged = all jobs passed. Ejected = one or more jobs failed. Ejected includes both flakes and real failures.',
-        displayType: 'area',
-        queries: [
-          {
-            name: 'Merged',
-            conditions: `${baseCondition} ci.mergeQueue.event:outcome ci.mergeQueue.outcome:merged`,
-            metric: 'count_unique(ci.retry.runId)',
-          },
-          {
-            name: 'Ejected',
-            conditions: `${baseCondition} ci.mergeQueue.event:outcome ci.mergeQueue.outcome:ejected`,
-            metric: 'count_unique(ci.retry.runId)',
-          },
-        ],
-        y: 26,
+        y: 28,
         x: 0,
         w: 6,
       }),
