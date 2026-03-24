@@ -45,29 +45,33 @@ jobs:
     steps:
       - name: Check that all jobs have passed
         id: check
+        uses: actions/github-script@v8
         env:
           NEEDS_JSON: ${{ inputs.needs-json }}
           BUILDS_FROM_RUN: ${{ inputs.builds-from-run }}
-        run: |
-          all_passed=true
+        with:
+          script: |
+            const needs = JSON.parse(process.env.NEEDS_JSON);
+            let allPassed = true;
 
-          while IFS=$'\t' read -r job_id job_result; do
-            if [[ -z "$job_result" ]]; then
-              echo "::error::Could not determine result for job: $job_id"
-              all_passed=false
-            elif [[ "$job_result" != "skipped" && "$job_result" != "success" ]]; then
-              echo "::error::$job_id did not succeed (result: $job_result)"
-              all_passed=false
-            fi
-          done < <(
-            jq -r 'to_entries[] | [.key, (.value.result // "")] | @tsv' <<<"$NEEDS_JSON"
-          )
+            for (const [job, { result }] of Object.entries(needs)) {
+              if (!result) {
+                core.error(`Could not determine result for job: ${job}`);
+                allPassed = false;
+              } else if (result !== 'success' && result !== 'skipped') {
+                core.error(`${job} did not succeed (result: ${result})`);
+                allPassed = false;
+              }
+            }
 
-          if [[ "$BUILDS_FROM_RUN" != "$RUN_ID" ]]; then
-            echo "::warning::Builds were used from a different GHA run: $BUILDS_FROM_RUN"
-          fi
+            if (process.env.BUILDS_FROM_RUN !== process.env.RUN_ID) {
+              core.warning(`Builds were used from a different GHA run: ${process.env.BUILDS_FROM_RUN}`);
+              core.info('Right now you can use this feature to test and iterate faster, but to merge a PR, you have to disable it.');
+              process.exitCode = 1;
+              return;
+            }
 
-          echo "result=$( [[ "$all_passed" == "true" ]] && echo success || echo failure )" >> "$GITHUB_OUTPUT"
+            core.setOutput('result', allPassed ? 'success' : 'failure');
 
       # ── Retry gate (merge queue only) ──────────────────────────────
       #
@@ -136,7 +140,7 @@ jobs:
       # statuses have no suites, so they always work reliably.
       - name: Post commit status
         if: ${{ steps.retry-gate.outputs.skip-status != 'true' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           STATUS_STATE: ${{ steps.check.outputs.result }}
         with:
@@ -161,7 +165,7 @@ jobs:
       #   2. merge-queue-outcome — merged vs ejected for every final MQ run
       - name: Emit Sentry events
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           SENTRY_DSN: ${{ vars.SENTRY_DSN_PERFORMANCE }}
           CI_RESULT: ${{ steps.check.outputs.result }}
