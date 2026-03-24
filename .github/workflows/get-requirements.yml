@@ -56,7 +56,7 @@ jobs:
       # TESTING ONLY — fault injection to verify retry logic.
       # Remove before merging to main.
       - run: |
-          if (( ${{ github.run_attempt }} < 4 )) && [[ "${{ github.event_name }}" == "merge_group" || "${{ github.event_name }}" == "push" ]]; then
+          if (( ${{ github.run_attempt }} < 2 )) && [[ "${{ github.event_name }}" == "merge_group" || "${{ github.event_name }}" == "push" ]]; then
             echo "502 Bad Gateway"; exit 1
           fi
 
