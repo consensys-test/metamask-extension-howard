@@ -12,7 +12,7 @@
 #   5. Fail the job if any checks failed
 #   6. Log merge group failures to Google Sheets
 
-name: CI status gate
+name: CI status gate (controls all-jobs-pass)
 
 on:
   workflow_call:
@@ -254,7 +254,7 @@ jobs:
 
               const envelope = [
                 JSON.stringify({ dsn, sent_at: now.toISOString() }),
-                '{"type":"log","item_count":1}',
+                '{"type":"log","item_count":1,"content_type":"application/vnd.sentry.items.log+json"}',
                 payload,
               ].join('\n');
 
