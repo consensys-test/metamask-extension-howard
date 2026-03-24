@@ -35,8 +35,6 @@
  *   WORKFLOW_CONCLUSION      — Conclusion of the triggering run (e.g. failure,
  *                               cancelled); used for cancelled-run early exit
  *   CI                       — Enables Check Run creation when 'true'
- *   CHECK_RUN_TOKEN          — Token for Check Run creation (fork workaround;
- *                               see TODO in code to remove after merge)
  *   SENTRY_DSN_PERFORMANCE   — Sentry DSN; enables structured log delivery
  *   GITHUB_RUN_ID            — Run ID of the triage workflow (for Sentry link)
  *
@@ -827,20 +825,12 @@ console.log('\n' + report);
 // until we merge it and see it run in the real repo.
 // ---------------------------------------------------------------------------
 
-if (process.env.CI === 'true') {
+if (process.env.CI === 'true' && REPO === 'MetaMask/metamask-extension') {
   try {
     const headSha = getRunHeadSha();
     const checkTitle = isRetryable
       ? 'All failures are retryable'
       : 'Non-retryable failures detected';
-
-    // TODO: Remove CHECK_RUN_TOKEN workaround — fork-only. On the real repo,
-    // remove the `token` option below so ghApi uses the default GH_TOKEN.
-    //
-    // Use CHECK_RUN_TOKEN if available — a PAT or GitHub App token with
-    // checks:write that creates check runs in the correct check suite.
-    // Falls back to GH_TOKEN (github.token) which works for non-PR events.
-    const checkToken = process.env.CHECK_RUN_TOKEN || GITHUB_TOKEN;
 
     ghApi(`${repoApi}/check-runs`, {
       method: 'POST',
@@ -854,7 +844,6 @@ if (process.env.CI === 'true') {
           summary: report,
         },
       },
-      token: checkToken,
     });
     console.log(`Created 'Main CI Failure Triage' check on ${headSha}`);
   } catch (err) {
