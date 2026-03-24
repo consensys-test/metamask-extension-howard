@@ -95,6 +95,14 @@ jobs:
       # on early attempts, rule 2 stays pending, which blocks rule 1
       # from ejecting — even though the suite already failed.
       #
+      # PREREQUISITE — repo ruleset setting:
+      #   "Do not require status checks on creation" must be ENABLED.
+      #   This tells the queue to WAIT for "All jobs pass" to appear
+      #   rather than treating a missing status as passing. Without
+      #   this, the queue would error out immediately because "All
+      #   jobs pass" doesn't exist when the entry is first created
+      #   (it's only posted at the very end of the run).
+      #
       # Timeline of a merge_group retry:
       #   1. Main attempt 1 fails → suite completes with failure
       #   2. This step sees retry-ci label → skips commit status
@@ -280,6 +288,7 @@ jobs:
         if: ${{ steps.check.outputs.result == 'failure' }}
         run: exit 1
 
+      # This reporting method has probably been superseded by the Sentry logging, and may be removed later.
       - name: Log merge group failure
         if: ${{ github.event_name == 'merge_group' && failure() && !github.event.repository.fork }}
         uses: MetaMask/github-tools/.github/actions/log-merge-group-failure@v1
