@@ -53,7 +53,8 @@ jobs:
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false'}}
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false'}}
     steps:
-      # TESTING ONLY — fault injection to verify retry logic. Remove before merging to main.
+      # TESTING ONLY — fault injection to verify retry logic.
+      # Remove before merging to main.
       - run: |
           if (( ${{ github.run_attempt }} < 4 )) && [[ "${{ github.event_name }}" == "merge_group" || "${{ github.event_name }}" == "push" ]]; then
             echo "502 Bad Gateway"; exit 1

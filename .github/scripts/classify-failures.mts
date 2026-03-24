@@ -32,9 +32,13 @@
  *   RUN_ATTEMPT              — Attempt number of the triggering run
  *   VERSION                  — Extension version (from package.json via curl)
  *   WORKFLOW_EVENT           — Triggering event type (e.g. merge_group, push)
+ *   WORKFLOW_CONCLUSION      — Conclusion of the triggering run (e.g. failure,
+ *                               cancelled); used for cancelled-run early exit
  *   CI                       — Enables Check Run creation when 'true'
- *   CHECK_RUN_TOKEN          — Token for Check Run creation (fork workaround)
+ *   CHECK_RUN_TOKEN          — Token for Check Run creation (fork workaround;
+ *                               see TODO in code to remove after merge)
  *   SENTRY_DSN_PERFORMANCE   — Sentry DSN; enables structured log delivery
+ *   GITHUB_RUN_ID            — Run ID of the triage workflow (for Sentry link)
  *
  * Outputs (to $GITHUB_OUTPUT):
  *   is-retryable=true|false    — whether all failures are retryable
