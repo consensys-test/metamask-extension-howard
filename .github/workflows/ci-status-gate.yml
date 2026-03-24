@@ -70,7 +70,7 @@ jobs:
               allPassed = false;
             }
 
-            core.setOutput('result', allPassed ? 'success' : 'failure');
+            core.setOutput('checkResult', allPassed ? 'success' : 'failure');
 
       # ── Retry gate (merge queue only) ──────────────────────────────
       #
@@ -119,7 +119,7 @@ jobs:
         if: >-
           ${{
             github.event_name == 'merge_group'
-            && steps.check.outputs.result == 'failure'
+            && steps.check.outputs.checkResult == 'failure'
             && github.run_attempt < 10
           }}
         env:
@@ -149,7 +149,7 @@ jobs:
         if: ${{ steps.retry-gate.outputs.skip-status != 'true' }}
         uses: actions/github-script@v8
         env:
-          STATUS_STATE: ${{ steps.check.outputs.result }}
+          STATUS_STATE: ${{ steps.check.outputs.checkResult }}
         with:
           script: |
             const state = process.env.STATUS_STATE;
@@ -175,7 +175,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           SENTRY_DSN: ${{ vars.SENTRY_DSN_PERFORMANCE }}
-          CI_RESULT: ${{ steps.check.outputs.result }}
+          CI_RESULT: ${{ steps.check.outputs.checkResult }}
           ATTEMPT: ${{ github.run_attempt }}
           EVENT_NAME: ${{ github.event_name }}
           SKIP_STATUS: ${{ steps.retry-gate.outputs.skip-status }}
@@ -284,7 +284,7 @@ jobs:
             }
 
       - name: Fail job if checks failed
-        if: ${{ steps.check.outputs.result == 'failure' }}
+        if: ${{ steps.check.outputs.checkResult == 'failure' }}
         run: exit 1
 
       # This reporting method has probably been superseded by the Sentry logging, and may be removed later.
