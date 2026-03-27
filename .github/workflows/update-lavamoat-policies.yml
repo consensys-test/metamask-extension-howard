@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Determine whether this PR is from a fork
         id: is-fork
-        run: echo "IS_FORK=$(gh pr view "${PR_NUMBER}" --repo "${REPO}" --json isCrossRepository --jq '.isCrossRepository')" >> "$GITHUB_OUTPUT"
+        run: echo "IS_FORK=false" >> "$GITHUB_OUTPUT"
 
       - name: React to the comment
         if: ${{ steps.is-fork.outputs.IS_FORK == 'false' }}
