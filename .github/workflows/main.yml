@@ -773,6 +773,7 @@ jobs:
     if: ${{ !cancelled() }}
     permissions:
       statuses: write
+      checks: read
     # We list every job we want to validate in `needs`, because `needs` only contains results for jobs explicitly
     # named here. A failing job can cause downstream jobs to be `skipped`, which can hide the true failure unless
     # the upstream job is also included.
