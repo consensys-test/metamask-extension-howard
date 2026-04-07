@@ -62,7 +62,7 @@ jobs:
       skip-everything: ${{ steps.set-skip-everything.outputs.skip-everything || 'false' }}
       builds-from-run: ${{ steps.find-reusable-builds.outputs.builds-from-run || env.RUN_ID }}
       builds-from-sha: ${{ steps.find-reusable-builds.outputs.builds-from-sha || env.HEAD_COMMIT_HASH }}
-      skip-builds: ${{ steps.build-overrides.outputs.skip || 'false' }}
+      skip-builds: ${{ steps.build-overrides.outputs.skip == 'true' && steps.find-reusable-builds.outputs.builds-from-run != '' && 'true' || 'false' }}
       needs-lint: ${{ steps.set-needs-lint.outputs.needs-lint || 'false' }}
       needs-unit-and-integration: ${{ steps.set-needs-unit-and-integration.outputs.needs-unit-and-integration || 'false' }}
       needs-releases: ${{ steps.set-needs-releases.outputs.needs-releases || 'false'}}
@@ -199,9 +199,13 @@ jobs:
       # Check for build override tags in commit message or PR labels.
       # [force-builds] / force-builds label → always build fresh.
       # [skip-builds] / skip-builds label → always reuse from base branch (skip hash check).
+      # Only applies to pull_request events — overrides are meaningless on
+      # main/stable pushes and dangerous in the merge queue (the squash commit
+      # message includes the PR description, and leftover tags would cause
+      # unverified builds to enter the merge queue).
       - name: Check build overrides
         id: build-overrides
-        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        if: ${{ env.EVENT_NAME == 'pull_request' }}
         uses: actions/github-script@v8
         with:
           script: |
