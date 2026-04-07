@@ -6,7 +6,7 @@ on:
       - main
       - stable
       - release/*
-      - trigger-ci-*
+      # - trigger-ci-*
   pull_request:
     types:
       - opened
