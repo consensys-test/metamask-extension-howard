@@ -118,6 +118,11 @@ jobs:
               'development/metamaskbot-build-announce/',
               'development/ts-migration-dashboard/',
             ];
+            // Files inside excluded dirs that DO affect builds.
+            const keptFiles = new Set([
+              '.github/workflows/main.yml',
+              '.github/workflows/run-build.yml',
+            ]);
             // Top-level files that never affect the production build output.
             const excludedFiles = new Set([
               'AGENTS.md', 'attribution.txt', 'CHANGELOG.md', 'LICENSE',
@@ -139,6 +144,7 @@ jobs:
             const kept = tree.split('\n').filter(line => {
               if (!line) return false;
               const path = line.split('\t')[1];
+              if (keptFiles.has(path)) return true;
               if (excludedDirs.some(d => path.startsWith(d))) return false;
               if (excludedFiles.has(path)) return false;
               if (eslintPattern.test(path)) return false;
@@ -173,6 +179,35 @@ jobs:
             });
             core.info(`Posted build-source-hash: ${process.env.BUILD_HASH}`);
 
+      # Check for [force-builds] tag in commit message or force-builds PR label.
+      - name: Check force-builds override
+        id: force-builds
+        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Check commit message for [force-builds] tag.
+            const { stdout: msg } = await exec.getExecOutput(
+              'git', ['show', '--format=%B', '--no-patch', process.env.HEAD_COMMIT_HASH],
+              { silent: true },
+            );
+            if (msg.includes('[force-builds]')) {
+              core.setOutput('force', 'true');
+              core.info('-> force-builds: true (commit message tag)');
+              return;
+            }
+
+            // Check PR labels for force-builds.
+            if (context.payload.pull_request) {
+              const labels = context.payload.pull_request.labels.map(l => l.name);
+              if (labels.includes('force-builds')) {
+                core.setOutput('force', 'true');
+                core.info('-> force-builds: true (PR label)');
+                return;
+              }
+            }
+            core.info('-> force-builds: false');
+
       # Extract the list of expected build artifact names from main.yml.
       # This avoids a hardcoded list that could drift out of sync.
       - name: Extract required build artifact names
@@ -188,7 +223,7 @@ jobs:
       # Skipped on main, stable, and direct pushes to release/* (too high-risk to skip builds).
       - name: Find reusable builds from prior run
         id: find-reusable-builds
-        if: ${{ env.IS_RUN_EVERYTHING_BRANCH != 'true' && !(!github.head_ref && startsWith(github.ref_name, 'release/')) && steps.compute-build-hash.outputs.build-hash && steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        if: ${{ env.IS_RUN_EVERYTHING_BRANCH != 'true' && !(!github.head_ref && startsWith(github.ref_name, 'release/')) && steps.compute-build-hash.outputs.build-hash && steps.check-skip-merge-queue.outputs.up-to-date != 'true' && steps.force-builds.outputs.force != 'true' }}
         uses: actions/github-script@v8
         env:
           BUILD_HASH: ${{ steps.compute-build-hash.outputs.build-hash }}
