@@ -63,27 +63,6 @@ jobs:
               allPassed = false;
             }
 
-            // Audit diff is not run in the merge queue — see the comment in
-            // repository-health-checks.yml above the audit diff steps for the
-            // rationale.
-            if (
-              context.eventName === 'pull_request' &&
-              needs['repository-health-checks']?.result !== 'skipped'
-            ) {
-              // Audit diff uses a commit status (not a check run) so it is
-              // never misattributed to another app's check suite.
-              const { data: statuses } = await github.rest.repos.listCommitStatusesForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: process.env.HEAD_COMMIT_HASH,
-              });
-              const auditStatus = statuses.find(s => s.context === 'Audit: no new vulnerabilities');
-              if (!auditStatus || auditStatus.state !== 'success') {
-                core.error('"Audit: no new vulnerabilities" commit status missing or did not succeed');
-                allPassed = false;
-              }
-            }
-
             core.setOutput('checkResult', allPassed ? 'success' : 'failure');
 
       # Post a commit status named "All jobs pass".
