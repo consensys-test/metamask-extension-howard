@@ -49,26 +49,30 @@ jobs:
           script: |
             const needs = JSON.parse(process.env.NEEDS_JSON);
             let allPassed = true;
+            const errors = [];
 
             for (const [job, { result }] of Object.entries(needs)) {
               if (!result) {
-                core.error(`Could not determine result for job: ${job}`);
+                errors.push(`Could not determine result for job: ${job}`);
                 allPassed = false;
               } else if (result !== 'success' && result !== 'skipped') {
-                core.error(`${job} did not succeed (result: ${result})`);
+                errors.push(`${job} did not succeed (result: ${result})`);
                 allPassed = false;
               }
             }
 
             if (process.env.SKIP_BUILDS === 'true') {
-              core.error(
+              errors.push(
                 '[skip-builds] was used — builds were reused without hash verification. ' +
                 'Remove the [skip-builds] tag or label and push again to merge.',
               );
               allPassed = false;
             }
 
+            for (const msg of errors) core.error(msg);
+
             core.setOutput('checkResult', allPassed ? 'success' : 'failure');
+            core.setOutput('errors', errors.join('\n'));
 
       # Post a commit status named "All jobs pass".
       #
@@ -104,7 +108,15 @@ jobs:
 
       - name: Fail job if checks failed
         if: ${{ steps.check.outputs.checkResult == 'failure' }}
-        run: exit 1
+        env:
+          ERRORS: ${{ steps.check.outputs.errors }}
+        run: |
+          # Re-emit each error from the `check` step so they appear in this
+          # step's annotations (users land here, not on the `check` step).
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && echo "::error::$line"
+          done <<< "$ERRORS"
+          exit 1
 
       - name: Log merge group failure
         if: ${{ github.event_name == 'merge_group' && failure() && !github.event.repository.fork }}
