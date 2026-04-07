@@ -91,7 +91,7 @@ jobs:
       - name: Checkout and setup environment
         uses: MetaMask/action-checkout-and-setup@v3
         with:
-          is-high-risk-environment: ${{ inputs.is-high-risk-environment }}
+          is-high-risk-environment: false
           skip-allow-scripts: true
 
       # Running tsc is only needed for webpack builds. Webpack uses typescript, but lavamoat node
