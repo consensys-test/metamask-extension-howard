@@ -15,6 +15,9 @@ on:
       builds-from-sha:
         description: The HEAD commit SHA of the run providing builds (for PR comment annotation)
         value: ${{ jobs.detect-changes.outputs.builds-from-sha }}
+      skip-builds:
+        description: Whether builds were skipped without hash verification (blocks merge)
+        value: ${{ jobs.detect-changes.outputs.skip-builds }}
       needs-lint:
         description: Whether lint job is needed
         value: ${{ jobs.detect-changes.outputs.needs-lint }}
@@ -59,6 +62,7 @@ jobs:
       skip-everything: ${{ steps.set-skip-everything.outputs.skip-everything || 'false' }}
       builds-from-run: ${{ steps.find-reusable-builds.outputs.builds-from-run || env.RUN_ID }}
       builds-from-sha: ${{ steps.find-reusable-builds.outputs.builds-from-sha || env.HEAD_COMMIT_HASH }}
+      skip-builds: ${{ steps.build-overrides.outputs.skip || 'false' }}
       needs-lint: ${{ steps.set-needs-lint.outputs.needs-lint || 'false' }}
       needs-unit-and-integration: ${{ steps.set-needs-unit-and-integration.outputs.needs-unit-and-integration || 'false' }}
       needs-releases: ${{ steps.set-needs-releases.outputs.needs-releases || 'false'}}
@@ -119,8 +123,8 @@ jobs:
               'development/ts-migration-dashboard/',
             ];
             // Files inside excluded dirs that DO affect builds.
+            // run-build.yml is kept because it injects env vars and secrets.
             const keptFiles = new Set([
-              '.github/workflows/main.yml',
               '.github/workflows/run-build.yml',
             ]);
             // Top-level files that never affect the production build output.
@@ -151,9 +155,20 @@ jobs:
               return true;
             }).join('\n') + '\n';
 
+            // main.yml is in the denylist (most changes are CI plumbing), but
+            // the build-command values it passes to run-build.yml DO affect
+            // output. Extract and sort them so only command changes bust the hash.
+            const { stdout: mainYml } = await exec.getExecOutput(
+              'git', ['show', `${process.env.HEAD_COMMIT_HASH}:.github/workflows/main.yml`],
+              { silent: true },
+            );
+            const buildCommands = (mainYml.match(/build-command: .+/g) ?? [])
+              .sort()
+              .join('\n') + '\n';
+
             const { stdout: hash } = await exec.getExecOutput(
               'git', ['hash-object', '--stdin'],
-              { silent: true, input: Buffer.from(kept) },
+              { silent: true, input: Buffer.from(kept + buildCommands) },
             );
             const buildHash = hash.trim();
             core.setOutput('build-hash', buildHash);
@@ -181,34 +196,34 @@ jobs:
             });
             core.info(`Posted build-source-hash: ${process.env.BUILD_HASH}`);
 
-      # Check for [force-builds] tag in commit message or force-builds PR label.
-      - name: Check force-builds override
-        id: force-builds
+      # Check for build override tags in commit message or PR labels.
+      # [force-builds] / force-builds label → always build fresh.
+      # [skip-builds] / skip-builds label → always reuse from base branch (skip hash check).
+      - name: Check build overrides
+        id: build-overrides
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
         uses: actions/github-script@v8
         with:
           script: |
-            // Check commit message for [force-builds] tag.
             const { stdout: msg } = await exec.getExecOutput(
               'git', ['show', '--format=%B', '--no-patch', process.env.HEAD_COMMIT_HASH],
               { silent: true },
             );
-            if (msg.includes('[force-builds]')) {
+            const labels = context.payload.pull_request
+              ? context.payload.pull_request.labels.map(l => l.name)
+              : [];
+
+            if (msg.includes('[force-builds]') || labels.includes('force-builds')) {
               core.setOutput('force', 'true');
-              core.info('-> force-builds: true (commit message tag)');
+              core.info('-> force-builds: true');
               return;
             }
-
-            // Check PR labels for force-builds.
-            if (context.payload.pull_request) {
-              const labels = context.payload.pull_request.labels.map(l => l.name);
-              if (labels.includes('force-builds')) {
-                core.setOutput('force', 'true');
-                core.info('-> force-builds: true (PR label)');
-                return;
-              }
+            if (msg.includes('[skip-builds]') || labels.includes('skip-builds')) {
+              core.setOutput('skip', 'true');
+              core.info('-> skip-builds: true');
+              return;
             }
-            core.info('-> force-builds: false');
+            core.info('-> no build overrides');
 
       # Extract the list of expected build artifact names from main.yml.
       # This avoids a hardcoded list that could drift out of sync.
@@ -225,12 +240,13 @@ jobs:
       # Skipped on main, stable, and direct pushes to release/* (too high-risk to skip builds).
       - name: Find reusable builds from prior run
         id: find-reusable-builds
-        if: ${{ env.IS_RUN_EVERYTHING_BRANCH != 'true' && !(!github.head_ref && startsWith(github.ref_name, 'release/')) && steps.compute-build-hash.outputs.build-hash && steps.check-skip-merge-queue.outputs.up-to-date != 'true' && steps.force-builds.outputs.force != 'true' }}
+        if: ${{ env.IS_RUN_EVERYTHING_BRANCH != 'true' && !(!github.head_ref && startsWith(github.ref_name, 'release/')) && steps.compute-build-hash.outputs.build-hash && steps.check-skip-merge-queue.outputs.up-to-date != 'true' && steps.build-overrides.outputs.force != 'true' }}
         uses: actions/github-script@v8
         env:
           BUILD_HASH: ${{ steps.compute-build-hash.outputs.build-hash }}
           BASE_BRANCH: ${{ env.BASE_BRANCH }}
           REQUIRED_BUILD_NAMES: ${{ steps.extract-build-names.outputs.names }}
+          SKIP_BUILDS: ${{ steps.build-overrides.outputs.skip }}
         with:
           script: |
             const { repo: { owner, repo } } = context;
@@ -238,7 +254,11 @@ jobs:
             const currentRunId = parseInt(process.env.RUN_ID, 10);
             const branch = process.env.BRANCH;
             const required = JSON.parse(process.env.REQUIRED_BUILD_NAMES);
+            const skipBuilds = process.env.SKIP_BUILDS === 'true';
             core.info(`Expecting ${required.length} build artifacts`);
+            if (skipBuilds) {
+              core.warning('[skip-builds] active — ignoring hash, finding most recent run with all artifacts');
+            }
 
             async function findMatchingRun(searchBranch) {
               core.info(`Searching branch '${searchBranch}' for matching build hash...`);
@@ -274,7 +294,7 @@ jobs:
                   });
                   const hashStatus = statuses.find(s => s.context === 'build-source-hash');
 
-                  if (hashStatus?.description !== buildHash) {
+                  if (!skipBuilds && hashStatus?.description !== buildHash) {
                     core.info(`-> Run ${run.id} (SHA: ${run.head_sha}): hash ${hashStatus?.description ?? 'not found'} — skipping`);
                     continue;
                   }

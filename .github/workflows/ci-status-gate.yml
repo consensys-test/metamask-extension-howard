@@ -19,6 +19,11 @@ on:
         description: JSON-encoded needs context from the caller (toJson(needs)). Used to check that all upstream jobs passed.
         required: true
         type: string
+      skip-builds:
+        description: Whether [skip-builds] was used — blocks merge since builds were reused without hash verification.
+        required: false
+        type: string
+        default: 'false'
 
 jobs:
   gate:
@@ -39,6 +44,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           NEEDS_JSON: ${{ inputs.needs-json }}
+          SKIP_BUILDS: ${{ inputs.skip-builds }}
         with:
           script: |
             const needs = JSON.parse(process.env.NEEDS_JSON);
@@ -52,6 +58,14 @@ jobs:
                 core.error(`${job} did not succeed (result: ${result})`);
                 allPassed = false;
               }
+            }
+
+            if (process.env.SKIP_BUILDS === 'true') {
+              core.error(
+                '[skip-builds] was used — builds were reused without hash verification. ' +
+                'Remove the [skip-builds] tag or label and push again to merge.',
+              );
+              allPassed = false;
             }
 
             core.setOutput('checkResult', allPassed ? 'success' : 'failure');

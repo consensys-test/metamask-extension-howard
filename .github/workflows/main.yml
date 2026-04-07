@@ -828,6 +828,7 @@ jobs:
     uses: ./.github/workflows/ci-status-gate.yml
     with:
       needs-json: ${{ toJson(needs) }}
+      skip-builds: ${{ needs.get-requirements.outputs.skip-builds }}
     secrets: inherit
 
   check-retry-ci:
