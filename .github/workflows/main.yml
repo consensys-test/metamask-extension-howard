@@ -443,7 +443,7 @@ jobs:
     needs:
       - get-requirements
       - build-dist-browserify
-    if: ${{ needs.get-requirements.outputs.builds-from-run == github.run_id }}
+    if: ${{ needs.get-requirements.outputs.skip-everything != 'true' && needs.get-requirements.outputs.builds-from-run == github.run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ github.ref_name == 'main' && 'default-branch' || null }}
@@ -735,6 +735,7 @@ jobs:
     # Only run for release branches, not forks
     if: ${{ (startsWith(github.head_ref || github.ref_name, 'release/') && !(github.event.pull_request.head.repo.fork || github.event.repository.fork)) }}
     needs:
+      - get-requirements
       - build-dist-browserify
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -743,13 +744,14 @@ jobs:
       - name: Trigger regression validation in external repo
         env:
           DISPATCH_TOKEN: ${{ secrets.METAMASK_REGRESSION_TRIGGER_TEST }}
+          BUILDS_FROM_RUN: ${{ needs.get-requirements.outputs.builds-from-run }}
         run: |
           # Extract version from branch name (e.g., release/12.5.0 -> 12.5.0)
           # Use BRANCH env var which correctly handles both push and pull_request events
           VERSION="${BRANCH#release/}"
 
           echo "Triggering regression validation..."
-          echo "Run ID: $RUN_ID"
+          echo "Run ID (builds): $BUILDS_FROM_RUN"
           echo "Branch: $BRANCH"
           echo "Version: $VERSION"
           echo "Commit SHA: $HEAD_COMMIT_HASH"
@@ -761,7 +763,7 @@ jobs:
             -d '{
               "event_type": "release_pr_updated",
               "client_payload": {
-                "run_id": "'"$RUN_ID"'",
+                "run_id": "'"$BUILDS_FROM_RUN"'",
                 "version": "'"$VERSION"'",
                 "branch": "'"$BRANCH"'",
                 "commit_sha": "'"$HEAD_COMMIT_HASH"'"
