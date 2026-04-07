@@ -100,32 +100,58 @@ jobs:
       # IMPORTANT: We hash from HEAD_COMMIT_HASH (the PR head), not the merge
       # commit that actions/checkout creates. This ensures the hash is stable
       # across pushes even when the base branch advances.
+      #
+      # Uses a DENYLIST approach: we exclude paths known NOT to affect builds.
+      # This is safer than an allowlist — if a new build-affecting file is
+      # added, it is automatically included (worst case: unnecessary rebuild).
       - name: Compute build-source hash
         id: compute-build-hash
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
-        run: |
-          BUILD_HASH=$(
-            git ls-tree -r "${HEAD_COMMIT_HASH}" -- \
-              .github/workflows/run-build.yml \
-              .storybook/ \
-              app/ \
-              development/build/ \
-              development/webpack/ \
-              lavamoat/ \
-              shared/ \
-              types/ \
-              ui/ \
-              .browserslistrc \
-              babel.config.js \
-              builds.yml \
-              package.json \
-              tailwind.config.js \
-              tsconfig.json \
-              yarn.lock \
-            | git hash-object --stdin
-          )
-          echo "build-hash=$BUILD_HASH" >> "$GITHUB_OUTPUT"
-          echo "-> Build-source hash: $BUILD_HASH"
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Directories that never affect the production build output.
+            const excludedDirs = [
+              '.agents/', '.claude/', '.cursor/', '.devcontainer/',
+              '.github/', '.husky/', '.storybook/', '.vscode/', '.yarn/',
+              'docs/', 'public/', 'test/',
+              'development/metamaskbot-build-announce/',
+              'development/ts-migration-dashboard/',
+            ];
+            // Top-level files that never affect the production build output.
+            const excludedFiles = new Set([
+              'AGENTS.md', 'attribution.txt', 'CHANGELOG.md', 'LICENSE',
+              'README.md', '.depcheckrc.yml', '.editorconfig', '.env.yarn',
+              '.gitattributes', '.git-blame-ignore-revs', '.gitignore',
+              '.madgerc', '.mocharc.js', '.prettierignore', '.prettierrc.yml',
+              'codecov.yml', 'coverage.json', 'crowdin.yml',
+              'jest.config.js', 'jest.integration.config.js',
+              'playwright.config.ts', 'privacy-snapshot.json',
+              'sonar-project.properties', 'stylelint.config.js',
+            ]);
+            // Also exclude any top-level .eslintrc*.js variant.
+            const eslintPattern = /^\.eslintrc(\.[a-z.-]+)?\.js$/;
+
+            const { stdout: tree } = await exec.getExecOutput(
+              'git', ['ls-tree', '-r', process.env.HEAD_COMMIT_HASH],
+              { silent: true },
+            );
+            const kept = tree.split('\n').filter(line => {
+              if (!line) return false;
+              const path = line.split('\t')[1];
+              if (excludedDirs.some(d => path.startsWith(d))) return false;
+              if (excludedFiles.has(path)) return false;
+              if (eslintPattern.test(path)) return false;
+              return true;
+            }).join('\n') + '\n';
+
+            const { stdout: hash } = await exec.getExecOutput(
+              'git', ['hash-object', '--stdin'],
+              { silent: true, input: Buffer.from(kept) },
+            );
+            const buildHash = hash.trim();
+            core.setOutput('build-hash', buildHash);
+            core.info(`-> Build-source hash: ${buildHash}`);
 
       # Post the hash as a commit status so future runs can look it up by SHA.
       - name: Post build-source-hash commit status
@@ -147,6 +173,16 @@ jobs:
             });
             core.info(`Posted build-source-hash: ${process.env.BUILD_HASH}`);
 
+      # Extract the list of expected build artifact names from main.yml.
+      # This avoids a hardcoded list that could drift out of sync.
+      - name: Extract required build artifact names
+        id: extract-build-names
+        if: ${{ steps.compute-build-hash.outputs.build-hash }}
+        run: |
+          NAMES=$(grep -oP '(?<=build-name: )\S+' .github/workflows/main.yml | jq -Rsc 'split("\n") | map(select(length > 0))')
+          echo "names=$NAMES" >> "$GITHUB_OUTPUT"
+          echo "-> Required build artifacts: $NAMES"
+
       # Find a prior run whose builds match the current source hash.
       # Checks same branch first, then base branch (main).
       # Skipped on main, stable, and direct pushes to release/* (too high-risk to skip builds).
@@ -157,12 +193,15 @@ jobs:
         env:
           BUILD_HASH: ${{ steps.compute-build-hash.outputs.build-hash }}
           BASE_BRANCH: ${{ env.BASE_BRANCH }}
+          REQUIRED_BUILD_NAMES: ${{ steps.extract-build-names.outputs.names }}
         with:
           script: |
             const { repo: { owner, repo } } = context;
             const buildHash = process.env.BUILD_HASH;
             const currentRunId = parseInt(process.env.RUN_ID, 10);
             const branch = process.env.BRANCH;
+            const required = JSON.parse(process.env.REQUIRED_BUILD_NAMES);
+            core.info(`Expecting ${required.length} build artifacts`);
 
             async function findMatchingRun(searchBranch) {
               core.info(`Searching branch '${searchBranch}' for matching build hash...`);
@@ -203,39 +242,14 @@ jobs:
                     continue;
                   }
 
-                  // Verify that build artifacts still exist (one API call for all artifacts)
-                  const { data: { artifacts } } = await github.rest.actions.listWorkflowRunArtifacts({
-                    owner,
-                    repo,
-                    run_id: run.id,
-                    per_page: 100,
-                  });
+                  // Verify that build artifacts still exist, using pagination to
+                  // handle runs with more than 100 artifacts.
+                  const artifacts = await github.paginate(
+                    github.rest.actions.listWorkflowRunArtifacts,
+                    { owner, repo, run_id: run.id, per_page: 100 },
+                  );
                   const artifactNames = new Set(artifacts.map(a => a.name));
 
-                  // IMPORTANT: Keep this list in sync with every `build-name:` value
-                  // in main.yml. If a build job is added or removed there, update here too.
-                  const required = [
-                    'build-dist-browserify',
-                    'build-dist-mv2-browserify',
-                    'build-beta-browserify',
-                    'build-beta-mv2-browserify',
-                    'build-flask-browserify',
-                    'build-flask-mv2-browserify',
-                    'build-test-browserify',
-                    'build-test-mv2-browserify',
-                    'build-test-flask-browserify',
-                    'build-test-flask-mv2-browserify',
-                    'build-dist-webpack',
-                    'build-dist-mv2-webpack',
-                    'build-beta-webpack',
-                    'build-beta-mv2-webpack',
-                    'build-flask-webpack',
-                    'build-flask-mv2-webpack',
-                    'build-test-webpack',
-                    'build-test-mv2-webpack',
-                    'build-test-flask-webpack',
-                    'build-test-flask-mv2-webpack',
-                  ];
                   const missing = required.filter(name => !artifactNames.has(name));
 
                   if (missing.length === 0) {
