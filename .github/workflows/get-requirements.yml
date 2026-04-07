@@ -160,8 +160,10 @@ jobs:
             core.info(`-> Build-source hash: ${buildHash}`);
 
       # Post the hash as a commit status so future runs can look it up by SHA.
+      # This is an optimization for future runs — failure must not block current CI.
       - name: Post build-source-hash commit status
         if: ${{ steps.compute-build-hash.outputs.build-hash }}
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           BUILD_HASH: ${{ steps.compute-build-hash.outputs.build-hash }}
