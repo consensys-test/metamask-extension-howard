@@ -54,14 +54,17 @@ jobs:
           script: |
             const needs = JSON.parse(process.env.NEEDS_JSON);
             let allPassed = true;
+            let onlyCancelled = true;   // true until we see a real failure
 
             for (const [job, { result }] of Object.entries(needs)) {
               if (!result) {
                 core.error(`Could not determine result for job: ${job}`);
                 allPassed = false;
+                onlyCancelled = false;
               } else if (result !== 'success' && result !== 'skipped') {
                 core.error(`${job} did not succeed (result: ${result})`);
                 allPassed = false;
+                if (result !== 'cancelled') onlyCancelled = false;
               }
             }
 
@@ -69,9 +72,15 @@ jobs:
               core.warning(`Builds were used from a different GHA run: ${process.env.BUILDS_FROM_RUN}`);
               core.info('Right now you can use this feature to test and iterate faster, but to merge a PR, you have to disable it.');
               allPassed = false;
+              onlyCancelled = false;
             }
 
-            core.setOutput('checkResult', allPassed ? 'success' : 'failure');
+            // 'cancelled' means only cancelled jobs (no real failures) — likely
+            // a merge-queue reshuffle that GitHub will re-run with a new SHA.
+            const checkResult = allPassed ? 'success'
+              : onlyCancelled ? 'cancelled'
+              : 'failure';
+            core.setOutput('checkResult', checkResult);
 
       # ── Retry gate (merge queue only) ──────────────────────────────
       #
@@ -159,18 +168,24 @@ jobs:
           STATUS_STATE: ${{ steps.check.outputs.checkResult || 'failure' }}
         with:
           script: |
-            const state = process.env.STATUS_STATE;
+            // GitHub commit-status API only accepts error/failure/pending/success.
+            // Map our 'cancelled' result to 'failure' for the status.
+            const raw = process.env.STATUS_STATE;
+            const state = (raw === 'success') ? 'success' : 'failure';
+            const description = raw === 'success'
+              ? 'All CI jobs completed successfully'
+              : raw === 'cancelled'
+                ? 'Run cancelled (likely merge queue reshuffle)'
+                : 'One or more CI jobs failed';
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha: process.env.HEAD_COMMIT_HASH,
               state,
               context: 'All jobs pass',
-              description: state === 'success'
-                ? 'All CI jobs completed successfully'
-                : 'One or more CI jobs failed',
+              description,
             });
-            core.info(`Posted commit status: ${state}`);
+            core.info(`Posted commit status: ${state} (${raw})`);
 
       # ── Emit Sentry events ───────────────────────────────────────
       #
@@ -226,8 +241,11 @@ jobs:
             }
 
             // 2. Merge queue outcome (only when status is final)
+            //    Skip when result is 'cancelled' — that's a queue reshuffle,
+            //    not a real ejection.  GitHub will start a new run.
             if (process.env.EVENT_NAME === 'merge_group'
-                && process.env.SKIP_STATUS !== 'true') {
+                && process.env.SKIP_STATUS !== 'true'
+                && process.env.CI_RESULT !== 'cancelled') {
               const outcome = process.env.CI_RESULT === 'success'
                 ? 'merged' : 'ejected';
               events.push({
