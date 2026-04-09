@@ -425,7 +425,9 @@ function classifyJob(job: Job): JobClassification {
   // Skip the generic "Process completed with exit code N" annotation —
   // it appears on every failed job and provides no diagnostic value.
   const firstAnnotation = annotations.find(
-    (a) => a.message?.trim() && !/^Process completed with exit code \d+/.test(a.message.trim()),
+    (a) =>
+      a.message?.trim() &&
+      !/^Process completed with exit code \d+/.test(a.message.trim()),
   );
   const fallbackSnippet = firstAnnotation
     ? firstAnnotation.message!.trim().slice(0, 200)
@@ -524,9 +526,7 @@ if (WORKFLOW_EVENT === 'merge_group') {
   const prNum = resolvePrNumber();
   if (prNum) {
     try {
-      const raw = ghApi(
-        `${repoApi}/issues/${prNum}/events?per_page=100`,
-      );
+      const raw = ghApi(`${repoApi}/issues/${prNum}/events?per_page=100`);
       const events = JSON.parse(raw) as Array<{
         event: string;
         actor: { login: string };
@@ -542,6 +542,28 @@ if (WORKFLOW_EVENT === 'merge_group') {
         console.log(
           `PR #${prNum} was manually dequeued by ${lastRemoval.actor.login} — skipping triage.`,
         );
+
+        // Post failure status in case ci-status-gate didn't run.
+        // Harmless if it already posted — the MQ only cares about the latest.
+        const headSha = getRunHeadSha();
+        if (headSha) {
+          try {
+            ghApi(`${repoApi}/statuses/${headSha}`, {
+              method: 'POST',
+              body: {
+                state: 'failure',
+                context: 'All jobs pass',
+                description: `Manually dequeued by ${lastRemoval.actor.login}`,
+              },
+            });
+            console.log(
+              `Posted failure commit status on ${headSha} to unblock merge queue.`,
+            );
+          } catch (err) {
+            console.warn('Failed to post failure commit status:', err);
+          }
+        }
+
         if (GITHUB_OUTPUT) {
           appendFileSync(
             GITHUB_OUTPUT,
@@ -562,13 +584,38 @@ console.log(`Classifying failures for run ${MAIN_RUN_ID}...`);
 const failedJobs = getFailedJobs();
 
 if (failedJobs.length === 0) {
-  // No jobs with conclusion === 'failure'. This is the normal path for
-  // cancelled runs on attempt 1 (cancelled jobs have conclusion 'cancelled',
-  // not 'failure'). Safe to exit: if the run was cancelled before
-  // ci-status-gate could defer the commit status, there's nothing stuck —
-  // deferral requires ci-status-gate to run its retry-gate step, which
-  // makes the overall conclusion 'failure', not 'cancelled'.
+  // No jobs with conclusion === 'failure'. This happens when the run was
+  // cancelled (jobs get conclusion 'cancelled', not 'failure').
+  //
+  // IMPORTANT: if this was a merge_group run, ci-status-gate was likely
+  // skipped by the cancellation (its `if: !cancelled()` condition becomes
+  // false). That means no "All jobs pass" commit status was posted. The
+  // merge queue requires that status, so it will stall until the 60-minute
+  // timeout unless we post a failure status here to unblock ejection.
   console.log('No failed jobs found.');
+
+  if (WORKFLOW_EVENT === 'merge_group' && WORKFLOW_CONCLUSION === 'cancelled') {
+    const headSha = getRunHeadSha();
+    if (headSha) {
+      try {
+        ghApi(`${repoApi}/statuses/${headSha}`, {
+          method: 'POST',
+          body: {
+            state: 'failure',
+            context: 'All jobs pass',
+            description:
+              'Run was cancelled — posting failure to unblock merge queue',
+          },
+        });
+        console.log(
+          `Posted failure commit status on ${headSha} to unblock merge queue.`,
+        );
+      } catch (err) {
+        console.warn('Failed to post failure commit status:', err);
+      }
+    }
+  }
+
   if (GITHUB_OUTPUT) {
     appendFileSync(
       GITHUB_OUTPUT,
