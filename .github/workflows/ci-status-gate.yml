@@ -247,26 +247,24 @@ jobs:
                 && process.env.SKIP_STATUS !== 'true'
                 && process.env.CI_RESULT !== 'cancelled') {
               let manualDequeue = false;
-              if (process.env.CI_RESULT !== 'success') {
-                const prMatch = process.env.BRANCH?.match(/pr-(\d+)-/);
-                if (prMatch) {
-                  try {
-                    const { data: evts } = await github.rest.issues.listEvents({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      issue_number: Number(prMatch[1]),
-                      per_page: 100,
-                    });
-                    const lastRemoval = evts
-                      .filter(e => e.event === 'removed_from_merge_queue')
-                      .pop();
-                    if (lastRemoval && lastRemoval.actor?.login !== 'github-merge-queue[bot]') {
-                      core.info(`PR #${prMatch[1]} manually dequeued by ${lastRemoval.actor?.login} — skipping outcome event`);
-                      manualDequeue = true;
-                    }
-                  } catch (err) {
-                    core.warning(`Could not check merge queue events: ${err.message}`);
+              const prMatch = process.env.BRANCH?.match(/pr-(\d+)-/);
+              if (prMatch) {
+                try {
+                  const { data: evts } = await github.rest.issues.listEvents({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: Number(prMatch[1]),
+                    per_page: 100,
+                  });
+                  const lastRemoval = evts
+                    .filter(e => e.event === 'removed_from_merge_queue')
+                    .pop();
+                  if (lastRemoval && lastRemoval.actor?.login !== 'github-merge-queue[bot]') {
+                    core.info(`PR #${prMatch[1]} manually dequeued by ${lastRemoval.actor?.login} — skipping outcome event`);
+                    manualDequeue = true;
                   }
+                } catch (err) {
+                  core.warning(`Could not check merge queue events: ${err.message}`);
                 }
               }
               if (!manualDequeue) {
