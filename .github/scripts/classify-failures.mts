@@ -509,6 +509,54 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
   process.exit(0);
 }
 
+// ---------------------------------------------------------------------------
+// Manual-dequeue early exit
+// ---------------------------------------------------------------------------
+// When a user manually removes a PR from the merge queue, GitHub cancels
+// the merge_group run and the workflow concludes as 'failure' (because
+// get-requirements fails with "not in the merge queue"). There's nothing
+// to triage — the user intentionally abandoned this queue entry.
+//
+// Detection: the PR timeline's `removed_from_merge_queue` event has the
+// actor who did it.  If it's a real user (not github-merge-queue[bot]),
+// it was a manual dequeue.
+if (WORKFLOW_EVENT === 'merge_group') {
+  const prNum = resolvePrNumber();
+  if (prNum) {
+    try {
+      const raw = ghApi(
+        `${repoApi}/issues/${prNum}/events?per_page=100`,
+      );
+      const events = JSON.parse(raw) as Array<{
+        event: string;
+        actor: { login: string };
+        created_at: string;
+      }>;
+      const lastRemoval = events
+        .filter((e) => e.event === 'removed_from_merge_queue')
+        .pop();
+      if (
+        lastRemoval &&
+        lastRemoval.actor.login !== 'github-merge-queue[bot]'
+      ) {
+        console.log(
+          `PR #${prNum} was manually dequeued by ${lastRemoval.actor.login} — skipping triage.`,
+        );
+        if (GITHUB_OUTPUT) {
+          appendFileSync(
+            GITHUB_OUTPUT,
+            'is-retryable=false\nhas-retry-label=false\nwill-retry=false\npr-number=\n',
+          );
+        }
+        process.exit(0);
+      }
+    } catch (err) {
+      console.warn('Could not check merge queue removal events:', err);
+      // Fall through to normal classification
+    }
+  }
+}
+
 console.log(`Classifying failures for run ${MAIN_RUN_ID}...`);
 
 const failedJobs = getFailedJobs();
