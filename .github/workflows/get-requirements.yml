@@ -110,17 +110,17 @@ jobs:
           FILTER_ALL_CHANGES_COUNT: ${{ steps.filter.outputs.all_changes_count }}
         run: |
           # On main we never run locales-only mode (full-signal CI and scheduled runs).
-          if [[ "$IS_RUN_EVERYTHING_BRANCH" == 'true' ]]; then
-            echo "needs-locales=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # if [[ "$IS_RUN_EVERYTHING_BRANCH" == 'true' ]]; then
+          #   echo "needs-locales=false" >> "$GITHUB_OUTPUT"
+          #   exit 0
+          # fi
 
-          # locales-only when *all* changes are in app/_locales.
-          if [[ -n "$FILTER_ALL_CHANGES_COUNT" && "$FILTER_ALL_CHANGES_COUNT" != "0" && "$FILTER_LOCALES_COUNT" == "$FILTER_ALL_CHANGES_COUNT" ]]; then
+          # # locales-only when *all* changes are in app/_locales.
+          # if [[ -n "$FILTER_ALL_CHANGES_COUNT" && "$FILTER_ALL_CHANGES_COUNT" != "0" && "$FILTER_LOCALES_COUNT" == "$FILTER_ALL_CHANGES_COUNT" ]]; then
             echo "needs-locales=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "needs-locales=false" >> "$GITHUB_OUTPUT"
-          fi
+          # else
+          #   echo "needs-locales=false" >> "$GITHUB_OUTPUT"
+          # fi
 
       - name: Compute just-repository-health-checks flag
         id: set-just-repository-health-checks
