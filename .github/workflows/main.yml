@@ -54,6 +54,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - run: |
+          if [[ "$GITHUB_EVENT_NAME" == "merge_group" && "$GITHUB_REF" == *"pr-28"* ]]; then
+            echo "Intentional failure for reshuffle test (PR #28 only)"
+            exit 1
+          fi
+
       - name: Checkout and setup environment
         uses: MetaMask/action-checkout-and-setup@v3
         with:
