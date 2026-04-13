@@ -720,10 +720,10 @@ function main() {
     (a) => a.effectiveSeverity === 'low' || a.effectiveSeverity === 'medium',
   );
 
-  // Block release candidates when any production advisory is present.
+  // Block release candidates when a moderate+ production advisory is present.
   const blockReleaseCandidate =
     IS_RELEASE_BRANCH &&
-    advisories.some((advisory) => advisory.affectsProduction);
+    prodAdvisories.some((a) => BLOCKING_SEVERITIES.has(a.effectiveSeverity));
 
   // Console output (machine readable)
   console.log(
