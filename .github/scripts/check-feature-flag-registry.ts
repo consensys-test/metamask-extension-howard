@@ -109,7 +109,7 @@ async function main(): Promise<void> {
   const fileCount = [...fileChanges.values()].filter((c) => c.length > 0).length;
   console.log(`Found changes in ${fileCount} file(s)\n`);
 
-  logRegistryChanges(baseBranch);
+  logRegistryChanges(diff);
 
   // --- Collect flag references from added lines ---
   const allReferences: FlagReference[] = [];
@@ -230,6 +230,41 @@ async function main(): Promise<void> {
 }
 
 function getDiff(baseBranch: string): string {
+  // 1. Try GitHub API (no git history needed, fastest path)
+  const prNumber = context.payload.pull_request?.number;
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (prNumber && repo) {
+    try {
+      const apiDiff = execFileSync(
+        'gh',
+        ['api', `repos/${repo}/pulls/${prNumber}`, '-H', 'Accept: application/vnd.github.diff'],
+        { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+      );
+      if (apiDiff.trim()) {
+        console.log('Got diff from GitHub API');
+        return apiDiff;
+      }
+    } catch {
+      console.warn('GitHub API diff unavailable, falling back to git diff');
+    }
+  }
+
+  // 2. Try git diff using the base SHA from the event payload (immutable,
+  //    works even when the base branch has advanced since the event fired).
+  const baseSha = process.env.BASE_SHA;
+  if (baseSha) {
+    try {
+      execFileSync('git', ['fetch', 'origin', baseSha, '--depth=1'], { stdio: 'pipe' });
+      return execFileSync(
+        'git', ['diff', `${baseSha}...HEAD`, '--', ...SCAN_DIRECTORIES],
+        { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+      );
+    } catch {
+      console.warn(`git diff with BASE_SHA (${baseSha}) failed, trying branch-based diff`);
+    }
+  }
+
+  // 3. Branch-based git diff (original fallback)
   const candidates: string[][] = [
     ['git', 'diff', `origin/${baseBranch}...HEAD`, '--', ...SCAN_DIRECTORIES],
     ['git', 'diff', `origin/${baseBranch}..HEAD`, '--', ...SCAN_DIRECTORIES],
@@ -655,18 +690,17 @@ function stripStringLiterals(line: string): string { return processStrings(line,
 function maskStringLiterals(line: string): string { return processStrings(line, 'mask'); }
 
 /** Logs which flags were added/removed in the registry (informational only). */
-function logRegistryChanges(baseBranch: string): void {
+function logRegistryChanges(fullDiff: string): void {
   const registryFile = 'test/e2e/feature-flags/feature-flag-registry.ts';
-  const candidates: string[][] = [
-    ['git', 'diff', `origin/${baseBranch}...HEAD`, '--', registryFile],
-    ['git', 'diff', `${baseBranch}...HEAD`, '--', registryFile],
-  ];
+
+  // Extract the registry file section from the already-fetched diff
+  const sections = fullDiff.split(/^diff --git /mu);
   let registryDiff = '';
-  for (const [cmd, ...args] of candidates) {
-    try {
-      registryDiff = execFileSync(cmd, args, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+  for (const section of sections) {
+    if (section.includes(`a/${registryFile}`) || section.includes(`b/${registryFile}`)) {
+      registryDiff = `diff --git ${section}`;
       break;
-    } catch { /* try next */ }
+    }
   }
 
   if (!registryDiff.trim()) {

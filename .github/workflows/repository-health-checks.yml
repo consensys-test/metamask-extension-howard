@@ -18,10 +18,6 @@ jobs:
           is-high-risk-environment: false
           skip-allow-scripts: true
 
-      - name: Fetch base branch for diff checks
-        if: ${{ !cancelled() }}
-        run: git fetch origin "${{ github.base_ref || 'main' }}" --depth=1
-
       - name: ShellCheck Lint
         if: ${{ !cancelled() }}
         run: ./development/shellcheck.sh
@@ -67,6 +63,8 @@ jobs:
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: yarn tsx .github/scripts/check-feature-flag-registry.ts
 
       - name: Check working tree
