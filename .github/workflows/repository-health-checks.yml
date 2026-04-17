@@ -80,18 +80,5 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Get the PR diff via GitHub API (avoids needing full git history).
-          # Falls back to git diff using the base SHA from the event payload.
-          if gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
-               -H "Accept: application/vnd.github.diff" > ./diff 2>/dev/null && [ -s ./diff ]; then
-            echo "Got diff from GitHub API"
-          else
-            echo "::warning::GitHub API diff unavailable or empty, falling back to git diff"
-            git fetch origin "${BASE_SHA}" --depth=1
-            git diff "${BASE_SHA}" HEAD -- . > ./diff
-          fi
-
-          yarn fitness-functions ci ./diff
+        run: yarn fitness-functions ci
