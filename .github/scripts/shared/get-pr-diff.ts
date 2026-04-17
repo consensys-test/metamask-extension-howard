@@ -81,7 +81,15 @@ export function getPrDiff(options: GetPrDiffOptions = {}): string {
     }
   }
 
-  // 3. Branch-based git diff (original fallback)
+  // 3. Branch-based git diff (original fallback).
+  //    Fetch the base branch first — in a shallow clone it won't exist locally.
+  try {
+    execFileSync('git', ['fetch', 'origin', baseBranch, '--depth=1'], {
+      stdio: 'pipe',
+    });
+  } catch {
+    console.warn(`Could not fetch origin/${baseBranch}`);
+  }
   const diffArgs = directories.length > 0 ? ['--', ...directories] : [];
   const candidates: string[][] = [
     ['git', 'diff', `origin/${baseBranch}...HEAD`, ...diffArgs],
