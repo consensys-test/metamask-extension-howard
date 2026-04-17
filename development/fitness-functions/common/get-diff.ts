@@ -47,6 +47,7 @@ function getCIDiff(path?: string): string {
 
   // No file argument — fetch diff directly (requires CI environment variables).
   // Lazy-import to avoid pulling @actions/github into local dev hooks.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- deliberate lazy require
   const { getPrDiff } = require('../../../.github/scripts/shared/get-pr-diff');
   return getPrDiff({ baseBranch: process.env.BASE_REF || 'main' });
 }
