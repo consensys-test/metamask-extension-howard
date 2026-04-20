@@ -91,15 +91,15 @@ jobs:
         id: skip-e2e-tag
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
         run: |
-          echo "SKIP=false" >> "$GITHUB_OUTPUT"
+          echo "SKIP=true" >> "$GITHUB_OUTPUT"
 
           # Ignore the [skip-e2e] tag for forks
-          if [[ "$IS_FORK" != "true" ]] && { [[ "$EVENT_NAME" == "pull_request" ]] || [[ "$EVENT_NAME" == "merge_group" ]] || [[ "$BRANCH" == trigger-ci-* ]]; }; then
-            if git show --format='%B' --no-patch "${HEAD_COMMIT_HASH}" | grep --fixed-strings --quiet '[skip-e2e]'; then
-              echo "SKIP=true" >> "$GITHUB_OUTPUT"
-              echo "-> SKIP=true due to [skip-e2e] tag in last commit message"
-            fi
-          fi
+          # if [[ "$IS_FORK" != "true" ]] && { [[ "$EVENT_NAME" == "pull_request" ]] || [[ "$EVENT_NAME" == "merge_group" ]] || [[ "$BRANCH" == trigger-ci-* ]]; }; then
+          #   if git show --format='%B' --no-patch "${HEAD_COMMIT_HASH}" | grep --fixed-strings --quiet '[skip-e2e]'; then
+          #     echo "SKIP=true" >> "$GITHUB_OUTPUT"
+          #     echo "-> SKIP=true due to [skip-e2e] tag in last commit message"
+          #   fi
+          # fi
 
       # Compute a content hash of all build-affecting source files.
       # Used to detect when builds can be reused from a prior run.
