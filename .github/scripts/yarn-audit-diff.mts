@@ -49,6 +49,77 @@ function sevLabel(a: ParsedAdvisory): string {
   return (a.effectiveSeverity ?? 'unknown').toUpperCase();
 }
 
+/**
+ * Returns true when the current PR changes yarn.lock (i.e. modifies
+ * dependencies). Uses GITHUB_BASE_REF which GitHub sets to the PR's
+ * target branch on pull_request events.
+ *
+ * On non-PR events (push, schedule) this always returns true so the
+ * caller never suppresses a failure for mainline triggers.
+ */
+function prChangesDeps(): boolean {
+  const baseRef = process.env.GITHUB_BASE_REF; // e.g. "main"
+  if (!baseRef) {
+    // Not a PR — treat as deps-changed so the caller's behaviour is
+    // unchanged for push / schedule events.
+    return true;
+  }
+
+  const result = spawnSync(
+    'git',
+    ['diff', '--name-only', `origin/${baseRef}...HEAD`, '--', 'yarn.lock'],
+    { encoding: 'utf8' },
+  );
+  return result.stdout.trim().length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Baseline refresh (PR-triggered, best-effort)
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-run the health-checks job from the baseline run (already found by the
+ * workflow). This refreshes the audit baseline so subsequent PRs aren't
+ * blocked by ambient CVEs published after the last push-to-main.
+ *
+ * Best-effort: failures are logged but never fail the PR check.
+ * Requires `actions: write` permission on GITHUB_TOKEN.
+ */
+function triggerBaselineRefresh(): void {
+  const repo = process.env.GITHUB_REPOSITORY;
+  const runId = process.env.BASELINE_RUN_ID;
+  if (!repo || !runId) {
+    console.log(
+      'GITHUB_REPOSITORY or BASELINE_RUN_ID not set — skipping baseline refresh trigger.',
+    );
+    return;
+  }
+
+  try {
+    // Find the repository-health-checks job in the baseline run
+    const jobId = ghApi(
+      `repos/${repo}/actions/runs/${runId}/jobs?per_page=50`,
+      { jq: '.jobs[] | select(.name | test("health"; "i")) | .id' },
+    ).trim();
+
+    if (!jobId) {
+      console.log(
+        'Health-checks job not found — skipping baseline refresh.',
+      );
+      return;
+    }
+
+    // Re-run just that job — it will re-audit and upload a fresh baseline
+    ghApi(`repos/${repo}/actions/jobs/${jobId}/rerun`, { method: 'POST' });
+    console.log(
+      `Triggered baseline refresh: re-running job ${jobId} from run ${runId}`,
+    );
+  } catch (error) {
+    // Best-effort — never fail the PR because the refresh trigger failed
+    console.log(`Failed to trigger baseline refresh: ${error}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // GitHub issue creation (push-to-main only)
 // ---------------------------------------------------------------------------
@@ -460,10 +531,28 @@ async function main() {
     );
   }
 
-  // On PRs, fail the step only when there are release-blocking advisories.
+  // On PRs, fail the step only when there are release-blocking advisories
+  // AND the PR actually changes dependencies. If the PR doesn't touch
+  // yarn.lock, any new advisories are ambient CVEs published after the
+  // baseline was captured — not caused by this PR. In that case, trigger
+  // a baseline refresh (re-run health-checks on main) so the next PR
+  // picks up a baseline that already includes these CVEs.
   // On push-to-main, the step always succeeds (baseline must be uploaded).
   if (!isMainlineTrigger && blockingAdvisories.length > 0) {
-    process.exitCode = 1;
+    if (prChangesDeps()) {
+      process.exitCode = 1;
+    } else {
+      githubAnnotate(
+        'warning',
+        `${blockingAdvisories.length} new advisory/advisories found, but this PR does not change yarn.lock — treating as informational.`,
+      );
+
+      // Trigger a baseline refresh so subsequent PRs aren't blocked.
+      // Only possible on same-repo PRs where GITHUB_TOKEN has actions:write.
+      if (process.env.IS_CROSS_REPO_PR !== 'true') {
+        triggerBaselineRefresh();
+      }
+    }
   }
 }
 

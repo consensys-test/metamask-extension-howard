@@ -13,6 +13,8 @@ jobs:
       BRANCH: ${{ github.head_ref || github.ref_name }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SLACK_WEBHOOK_METAMASK_EXTENSION: ${{ secrets.SLACK_WEBHOOK_METAMASK_EXTENSION }}
+      # True only when the PR head lives in a different repository (no secrets).
+      IS_CROSS_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
     steps:
       - name: Checkout and setup environment
         uses: MetaMask/action-checkout-and-setup@v3
@@ -73,19 +75,15 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            // Security: we must use an explicit push-to-main run ID when
-            // downloading the baseline artifact. If we omit run-id,
-            // actions/download-artifact defaults to the current run only.
-            // If we searched all runs without the branch+event filter, a PR
-            // branch run could upload a poisoned audit-baseline artifact that
-            // whitelists arbitrary GHSA IDs, causing the diff to report zero
-            // new advisories.
+            // Security: we download only from runs on the `main` branch,
+            // which prevents a PR branch from uploading a poisoned baseline
+            // artifact. Push, schedule, and workflow_dispatch runs on main
+            // are all equally trustworthy.
             const { data } = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'main.yml',
               branch: 'main',
-              event: 'push',
               status: 'completed',
               per_page: 1,
             });
@@ -122,6 +120,8 @@ jobs:
       # check when new production moderate+ advisories are found.
       - name: Audit -- diff against baseline
         if: ${{ !cancelled() && steps.download-baseline.outcome == 'success' }}
+        env:
+          BASELINE_RUN_ID: ${{ steps.find-baseline-run.outputs.run-id }}
         run: |
           yarn tsx .github/scripts/yarn-audit-diff.mts
 
@@ -131,7 +131,7 @@ jobs:
         if: >-
           ${{
             !cancelled()
-            && github.event_name == 'push'
+            && (github.event_name == 'push' || github.event_name == 'schedule')
             && github.ref == 'refs/heads/main'
           }}
         run: mv .tmp/audit-current.json .tmp/audit-baseline.json
@@ -140,7 +140,7 @@ jobs:
         if: >-
           ${{
             !cancelled()
-            && github.event_name == 'push'
+            && (github.event_name == 'push' || github.event_name == 'schedule')
             && github.ref == 'refs/heads/main'
           }}
         uses: actions/upload-artifact@v7
@@ -152,7 +152,7 @@ jobs:
         if: >-
           ${{
             !cancelled()
-            && github.event_name == 'push'
+            && (github.event_name == 'push' || github.event_name == 'schedule')
             && github.ref == 'refs/heads/main'
             && github.repository == 'MetaMask/metamask-extension'
             && vars.AWS_REGION
