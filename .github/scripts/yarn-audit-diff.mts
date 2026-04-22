@@ -97,14 +97,27 @@ function triggerBaselineRefresh(): void {
 
   try {
     // Find the repository-health-checks job in the baseline run
-    const jobId = ghApi(
+    const raw = ghApi(
       `repos/${repo}/actions/runs/${runId}/jobs?per_page=50`,
-      { jq: '.jobs[] | select(.name | test("health"; "i")) | .id' },
+      { jq: '.jobs[] | select(.name | test("health"; "i")) | {id, status}' },
     ).trim();
 
-    if (!jobId) {
+    if (!raw) {
       console.log(
         'Health-checks job not found — skipping baseline refresh.',
+      );
+      return;
+    }
+
+    const { id: jobId, status } = JSON.parse(raw) as {
+      id: number;
+      status: string;
+    };
+
+    // If another PR already triggered a re-run, don't pile on.
+    if (status === 'queued' || status === 'in_progress') {
+      console.log(
+        `Baseline refresh already in progress (job ${jobId}, status: ${status}) — skipping.`,
       );
       return;
     }
@@ -117,6 +130,37 @@ function triggerBaselineRefresh(): void {
   } catch (error) {
     // Best-effort — never fail the PR because the refresh trigger failed
     console.log(`Failed to trigger baseline refresh: ${error}`);
+  }
+}
+
+/**
+ * Add the `retry-ci` label to the current PR so the triage system
+ * auto-retries after the baseline refresh completes.
+ *
+ * Best-effort: failures are logged but never fail the PR check.
+ * Requires `pull-requests: write` permission on GITHUB_TOKEN.
+ */
+function addRetryLabel(): void {
+  const repo = process.env.GITHUB_REPOSITORY;
+  const ref = process.env.GITHUB_REF; // refs/pull/12345/merge
+  if (!repo || !ref) {
+    return;
+  }
+
+  const match = ref.match(/^refs\/pull\/(\d+)\/merge$/);
+  if (!match) {
+    return;
+  }
+  const prNumber = match[1];
+
+  try {
+    ghApi(`repos/${repo}/issues/${prNumber}/labels`, {
+      method: 'POST',
+      body: { labels: ['retry-ci'] },
+    });
+    console.log(`Added retry-ci label to PR #${prNumber}`);
+  } catch (error) {
+    console.log(`Failed to add retry-ci label: ${error}`);
   }
 }
 
@@ -534,24 +578,34 @@ async function main() {
   // On PRs, fail the step only when there are release-blocking advisories
   // AND the PR actually changes dependencies. If the PR doesn't touch
   // yarn.lock, any new advisories are ambient CVEs published after the
-  // baseline was captured — not caused by this PR. In that case, trigger
-  // a baseline refresh (re-run health-checks on main) so the next PR
-  // picks up a baseline that already includes these CVEs.
+  // baseline was captured — not caused by this PR.
+  //
+  // Either way, trigger a baseline refresh so the next run (or a re-run
+  // of this PR) diffs against a baseline that already includes ambient CVEs.
   // On push-to-main, the step always succeeds (baseline must be uploaded).
   if (!isMainlineTrigger && blockingAdvisories.length > 0) {
+    // Trigger a baseline refresh so subsequent runs aren't blocked by
+    // ambient CVEs. Only possible on same-repo PRs with actions:write.
+    if (process.env.IS_CROSS_REPO_PR !== 'true') {
+      triggerBaselineRefresh();
+    }
+
     if (prChangesDeps()) {
       process.exitCode = 1;
+      githubAnnotate(
+        'warning',
+        'New advisories found and this PR changes yarn.lock. ' +
+          'If the advisories are unrelated to your changes, re-run this check ' +
+          'after the baseline refresh completes (~2 min).',
+      );
+
+      // Add retry-ci label so triage auto-retries after the baseline refresh.
+      addRetryLabel();
     } else {
       githubAnnotate(
         'warning',
         `${blockingAdvisories.length} new advisory/advisories found, but this PR does not change yarn.lock — treating as informational.`,
       );
-
-      // Trigger a baseline refresh so subsequent PRs aren't blocked.
-      // Only possible on same-repo PRs where GITHUB_TOKEN has actions:write.
-      if (process.env.IS_CROSS_REPO_PR !== 'true') {
-        triggerBaselineRefresh();
-      }
     }
   }
 }
