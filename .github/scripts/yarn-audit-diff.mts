@@ -117,15 +117,15 @@ function triggerBaselineRefresh(): string | null {
       status: string;
     };
 
-    const runUrl = `${serverUrl}/${repo}/actions/runs/${runId}`;
+    const jobUrl = `${serverUrl}/${repo}/actions/runs/${runId}/job/${jobId}`;
 
     // If another PR already triggered a re-run, don't pile on.
     if (status === 'queued' || status === 'in_progress') {
       console.log(
         `Baseline refresh already in progress (job ${jobId}, status: ${status}) — skipping.`,
       );
-      console.log(`  → ${runUrl}`);
-      return runUrl;
+      console.log(`  → ${jobUrl}`);
+      return jobUrl;
     }
 
     // Re-run just that job — it will re-audit and upload a fresh baseline
@@ -133,8 +133,8 @@ function triggerBaselineRefresh(): string | null {
     console.log(
       `Triggered baseline refresh: re-running job ${jobId} from run ${runId}`,
     );
-    console.log(`  → ${runUrl}`);
-    return runUrl;
+    console.log(`  → ${jobUrl}`);
+    return jobUrl;
   } catch (error) {
     // Best-effort — never fail the PR because the refresh trigger failed
     console.log(`Failed to trigger baseline refresh: ${error}`);
@@ -568,8 +568,6 @@ async function main() {
     treeText,
     '```',
     '',
-    'Run `yarn audit` locally to reproduce.',
-    '',
   ];
 
   // On push-to-main, create a GitHub tracking issue (before Slack so we can link it).
@@ -619,7 +617,8 @@ async function main() {
       diffSummaryLines[3] =
         'New advisories were found and this PR changes `yarn.lock`. ' +
         'If the advisories are unrelated to your changes, this check will auto-retry ' +
-        'after the baseline refresh completes (~2 min).';
+        'after the baseline refresh completes (~2 min).' +
+        ' Run `yarn audit` locally to check whether these come from your dependency changes.';
       if (refreshUrl) {
         diffSummaryLines.push(
           `> **Baseline refresh triggered** — [view run](${refreshUrl})`,
@@ -658,6 +657,11 @@ async function main() {
           (refreshUrl ? ` Baseline refresh: ${refreshUrl}` : ''),
       );
     }
+  }
+
+  // For mainline and genuine PR-introduced CVEs, add the local reproduce hint.
+  if (isMainlineTrigger || blockingAdvisories.length === 0) {
+    diffSummaryLines.push('Run `yarn audit` locally to reproduce.', '');
   }
 
   writeStepSummary(diffSummaryLines.join('\n'));
