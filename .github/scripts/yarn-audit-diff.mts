@@ -777,7 +777,7 @@ async function main() {
       // Ambient CVEs: either yarn.lock wasn't touched, or it was touched
       // but the advisory packages themselves weren't changed.
       const reason = touchesYarnLock
-        ? 'this PR changes `yarn.lock` but does not touch the affected packages'
+        ? 'although this PR changes `yarn.lock`, it does not touch the affected packages'
         : 'this PR does not change `yarn.lock`';
       diffSummaryLines[1] =
         `### yarn audit: **passed** (ambient) — ${blockingAdvisories.length} pre-existing advisor${blockingAdvisories.length === 1 ? 'y' : 'ies'}`;
