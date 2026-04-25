@@ -65,12 +65,31 @@ function prChangesDeps(): boolean {
     return true;
   }
 
+  // Ensure the base ref is available — shallow PR checkouts may not have it.
+  spawnSync('git', ['fetch', 'origin', baseRef, '--depth=1'], {
+    encoding: 'utf8',
+  });
+
   const result = spawnSync(
     'git',
     ['diff', '--name-only', `origin/${baseRef}...HEAD`, '--', 'yarn.lock'],
     { encoding: 'utf8' },
   );
-  return result.stdout.trim().length > 0;
+  if (result.status !== 0) {
+    // git diff failed — likely origin/<base> not fetched in shallow clone.
+    // Fall back to treating as deps-changed so we don't silently skip.
+    console.log(
+      `git diff against origin/${baseRef} failed (exit ${result.status}): ${(result.stderr ?? '').trim() || '(no stderr)'}`,
+    );
+    return true;
+  }
+  const changed = result.stdout.trim().length > 0;
+  console.log(
+    changed
+      ? 'PR changes yarn.lock — dependency change detected.'
+      : 'PR does not change yarn.lock.',
+  );
+  return changed;
 }
 
 // ---------------------------------------------------------------------------
