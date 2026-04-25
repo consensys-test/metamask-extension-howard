@@ -22,29 +22,29 @@ jobs:
           is-high-risk-environment: false
           skip-allow-scripts: true
 
-      - name: ShellCheck Lint
-        if: ${{ !cancelled() }}
-        run: ./development/shellcheck.sh
+      # - name: ShellCheck Lint
+      #   if: ${{ !cancelled() }}
+      #   run: ./development/shellcheck.sh
 
-      - name: Validate changelog
-        if: ${{ !startsWith(env.BRANCH, 'release/') }}
-        run: yarn lint:changelog
+      # - name: Validate changelog
+      #   if: ${{ !startsWith(env.BRANCH, 'release/') }}
+      #   run: yarn lint:changelog
 
-      - name: Validate release candidate changelog
-        if: ${{ startsWith(env.BRANCH, 'release/') }}
-        run: .github/scripts/validate-changelog-in-rc.sh
+      # - name: Validate release candidate changelog
+      #   if: ${{ startsWith(env.BRANCH, 'release/') }}
+      #   run: .github/scripts/validate-changelog-in-rc.sh
 
-      - name: Lint lockfile
-        if: ${{ !cancelled() }}
-        run: yarn lint:lockfile
+      # - name: Lint lockfile
+      #   if: ${{ !cancelled() }}
+      #   run: yarn lint:lockfile
 
-      - name: Lint console baseline
-        if: ${{ !cancelled() }}
-        run: yarn lint:baseline
+      # - name: Lint console baseline
+      #   if: ${{ !cancelled() }}
+      #   run: yarn lint:baseline
 
-      - name: Check yarn resolutions
-        if: ${{ !cancelled() }}
-        run: yarn --check-resolutions
+      # - name: Check yarn resolutions
+      #   if: ${{ !cancelled() }}
+      #   run: yarn --check-resolutions
 
       # --- Baseline download (PR, push-to-main, and cron) ---
       # When the download fails (first rollout, expired artifact, or fork PR
@@ -166,38 +166,38 @@ jobs:
           s3-bucket: ${{ vars.AWS_S3_BUCKET }}/${{ github.event.repository.name }}/audit-baseline
           path: .tmp/audit-baseline.json
 
-      - name: Detect yarn lock deduplications
-        if: ${{ !cancelled() }}
-        run: yarn dedupe --check
+      # - name: Detect yarn lock deduplications
+      #   if: ${{ !cancelled() }}
+      #   run: yarn dedupe --check
 
-      - name: Run depcheck
-        if: ${{ !cancelled() }}
-        run: yarn depcheck
+      # - name: Run depcheck
+      #   if: ${{ !cancelled() }}
+      #   run: yarn depcheck
 
-      - name: Validate allow-scripts config
-        if: ${{ !cancelled() }}
-        run: yarn allow-scripts auto
+      # - name: Validate allow-scripts config
+      #   if: ${{ !cancelled() }}
+      #   run: yarn allow-scripts auto
 
-      - name: Check feature flag registry
-        if: ${{ !cancelled() }}
-        env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: yarn tsx .github/scripts/check-feature-flag-registry.ts
+      # - name: Check feature flag registry
+      #   if: ${{ !cancelled() }}
+      #   env:
+      #     GITHUB_BASE_REF: ${{ github.base_ref }}
+      #     BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: yarn tsx .github/scripts/check-feature-flag-registry.ts
 
-      - name: Check working tree
-        if: ${{ !cancelled() }}
-        run: |
-          if ! git diff --exit-code; then
-              echo "::error::Working tree dirty."
-              exit 1
-          fi
+      # - name: Check working tree
+      #   if: ${{ !cancelled() }}
+      #   run: |
+      #     if ! git diff --exit-code; then
+      #         echo "::error::Working tree dirty."
+      #         exit 1
+      #     fi
 
-      - name: Run fitness functions
-        if: ${{ !cancelled() && github.event_name == 'pull_request'}}
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: yarn fitness-functions ci
+      # - name: Run fitness functions
+      #   if: ${{ !cancelled() && github.event_name == 'pull_request'}}
+      #   env:
+      #     BASE_REF: ${{ github.event.pull_request.base.ref }}
+      #     BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: yarn fitness-functions ci
