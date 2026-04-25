@@ -51,45 +51,44 @@ function sevLabel(a: ParsedAdvisory): string {
 
 /**
  * Returns true when the current PR changes yarn.lock (i.e. modifies
- * dependencies). Uses GITHUB_BASE_REF which GitHub sets to the PR's
- * target branch on pull_request events.
+ * dependencies). Queries the GitHub PR files API so it works regardless
+ * of checkout depth.
  *
  * On non-PR events (push, schedule) this always returns true so the
  * caller never suppresses a failure for mainline triggers.
  */
 function prChangesDeps(): boolean {
-  const baseRef = process.env.GITHUB_BASE_REF; // e.g. "main"
-  if (!baseRef) {
-    // Not a PR — treat as deps-changed so the caller's behaviour is
-    // unchanged for push / schedule events.
+  const repo = process.env.GITHUB_REPOSITORY;
+  const ref = process.env.GITHUB_REF; // refs/pull/NNN/merge
+  if (!repo || !ref) {
+    // Not a PR (or missing context) — treat as deps-changed.
     return true;
   }
 
-  // Ensure the base ref is available — shallow PR checkouts may not have it.
-  spawnSync('git', ['fetch', 'origin', baseRef, '--depth=1'], {
-    encoding: 'utf8',
-  });
+  const match = ref.match(/^refs\/pull\/(\d+)\/merge$/);
+  if (!match) {
+    // Not a PR event — treat as deps-changed.
+    return true;
+  }
+  const prNumber = match[1];
 
-  const result = spawnSync(
-    'git',
-    ['diff', '--name-only', `origin/${baseRef}...HEAD`, '--', 'yarn.lock'],
-    { encoding: 'utf8' },
-  );
-  if (result.status !== 0) {
-    // git diff failed — likely origin/<base> not fetched in shallow clone.
-    // Fall back to treating as deps-changed so we don't silently skip.
+  try {
+    const raw = ghApi(
+      `repos/${repo}/pulls/${prNumber}/files?per_page=100`,
+      { paginate: true, jq: '[.[].filename] | map(select(. == "yarn.lock")) | length' },
+    ).trim();
+    const changed = raw !== '0';
     console.log(
-      `git diff against origin/${baseRef} failed (exit ${result.status}): ${(result.stderr ?? '').trim() || '(no stderr)'}`,
+      changed
+        ? 'PR changes yarn.lock — dependency change detected.'
+        : 'PR does not change yarn.lock.',
     );
+    return changed;
+  } catch (error) {
+    console.log(`Failed to query PR files: ${error}`);
+    // Safe default — treat as deps-changed.
     return true;
   }
-  const changed = result.stdout.trim().length > 0;
-  console.log(
-    changed
-      ? 'PR changes yarn.lock — dependency change detected.'
-      : 'PR does not change yarn.lock.',
-  );
-  return changed;
 }
 
 // ---------------------------------------------------------------------------
