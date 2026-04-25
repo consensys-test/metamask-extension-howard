@@ -117,24 +117,26 @@ function triggerBaselineRefresh(): string | null {
       status: string;
     };
 
-    const jobUrl = `${serverUrl}/${repo}/actions/runs/${runId}/job/${jobId}`;
+    const runUrl = `${serverUrl}/${repo}/actions/runs/${runId}`;
 
     // If another PR already triggered a re-run, don't pile on.
     if (status === 'queued' || status === 'in_progress') {
       console.log(
         `Baseline refresh already in progress (job ${jobId}, status: ${status}) — skipping.`,
       );
-      console.log(`  → ${jobUrl}`);
-      return jobUrl;
+      console.log(`  → ${runUrl}`);
+      return runUrl;
     }
 
-    // Re-run just that job — it will re-audit and upload a fresh baseline
+    // Re-run just that job — it will re-audit and upload a fresh baseline.
+    // The re-run creates a new attempt on the same run, so the run URL
+    // will show the latest attempt.
     ghApi(`repos/${repo}/actions/jobs/${jobId}/rerun`, { method: 'POST' });
     console.log(
       `Triggered baseline refresh: re-running job ${jobId} from run ${runId}`,
     );
-    console.log(`  → ${jobUrl}`);
-    return jobUrl;
+    console.log(`  → ${runUrl}`);
+    return runUrl;
   } catch (error) {
     // Best-effort — never fail the PR because the refresh trigger failed
     console.log(`Failed to trigger baseline refresh: ${error}`);
