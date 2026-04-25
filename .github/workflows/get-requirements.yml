@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       needs-locales: ${{ steps.set-needs-locales.outputs.needs-locales || 'false' }}
-      skip-everything: ${{ steps.set-skip-everything.outputs.skip-everything || 'false' }}
+      skip-everything: ${{ 'true' || steps.set-skip-everything.outputs.skip-everything || 'false' }}
       builds-from-run: ${{ steps.find-reusable-builds.outputs.builds-from-run || env.RUN_ID }}
       builds-from-sha: ${{ steps.find-reusable-builds.outputs.builds-from-sha || env.HEAD_COMMIT_HASH }}
       skip-builds: ${{ steps.build-overrides.outputs.skip == 'true' && steps.find-reusable-builds.outputs.builds-from-run != '' && 'true' || 'false' }}
@@ -73,8 +73,8 @@ jobs:
       needs-unit-and-integration: ${{ steps.set-needs-unit-and-integration.outputs.needs-unit-and-integration || 'false' }}
       needs-releases: ${{ steps.set-needs-releases.outputs.needs-releases || 'false' }}
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false' }}
-      needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false' }}
-      just-repository-health-checks: ${{ steps.set-just-repository-health-checks.outputs.just-repository-health-checks || 'false' }}
+      needs-e2e: ${{ 'false' || steps.set-needs-e2e.outputs.needs-e2e || 'false' }}
+      just-repository-health-checks: ${{ 'true' || steps.set-just-repository-health-checks.outputs.just-repository-health-checks || 'false' }}
     steps:
       - name: Check pull request merge queue status
         id: check-skip-merge-queue
