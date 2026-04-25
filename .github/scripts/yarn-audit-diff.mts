@@ -1,4 +1,4 @@
-import { spawnSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { IncomingWebhook } from '@slack/webhook';
@@ -49,6 +49,16 @@ function sevLabel(a: ParsedAdvisory): string {
   return (a.effectiveSeverity ?? 'unknown').toUpperCase();
 }
 
+/** Parse the PR number from GITHUB_REF, or null if not a PR event. */
+function getPrNumber(): string | null {
+  const ref = process.env.GITHUB_REF; // refs/pull/NNN/merge
+  if (!ref) {
+    return null;
+  }
+  const match = ref.match(/^refs\/pull\/(\d+)\/merge$/);
+  return match ? match[1] : null;
+}
+
 /**
  * Returns true when the current PR changes yarn.lock (i.e. modifies
  * dependencies). Queries the GitHub PR files API so it works regardless
@@ -57,20 +67,13 @@ function sevLabel(a: ParsedAdvisory): string {
  * On non-PR events (push, schedule) this always returns true so the
  * caller never suppresses a failure for mainline triggers.
  */
-function prChangesDeps(): boolean {
+function prChangesYarnLock(): boolean {
   const repo = process.env.GITHUB_REPOSITORY;
-  const ref = process.env.GITHUB_REF; // refs/pull/NNN/merge
-  if (!repo || !ref) {
+  const prNumber = getPrNumber();
+  if (!repo || !prNumber) {
     // Not a PR (or missing context) — treat as deps-changed.
     return true;
   }
-
-  const match = ref.match(/^refs\/pull\/(\d+)\/merge$/);
-  if (!match) {
-    // Not a PR event — treat as deps-changed.
-    return true;
-  }
-  const prNumber = match[1];
 
   try {
     const raw = ghApi(
@@ -88,6 +91,113 @@ function prChangesDeps(): boolean {
     console.log(`Failed to query PR files: ${error}`);
     // Safe default — treat as deps-changed.
     return true;
+  }
+}
+
+/**
+ * Given a list of advisories, check whether the PR's yarn.lock diff actually
+ * touches any of the vulnerable packages. Returns true if we can confirm at
+ * least one advisory package was changed, or if we can't determine (safe
+ * fallback).
+ *
+ * This allows us to distinguish:
+ *   - yarn.lock changed AND advisory package touched → genuinely introduced
+ *   - yarn.lock changed but advisory package NOT touched → ambient CVE
+ *
+ * Uses the full PR diff (Accept: application/vnd.github.diff) instead of
+ * the files-API patch field, which is truncated for diffs > ~300 lines.
+ */
+function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): boolean {
+  const repo = process.env.GITHUB_REPOSITORY;
+  const prNumber = getPrNumber();
+  if (!repo || !prNumber || advisories.length === 0) {
+    return true; // safe fallback
+  }
+
+  // Collect the set of module names we care about.
+  const advisoryModules = new Set(advisories.map((a) => a.moduleName));
+
+  try {
+    // Fetch the full (untruncated) unified diff for this PR.
+    const fullDiff = execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/${repo}/pulls/${prNumber}`,
+        '-H',
+        'Accept: application/vnd.github.diff',
+      ],
+      { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+    );
+
+    // Extract just the yarn.lock section from the full diff.
+    // The section starts with a line "diff --git a/yarn.lock b/yarn.lock"
+    // and ends at the next "diff --git" line (or EOF).
+    // Use a regex to match only at the start of a line — a plain indexOf
+    // could match the string inside another file's diff (e.g. this script
+    // itself contains that string as a literal).
+    const headerRe = /^diff --git a\/yarn\.lock b\/yarn\.lock/m;
+    const headerMatch = headerRe.exec(fullDiff);
+    if (!headerMatch) {
+      console.log(
+        'yarn.lock section not found in PR diff — assuming packages changed.',
+      );
+      return true;
+    }
+    const yarnLockStart = headerMatch.index;
+    const nextDiff = fullDiff.indexOf('\ndiff --git ', yarnLockStart + 1);
+    const yarnLockDiff =
+      nextDiff === -1
+        ? fullDiff.slice(yarnLockStart)
+        : fullDiff.slice(yarnLockStart, nextDiff);
+
+    // Extract package names from changed lines in the yarn.lock diff.
+    // Two patterns to catch:
+    //   1. Header lines:     +"package@npm:^1.0.0":  (package added/removed)
+    //   2. Resolution lines: +  resolution: "package@npm:1.0.0"  (version changed)
+    // When a package is merely updated (same version spec, new resolution),
+    // only the indented version/resolution/checksum lines are +/- lines —
+    // the header is a context line and won't have a +/- prefix.
+    const patterns: RegExp[] = [
+      /^[+-]"(.+?)@npm:/gm,                          // header lines
+      /^[+-]\s+resolution:\s+"(.+?)@npm:/gm,         // resolution lines
+    ];
+    const changedPackages = new Set<string>();
+    for (const pattern of patterns) {
+      let m: RegExpExecArray | null;
+      while ((m = pattern.exec(yarnLockDiff)) !== null) {
+        changedPackages.add(m[1]);
+      }
+    }
+
+    if (changedPackages.size === 0) {
+      console.log(
+        'Could not parse any package names from yarn.lock diff — assuming packages changed.',
+      );
+      return true;
+    }
+
+    console.log(
+      `Packages changed in yarn.lock: ${[...changedPackages].join(', ')}`,
+    );
+    console.log(`Advisory packages: ${[...advisoryModules].join(', ')}`);
+
+    const overlap = [...advisoryModules].filter((mod) =>
+      changedPackages.has(mod),
+    );
+
+    if (overlap.length > 0) {
+      console.log(`PR changes advisory package(s): ${overlap.join(', ')}`);
+      return true;
+    }
+
+    console.log(
+      'PR changes yarn.lock but does NOT touch any advisory packages — ambient CVE.',
+    );
+    return false;
+  } catch (error) {
+    console.log(`Failed to parse yarn.lock diff: ${error}`);
+    return true; // safe fallback
   }
 }
 
@@ -613,9 +723,10 @@ async function main() {
   }
 
   // On PRs, fail the step only when there are release-blocking advisories
-  // AND the PR actually changes dependencies. If the PR doesn't touch
-  // yarn.lock, any new advisories are ambient CVEs published after the
-  // baseline was captured — not caused by this PR.
+  // AND the PR actually changes the vulnerable packages. Three cases:
+  //   1. PR doesn't touch yarn.lock → ambient CVE, pass
+  //   2. PR touches yarn.lock but NOT the advisory packages → ambient, pass
+  //   3. PR touches yarn.lock AND the advisory packages → fail
   //
   // Either way, trigger a baseline refresh so the next run (or a re-run
   // of this PR) diffs against a baseline that already includes ambient CVEs.
@@ -628,14 +739,20 @@ async function main() {
       refreshUrl = triggerBaselineRefresh();
     }
 
-    if (prChangesDeps()) {
+    // Two-level check: does this PR change yarn.lock, and if so, does it
+    // touch any of the packages flagged by the advisories?
+    const touchesYarnLock = prChangesYarnLock();
+    const touchesAdvisoryPkgs =
+      touchesYarnLock && prChangesAdvisoryPackages(blockingAdvisories);
+
+    if (touchesAdvisoryPkgs) {
       process.exitCode = 1;
 
-      // Rewrite summary for yarn.lock PRs with ambient CVEs
+      // Rewrite summary — PR changed a package that has a CVE
       diffSummaryLines[1] =
         `### yarn audit: **FAILED** — ${newAdvisories.length} new advisor${newAdvisories.length === 1 ? 'y' : 'ies'}`;
       diffSummaryLines[3] =
-        'New advisories were found and this PR changes `yarn.lock`. ' +
+        'New advisories were found and this PR changes a package affected by a CVE. ' +
         'If the advisories are unrelated to your changes, this check will auto-retry ' +
         'after the baseline refresh completes (~2 min).' +
         ' Run `yarn audit` locally to check whether these come from your dependency changes.';
@@ -648,7 +765,7 @@ async function main() {
 
       githubAnnotate(
         'warning',
-        'New advisories found and this PR changes yarn.lock. ' +
+        'New advisories found and this PR changes an affected package. ' +
           'If the advisories are unrelated to your changes, re-run this check ' +
           'after the baseline refresh completes (~2 min).' +
           (refreshUrl ? ` Refresh: ${refreshUrl}` : ''),
@@ -657,12 +774,16 @@ async function main() {
       // Add retry-ci label so triage auto-retries after the baseline refresh.
       addRetryLabel();
     } else {
-      // Rewrite summary for non-yarn.lock PRs with ambient CVEs
+      // Ambient CVEs: either yarn.lock wasn't touched, or it was touched
+      // but the advisory packages themselves weren't changed.
+      const reason = touchesYarnLock
+        ? 'this PR changes `yarn.lock` but does not touch the affected packages'
+        : 'this PR does not change `yarn.lock`';
       diffSummaryLines[1] =
         `### yarn audit: **passed** (ambient) — ${blockingAdvisories.length} pre-existing advisor${blockingAdvisories.length === 1 ? 'y' : 'ies'}`;
       diffSummaryLines[3] =
-        'New advisories were detected compared to the baseline, but this PR does not change ' +
-        '`yarn.lock` — these are ambient CVEs, not introduced by this PR.';
+        `New advisories were detected compared to the baseline, but ${reason}` +
+        ' — these are ambient CVEs, not introduced by this PR.';
       if (refreshUrl) {
         diffSummaryLines.push(
           `> **Baseline refresh triggered** — [view run](${refreshUrl}). ` +
