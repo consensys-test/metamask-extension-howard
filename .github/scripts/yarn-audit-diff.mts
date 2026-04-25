@@ -84,15 +84,18 @@ function prChangesDeps(): boolean {
  *
  * Best-effort: failures are logged but never fail the PR check.
  * Requires `actions: write` permission on GITHUB_TOKEN.
+ *
+ * @returns The URL of the re-run on success, or null if skipped/failed.
  */
-function triggerBaselineRefresh(): void {
+function triggerBaselineRefresh(): string | null {
   const repo = process.env.GITHUB_REPOSITORY;
   const runId = process.env.BASELINE_RUN_ID;
+  const serverUrl = process.env.GITHUB_SERVER_URL ?? 'https://github.com';
   if (!repo || !runId) {
     console.log(
       'GITHUB_REPOSITORY or BASELINE_RUN_ID not set — skipping baseline refresh trigger.',
     );
-    return;
+    return null;
   }
 
   try {
@@ -106,7 +109,7 @@ function triggerBaselineRefresh(): void {
       console.log(
         'Health-checks job not found — skipping baseline refresh.',
       );
-      return;
+      return null;
     }
 
     const { id: jobId, status } = JSON.parse(raw) as {
@@ -114,12 +117,15 @@ function triggerBaselineRefresh(): void {
       status: string;
     };
 
+    const runUrl = `${serverUrl}/${repo}/actions/runs/${runId}`;
+
     // If another PR already triggered a re-run, don't pile on.
     if (status === 'queued' || status === 'in_progress') {
       console.log(
         `Baseline refresh already in progress (job ${jobId}, status: ${status}) — skipping.`,
       );
-      return;
+      console.log(`  → ${runUrl}`);
+      return runUrl;
     }
 
     // Re-run just that job — it will re-audit and upload a fresh baseline
@@ -127,9 +133,12 @@ function triggerBaselineRefresh(): void {
     console.log(
       `Triggered baseline refresh: re-running job ${jobId} from run ${runId}`,
     );
+    console.log(`  → ${runUrl}`);
+    return runUrl;
   } catch (error) {
     // Best-effort — never fail the PR because the refresh trigger failed
     console.log(`Failed to trigger baseline refresh: ${error}`);
+    return null;
   }
 }
 
@@ -562,7 +571,6 @@ async function main() {
     'Run `yarn audit` locally to reproduce.',
     '',
   ];
-  writeStepSummary(diffSummaryLines.join('\n'));
 
   // On push-to-main, create a GitHub tracking issue (before Slack so we can link it).
   const issueResult = maybeCreateIssue(
@@ -597,28 +605,62 @@ async function main() {
   if (!isMainlineTrigger && blockingAdvisories.length > 0) {
     // Trigger a baseline refresh so subsequent runs aren't blocked by
     // ambient CVEs. Only possible on same-repo PRs with actions:write.
+    let refreshUrl: string | null = null;
     if (process.env.IS_CROSS_REPO_PR !== 'true') {
-      triggerBaselineRefresh();
+      refreshUrl = triggerBaselineRefresh();
     }
 
     if (prChangesDeps()) {
       process.exitCode = 1;
+
+      // Rewrite summary for yarn.lock PRs with ambient CVEs
+      diffSummaryLines[1] =
+        `### yarn audit: **FAILED** — ${newAdvisories.length} new advisor${newAdvisories.length === 1 ? 'y' : 'ies'}`;
+      diffSummaryLines[3] =
+        'New advisories were found and this PR changes `yarn.lock`. ' +
+        'If the advisories are unrelated to your changes, this check will auto-retry ' +
+        'after the baseline refresh completes (~2 min).';
+      if (refreshUrl) {
+        diffSummaryLines.push(
+          `> **Baseline refresh triggered** — [view run](${refreshUrl})`,
+          '',
+        );
+      }
+
       githubAnnotate(
         'warning',
         'New advisories found and this PR changes yarn.lock. ' +
           'If the advisories are unrelated to your changes, re-run this check ' +
-          'after the baseline refresh completes (~2 min).',
+          'after the baseline refresh completes (~2 min).' +
+          (refreshUrl ? ` Refresh: ${refreshUrl}` : ''),
       );
 
       // Add retry-ci label so triage auto-retries after the baseline refresh.
       addRetryLabel();
     } else {
+      // Rewrite summary for non-yarn.lock PRs with ambient CVEs
+      diffSummaryLines[1] =
+        `### yarn audit: **passed** (ambient) — ${blockingAdvisories.length} pre-existing advisor${blockingAdvisories.length === 1 ? 'y' : 'ies'}`;
+      diffSummaryLines[3] =
+        'New advisories were detected compared to the baseline, but this PR does not change ' +
+        '`yarn.lock` — these are ambient CVEs, not introduced by this PR.';
+      if (refreshUrl) {
+        diffSummaryLines.push(
+          `> **Baseline refresh triggered** — [view run](${refreshUrl}). ` +
+            'Subsequent PRs will diff against the updated baseline.',
+          '',
+        );
+      }
+
       githubAnnotate(
         'warning',
-        `${blockingAdvisories.length} new advisory/advisories found, but this PR does not change yarn.lock — treating as informational.`,
+        `${blockingAdvisories.length} ambient advisor${blockingAdvisories.length === 1 ? 'y' : 'ies'} found (not introduced by this PR).` +
+          (refreshUrl ? ` Baseline refresh: ${refreshUrl}` : ''),
       );
     }
   }
+
+  writeStepSummary(diffSummaryLines.join('\n'));
 }
 
 try {
