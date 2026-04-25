@@ -122,6 +122,7 @@ jobs:
         if: ${{ !cancelled() && steps.download-baseline.outcome == 'success' }}
         env:
           BASELINE_RUN_ID: ${{ steps.find-baseline-run.outputs.run-id }}
+          TEST_DROP_BASELINE_MODULE: ${{ vars.TEST_DROP_BASELINE_MODULE || '' }}
         run: |
           yarn tsx .github/scripts/yarn-audit-diff.mts
 

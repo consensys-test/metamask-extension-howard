@@ -449,7 +449,7 @@ async function main() {
     return;
   }
 
-  const baseline = readAdvisories(AUDIT_BASELINE_FILE);
+  let baseline = readAdvisories(AUDIT_BASELINE_FILE);
   if (baseline === null) {
     // I/O error — should not happen since the workflow only runs this step
     // when the baseline was successfully downloaded.
@@ -463,6 +463,17 @@ async function main() {
   }
   // baseline may be [] if main has zero advisories — that's legitimate;
   // every current advisory is genuinely new in that case.
+
+  // TEST ONLY — remove before merging upstream.
+  // Simulate a stale baseline by dropping one module so the diff sees it as "new".
+  const testDrop = process.env.TEST_DROP_BASELINE_MODULE;
+  if (testDrop) {
+    const before = baseline.length;
+    baseline = baseline.filter((a) => a.moduleName !== testDrop);
+    console.log(
+      `[TEST] Dropped "${testDrop}" from baseline: ${before} → ${baseline.length}`,
+    );
+  }
 
   // ------------------------------------------------------------------
   // Diff: advisories present in current but not in baseline (by GHSA ID)
