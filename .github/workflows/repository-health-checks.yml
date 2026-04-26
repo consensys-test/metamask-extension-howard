@@ -75,25 +75,31 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            // Security: we download only from runs on the `main` branch,
-            // which prevents a PR branch from uploading a poisoned baseline
-            // artifact. Push, schedule, and workflow_dispatch runs on main
-            // are all equally trustworthy.
-            const { data } = await github.rest.actions.listWorkflowRuns({
+            // Artifact-first search: find the audit-baseline artifact from
+            // the most recent main-branch run. Using the artifact API avoids
+            // race conditions with re-runs — a re-run of an older run may
+            // upload a newer artifact, but we always prefer the highest
+            // run ID (latest workflow run) to stay on the newest commit.
+            //
+            // Security: filter to head_branch === 'main' so a PR branch
+            // can never supply a poisoned baseline.
+            const { data } = await github.rest.actions.listArtifactsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'main.yml',
-              branch: 'main',
-              status: 'completed',
-              per_page: 1,
+              name: 'audit-baseline',
+              per_page: 20,
             });
-            const run = data.workflow_runs[0];
-            if (!run) {
-              core.setFailed('No completed push-to-main run found for main.yml');
+            const baseline = data.artifacts
+              .filter(a => a.workflow_run?.head_branch === 'main')
+              .sort((a, b) => b.workflow_run.id - a.workflow_run.id)[0];
+            if (!baseline) {
+              core.setFailed('No audit-baseline artifact found from a main-branch run');
               return;
             }
-            core.info(`Using baseline from run ${run.id} (${run.html_url})`);
-            core.setOutput('run-id', String(run.id));
+            const runId = baseline.workflow_run.id;
+            const runUrl = baseline.workflow_run.html_url;
+            core.info(`Using baseline from run ${runId} (${runUrl})`);
+            core.setOutput('run-id', String(runId));
 
       - name: Audit -- download baseline
         id: download-baseline

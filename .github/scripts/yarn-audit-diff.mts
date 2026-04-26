@@ -217,56 +217,98 @@ function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): boolean {
  */
 function triggerBaselineRefresh(): string | null {
   const repo = process.env.GITHUB_REPOSITORY;
-  const runId = process.env.BASELINE_RUN_ID;
   const serverUrl = process.env.GITHUB_SERVER_URL ?? 'https://github.com';
-  if (!repo || !runId) {
+  if (!repo) {
     console.log(
-      'GITHUB_REPOSITORY or BASELINE_RUN_ID not set — skipping baseline refresh trigger.',
+      'GITHUB_REPOSITORY not set — skipping baseline refresh trigger.',
     );
     return null;
   }
 
   try {
-    // Find the repository-health-checks job in the baseline run
-    const raw = ghApi(
-      `repos/${repo}/actions/runs/${runId}/jobs?per_page=50`,
-      { jq: '.jobs[] | select(.name | test("health"; "i")) | {id, status}' },
-    ).trim();
+    // Find a completed Main workflow run on main whose health-checks job
+    // we can re-run. We try BASELINE_RUN_ID first (the run our baseline
+    // came from), then fall back to the most recent completed run. This
+    // handles the common case where BASELINE_RUN_ID is still in progress
+    // because other jobs (lint, build, tests) take ~40 min while
+    // health-checks finishes in ~6 min.
+    const baselineRunId = process.env.BASELINE_RUN_ID;
+    const candidateRunIds: string[] = [];
 
-    if (!raw) {
-      console.log(
-        'Health-checks job not found — skipping baseline refresh.',
-      );
-      return null;
+    if (baselineRunId) {
+      candidateRunIds.push(baselineRunId);
     }
 
-    const { id: jobId, status } = JSON.parse(raw) as {
-      id: number;
-      status: string;
-    };
+    // Also find the most recent completed Main run as a fallback.
+    const completedRunId = ghApi(
+      `repos/${repo}/actions/runs?branch=main&status=completed&per_page=5`,
+      {
+        jq: '[.workflow_runs[] | select(.name == "Main")] | first | .id // empty',
+      },
+    ).trim();
 
-    const runUrl = `${serverUrl}/${repo}/actions/runs/${runId}`;
+    if (completedRunId && completedRunId !== baselineRunId) {
+      candidateRunIds.push(completedRunId);
+    }
 
-    // If another PR already triggered a re-run, don't pile on.
-    if (status === 'queued' || status === 'in_progress') {
+    for (const candidateId of candidateRunIds) {
+      const runUrl = `${serverUrl}/${repo}/actions/runs/${candidateId}`;
+
+      // The re-run API requires the run to be completed.
+      const runStatus = ghApi(
+        `repos/${repo}/actions/runs/${candidateId}`,
+        { jq: '.status' },
+      ).trim();
+
+      if (runStatus !== 'completed') {
+        console.log(
+          `Run ${candidateId} is ${runStatus} — trying next candidate.`,
+        );
+        continue;
+      }
+
+      // Find the repository-health-checks job in this run.
+      const raw = ghApi(
+        `repos/${repo}/actions/runs/${candidateId}/jobs?per_page=50`,
+        { jq: '.jobs[] | select(.name | test("health"; "i")) | {id, status}' },
+      ).trim();
+
+      if (!raw) {
+        console.log(
+          `Health-checks job not found in run ${candidateId} — trying next candidate.`,
+        );
+        continue;
+      }
+
+      const { id: jobId, status } = JSON.parse(raw) as {
+        id: number;
+        status: string;
+      };
+
+      // If another PR already re-ran this job, don't pile on.
+      if (status === 'queued' || status === 'in_progress') {
+        console.log(
+          `Baseline refresh already ${status.replace('_', ' ')} (job ${jobId}) — skipping.`,
+        );
+        console.log(`  → ${runUrl}`);
+        return runUrl;
+      }
+
+      // Re-run just that job — it will re-audit and upload a fresh baseline.
+      ghApi(`repos/${repo}/actions/jobs/${jobId}/rerun`, { method: 'POST' });
       console.log(
-        `Baseline refresh already in progress (job ${jobId}, status: ${status}) — skipping.`,
+        `Triggered baseline refresh: re-running job ${jobId} from run ${candidateId}`,
       );
       console.log(`  → ${runUrl}`);
       return runUrl;
     }
 
-    // Re-run just that job — it will re-audit and upload a fresh baseline.
-    // The re-run creates a new attempt on the same run, so the run URL
-    // will show the latest attempt.
-    ghApi(`repos/${repo}/actions/jobs/${jobId}/rerun`, { method: 'POST' });
-    console.log(
-      `Triggered baseline refresh: re-running job ${jobId} from run ${runId}`,
-    );
-    console.log(`  → ${runUrl}`);
-    return runUrl;
+    console.log('No completed Main run found to re-run — skipping baseline refresh.');
+    return null;
   } catch (error) {
-    // Best-effort — never fail the PR because the refresh trigger failed
+    // Best-effort — never fail the PR because the refresh trigger failed.
+    // Covers race conditions where two PRs try to re-run simultaneously
+    // (the API returns 409).
     console.log(`Failed to trigger baseline refresh: ${error}`);
     return null;
   }
