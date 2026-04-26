@@ -251,6 +251,10 @@ function triggerBaselineRefresh(): string | null {
       candidateRunIds.push(completedRunId);
     }
 
+    // Track the first in-progress run we find — if we can't trigger a new
+    // refresh, we'll return this URL so the caller knows one is underway.
+    let inProgressUrl: string | null = null;
+
     for (const candidateId of candidateRunIds) {
       const runUrl = `${serverUrl}/${repo}/actions/runs/${candidateId}`;
 
@@ -264,6 +268,7 @@ function triggerBaselineRefresh(): string | null {
         console.log(
           `Run ${candidateId} is ${runStatus} — trying next candidate.`,
         );
+        inProgressUrl ??= runUrl;
         continue;
       }
 
@@ -303,7 +308,15 @@ function triggerBaselineRefresh(): string | null {
       return runUrl;
     }
 
-    console.log('No completed Main run found to re-run — skipping baseline refresh.');
+    if (inProgressUrl) {
+      console.log(
+        'A baseline refresh is already in progress — no additional re-run needed.',
+      );
+      console.log(`  → ${inProgressUrl}`);
+      return inProgressUrl;
+    }
+
+    console.log('No Main run found to re-run — skipping baseline refresh.');
     return null;
   } catch (error) {
     // Best-effort — never fail the PR because the refresh trigger failed.

@@ -97,7 +97,7 @@ jobs:
               return;
             }
             const runId = baseline.workflow_run.id;
-            const runUrl = baseline.workflow_run.html_url;
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${runId}`;
             core.info(`Using baseline from run ${runId} (${runUrl})`);
             core.setOutput('run-id', String(runId));
 
