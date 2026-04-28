@@ -41,6 +41,12 @@ async function mockFeatureFlagsWithoutAutoEnableNotifications(server: Mockttp) {
 
 describe('Notification List - View Items and Details', function () {
   it('find each notification type we support, and navigates to their details page', async function () {
+    // Feature announcements are fetched from Contentful, which requires CONTENTFUL_ACCESS_SPACE_ID
+    // and CONTENTFUL_ACCESS_TOKEN baked in at build time. Cross-repo PRs don't have these secrets,
+    // so the built extension can't form a valid Contentful URL and the test fails.
+    if (process.env.IS_CROSS_REPO_PR === 'true') {
+      this.skip();
+    }
     await withFixtures(
       {
         fixtures: new FixtureBuilderV2().build(),
