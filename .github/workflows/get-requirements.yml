@@ -88,19 +88,49 @@ jobs:
         run: git fetch --depth=1 origin "${HEAD_COMMIT_HASH}"
 
       # Do this before we use dorny/paths-filter, which might checkout other commits
-      - name: Check skip-e2e tag
+      - name: Check skip-e2e override
         id: skip-e2e-tag
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
-        run: |
-          echo "SKIP=false" >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@v8
+        with:
+          script: |
+            core.setOutput('SKIP', 'false');
 
-          # Ignore the [skip-e2e] tag for cross-repo PRs (untrusted commit messages)
-          if [[ "$IS_CROSS_REPO_PR" != "true" ]] && { [[ "$EVENT_NAME" == "pull_request" ]] || [[ "$EVENT_NAME" == "merge_group" ]] || [[ "$BRANCH" == trigger-ci-* ]]; }; then
-            if git show --format='%B' --no-patch "${HEAD_COMMIT_HASH}" | grep --fixed-strings --quiet '[skip-e2e]'; then
-              echo "SKIP=true" >> "$GITHUB_OUTPUT"
-              echo "-> SKIP=true due to [skip-e2e] tag in last commit message"
-            fi
-          fi
+            // Ignore skip-e2e for cross-repo PRs (untrusted commit messages/labels)
+            if (process.env.IS_CROSS_REPO_PR === 'true') {
+              core.info('-> cross-repo PR, skip-e2e overrides ignored');
+              return;
+            }
+
+            const eventName = process.env.EVENT_NAME;
+            const branch = process.env.BRANCH;
+            if (eventName !== 'pull_request' && eventName !== 'merge_group' && !branch.startsWith('trigger-ci-')) {
+              core.info('-> event/branch not eligible for skip-e2e override');
+              return;
+            }
+
+            // Check commit message for [skip-e2e] tag
+            const { stdout: msg } = await exec.getExecOutput(
+              'git', ['show', '--format=%B', '--no-patch', process.env.HEAD_COMMIT_HASH],
+              { silent: true },
+            );
+            if (msg.includes('[skip-e2e]')) {
+              core.setOutput('SKIP', 'true');
+              core.info('-> SKIP=true due to [skip-e2e] tag in commit message');
+              return;
+            }
+
+            // Check PR labels for skip-e2e label
+            const labels = context.payload.pull_request
+              ? context.payload.pull_request.labels.map(l => l.name)
+              : [];
+            if (labels.includes('skip-e2e')) {
+              core.setOutput('SKIP', 'true');
+              core.info('-> SKIP=true due to skip-e2e label on PR');
+              return;
+            }
+
+            core.info('-> no skip-e2e override found');
 
       # Compute a content hash of all build-affecting source files.
       # Used to detect when builds can be reused from a prior run.
@@ -445,11 +475,39 @@ jobs:
         if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
         run: echo "needs-lint=true" >> "$GITHUB_OUTPUT"
 
-      # May be split into two later, but can't easily be split right now
+      # Uses the build-reuse 2x2 matrix: skip only when builds are reused AND
+      # no unit/integration test files changed. Always runs on main/stable.
       - name: Compute needs-unit-and-integration flag
         id: set-needs-unit-and-integration
         if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
-        run: echo "needs-unit-and-integration=true" >> "$GITHUB_OUTPUT"
+        env:
+          BUILDS_REUSED: ${{ steps.find-reusable-builds.outputs.builds-from-run != '' }}
+          FILTER_UNIT_INTEGRATION_COUNT: ${{ steps.filter.outputs.unit_integration_test_files_count }}
+        run: |
+          echo "=== Unit/integration skip decision ==="
+          echo "  Run-everything branch: $IS_RUN_EVERYTHING_BRANCH"
+          echo "  Builds reused: $BUILDS_REUSED"
+          echo "  Unit/integration test files changed: $FILTER_UNIT_INTEGRATION_COUNT"
+
+          NEEDS=true
+          REASON=""
+
+          # On main/stable, always run all tests (safety net)
+          if [[ "$IS_RUN_EVERYTHING_BRANCH" == "true" ]]; then
+            REASON="run-everything branch"
+
+          # Build-reuse 2x2 matrix: builds reused AND no test files changed
+          elif [[ "$BUILDS_REUSED" == "true" && "$FILTER_UNIT_INTEGRATION_COUNT" == "0" ]]; then
+            NEEDS=false
+            REASON="builds reused and no unit/integration test files changed (2x2 matrix)"
+          fi
+
+          echo "needs-unit-and-integration=$NEEDS" >> "$GITHUB_OUTPUT"
+          if [[ "$NEEDS" == "true" ]]; then
+            echo "-> needs-unit-and-integration=true${REASON:+ ($REASON)}"
+          else
+            echo "-> needs-unit-and-integration=false (reason: $REASON)"
+          fi
 
       # This is very simple right now, but is built to have future complexity
       - name: Compute needs-releases flag
@@ -464,7 +522,9 @@ jobs:
           }}
         run: echo "needs-releases=true" >> "$GITHUB_OUTPUT"
 
-      # This is very simple right now, but is built to have future complexity
+      # Benchmarks measure build output performance — reused builds produce
+      # identical results, so running them is pointless. This absorbs the
+      # inline builds-from-run == github.run_id gate from main.yml.
       - name: Compute needs-benchmarks flag
         id: set-needs-benchmarks
         # Skip on cross-repo PRs — benchmarks need secrets not available to external contributors.
@@ -475,33 +535,65 @@ jobs:
             env.EVENT_NAME != 'merge_group' &&
             steps.set-skip-everything.outputs.skip-everything != 'true'
           }}
-        run: echo "needs-benchmarks=true" >> "$GITHUB_OUTPUT"
+        env:
+          BUILDS_REUSED: ${{ steps.find-reusable-builds.outputs.builds-from-run != '' }}
+        run: |
+          echo "=== Benchmarks skip decision ==="
+          echo "  Builds reused: $BUILDS_REUSED"
+
+          if [[ "$BUILDS_REUSED" == "true" ]]; then
+            echo "-> needs-benchmarks=false (builds reused — identical output)"
+          else
+            echo "needs-benchmarks=true" >> "$GITHUB_OUTPUT"
+            echo "-> needs-benchmarks=true (fresh builds)"
+          fi
 
       - name: Compute needs-e2e flag
         id: set-needs-e2e
         if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
         env:
           SKIP_E2E: ${{ steps.skip-e2e-tag.outputs.SKIP }}
+          BUILDS_REUSED: ${{ steps.find-reusable-builds.outputs.builds-from-run != '' }}
+          FILTER_E2E_TEST_FILES_COUNT: ${{ steps.filter.outputs.e2e_test_files_count }}
           FILTER_NON_E2E_RELATED_FILES_COUNT: ${{ steps.filter.outputs.non_e2e_related_files_count }}
           FILTER_ALL_CHANGES_COUNT: ${{ steps.filter.outputs.all_changes_count }}
         run: |
-          # Default to running E2E tests
-          echo "needs-e2e=true" >> "$GITHUB_OUTPUT"
+          echo "=== E2E skip decision ==="
+          echo "  Run-everything branch: $IS_RUN_EVERYTHING_BRANCH"
+          echo "  Manual override (skip-e2e tag/label): $SKIP_E2E"
+          echo "  Builds reused: $BUILDS_REUSED"
+          echo "  E2E test files changed: $FILTER_E2E_TEST_FILES_COUNT"
+          echo "  Non-E2E-related files: $FILTER_NON_E2E_RELATED_FILES_COUNT / $FILTER_ALL_CHANGES_COUNT total"
 
-          # Only consider skipping for PRs, merge-queue events, or trigger-ci-* branches
-          if [[ "$SKIP_E2E" == "true" || "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "merge_group" ]]; then
+          # On main/stable, always run all tests (safety net)
+          if [[ "$IS_RUN_EVERYTHING_BRANCH" == "true" ]]; then
+            echo "needs-e2e=true" >> "$GITHUB_OUTPUT"
+            echo "-> needs-e2e=true (run-everything branch)"
+            exit 0
+          fi
 
-            # Skip if [skip-e2e] tag found
-            if [[ "$SKIP_E2E" == "true" ]]; then
-              echo "needs-e2e=false" >> "$GITHUB_OUTPUT"
-              echo "-> Skipping E2E tests due to 'skip-e2e' tag"
+          NEEDS_E2E=true
+          REASON=""
 
-            # Skip E2E only if ALL changed files are in non_e2e_related_files filter
-            elif [[ "$FILTER_NON_E2E_RELATED_FILES_COUNT" == "$FILTER_ALL_CHANGES_COUNT" ]]; then
-              echo "needs-e2e=false" >> "$GITHUB_OUTPUT"
-              echo "-> Skipping E2E tests - only non_e2e_related_files changes found"
+          # 1. Manual override: [skip-e2e] tag or skip-e2e label
+          if [[ "$SKIP_E2E" == "true" ]]; then
+            NEEDS_E2E=false
+            REASON="manual override ([skip-e2e] tag or skip-e2e label)"
 
-            else
-              echo "-> Running E2E tests - found changes outside non_e2e_related_files filter"
-            fi
+          # 2. Build-reuse 2x2 matrix: builds reused AND no E2E test files changed
+          elif [[ "$BUILDS_REUSED" == "true" && "$FILTER_E2E_TEST_FILES_COUNT" == "0" ]]; then
+            NEEDS_E2E=false
+            REASON="builds reused and no E2E test files changed (2x2 matrix)"
+
+          # 3. Existing filter: ALL changed files are non-E2E-related
+          elif [[ -n "$FILTER_ALL_CHANGES_COUNT" && "$FILTER_ALL_CHANGES_COUNT" != "0" && "$FILTER_NON_E2E_RELATED_FILES_COUNT" == "$FILTER_ALL_CHANGES_COUNT" ]]; then
+            NEEDS_E2E=false
+            REASON="all changed files match non_e2e_related_files filter"
+          fi
+
+          echo "needs-e2e=$NEEDS_E2E" >> "$GITHUB_OUTPUT"
+          if [[ "$NEEDS_E2E" == "true" ]]; then
+            echo "-> needs-e2e=true (no skip conditions met)"
+          else
+            echo "-> needs-e2e=false (reason: $REASON)"
           fi

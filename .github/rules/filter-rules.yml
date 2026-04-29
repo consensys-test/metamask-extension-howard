@@ -50,6 +50,16 @@ non_e2e_related_files:
   - *config_files
   - *dev_tools
 
+# E2E test files — changes require running E2E even when builds are reused
+e2e_test_files:
+  - 'test/e2e/**'
+
+# Unit/integration test files — changes require running unit/integration even when builds are reused
+unit_integration_test_files:
+  - *test_files
+  - 'jest.config.js'
+  - 'jest.integration.config.js'
+
 # ALL CHANGED FILES
 all_changes:
   - '**'
