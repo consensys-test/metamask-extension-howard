@@ -1,6 +1,6 @@
 # Documentation
 
-These docs relate to how to contribute to the MetaMask project itself.
+These docs relate to how to contribute to the MetaMask Extension project itself.
 
 You can find the latest version of MetaMask on [our official website](https://metamask.io/).
 
