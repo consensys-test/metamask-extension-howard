@@ -6,8 +6,8 @@
 # - {filter_name}_count: number of matching files
 #
 # E2E STRATEGY: Use separate filters to detect different file types that are
-# not E2E related. Conservative approach — only files that safely allow
-# skipping E2E tests.
+# not E2E related. Conservative approach: only include files that safely
+# allow skipping E2E tests.
 
 # DOCUMENTATION FILES
 documentation_files: &documentation_files
