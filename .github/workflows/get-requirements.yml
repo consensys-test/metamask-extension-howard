@@ -305,7 +305,14 @@ jobs:
       # Skipped on main, stable, and release/* branches (too high-risk to skip builds).
       - name: Find reusable builds from prior run
         id: find-reusable-builds
-        if: ${{ env.IS_RUN_EVERYTHING_BRANCH != 'true' && !startsWith(github.head_ref || github.ref_name, 'release/') && steps.compute-build-hash.outputs.build-hash && steps.check-skip-merge-queue.outputs.up-to-date != 'true' && steps.build-overrides.outputs.force != 'true' }}
+        if: >-
+          ${{
+            env.IS_RUN_EVERYTHING_BRANCH != 'true' &&
+            !startsWith(env.BRANCH, 'release/') &&
+            steps.compute-build-hash.outputs.build-hash &&
+            steps.check-skip-merge-queue.outputs.up-to-date != 'true' &&
+            steps.build-overrides.outputs.force != 'true'
+          }}
         uses: actions/github-script@v8
         env:
           BUILD_HASH: ${{ steps.compute-build-hash.outputs.build-hash }}
@@ -634,6 +641,7 @@ jobs:
           BUILDS_REUSED: ${{ steps.find-reusable-builds.outputs.builds-from-run != '' }}
           FILTER_E2E_TEST_FILES_COUNT: ${{ steps.filter.outputs.e2e_test_files_count }}
           FILTER_NON_E2E_RELATED_FILES_COUNT: ${{ steps.filter.outputs.non_e2e_related_files_count }}
+          FILTER_BUILD_AFFECTING_CI_COUNT: ${{ steps.filter.outputs.build_affecting_ci_files_count }}
           FILTER_ALL_CHANGES_COUNT: ${{ steps.filter.outputs.all_changes_count }}
         run: |
           echo "=== E2E skip decision ==="
@@ -643,6 +651,7 @@ jobs:
           echo "  Builds reused: $BUILDS_REUSED"
           echo "  E2E test files changed: $FILTER_E2E_TEST_FILES_COUNT"
           echo "  Non-E2E-related files: $FILTER_NON_E2E_RELATED_FILES_COUNT / $FILTER_ALL_CHANGES_COUNT total"
+          echo "  Build-affecting CI files changed: $FILTER_BUILD_AFFECTING_CI_COUNT"
 
           # On main/stable, always run all tests (safety net)
           if [[ "$IS_RUN_EVERYTHING_BRANCH" == "true" ]]; then
@@ -671,8 +680,13 @@ jobs:
             NEEDS_E2E=false
             REASON="builds reused and no E2E test files changed (2x2 matrix)"
 
-          # 3. Existing filter: ALL changed files are non-E2E-related
-          elif [[ -n "$FILTER_ALL_CHANGES_COUNT" && "$FILTER_ALL_CHANGES_COUNT" != "0" && "$FILTER_NON_E2E_RELATED_FILES_COUNT" == "$FILTER_ALL_CHANGES_COUNT" ]]; then
+          # 3. Existing filter: ALL changed files are non-E2E-related AND none
+          #    are build-affecting CI files (e.g. run-build.yml is under .github/
+          #    so it matches non_e2e_related_files, but it affects build output)
+          elif [[ -n "$FILTER_ALL_CHANGES_COUNT" \
+              && "$FILTER_ALL_CHANGES_COUNT" != "0" \
+              && "$FILTER_NON_E2E_RELATED_FILES_COUNT" == "$FILTER_ALL_CHANGES_COUNT" \
+              && "$FILTER_BUILD_AFFECTING_CI_COUNT" == "0" ]]; then
             NEEDS_E2E=false
             REASON="all changed files match non_e2e_related_files filter"
           fi

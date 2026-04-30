@@ -70,7 +70,6 @@ dev_tools: &dev_tools
 # If a CI-only PR does need E2E, use [force-e2e] tag or force-e2e label.
 ci_files: &ci_files
   - '.github/**'
-  - '!.github/workflows/run-build.yml'
 
 # AI / EDITOR CONFIG — agent instructions and IDE settings, no runtime impact.
 editor_and_agent_files: &editor_and_agent_files
@@ -101,6 +100,12 @@ storybook_files:
 # E2E test files — changes require running E2E even when builds are reused
 e2e_test_files:
   - 'test/e2e/**'
+
+# Build-affecting CI files — these live under .github/ (which is in ci_files
+# and therefore non_e2e_related_files) but they DO affect build output, so a
+# PR touching only these must NOT skip E2E via the non_e2e_related_files gate.
+build_affecting_ci_files:
+  - '.github/workflows/run-build.yml'
 
 # Unit/integration test files — changes require running unit/integration even when builds are reused
 unit_integration_test_files:
