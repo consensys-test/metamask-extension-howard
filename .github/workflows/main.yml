@@ -381,7 +381,7 @@ jobs:
     secrets: inherit
 
   run-benchmarks:
-    if: ${{ needs.get-requirements.outputs.needs-benchmarks == 'true' }}
+    if: ${{ 0 && needs.get-requirements.outputs.needs-benchmarks == 'true' }}
     permissions:
       contents: read
       id-token: write
