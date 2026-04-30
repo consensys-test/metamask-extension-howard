@@ -1,3 +1,4 @@
+// Storybook i18n integration
 import React, { Component, createContext, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { getMessage } from '../shared/lib/i18n';
