@@ -922,3 +922,4 @@ export function extractRpcDomain(
     return 'invalid';
   }
 }
+// Scenario 4
