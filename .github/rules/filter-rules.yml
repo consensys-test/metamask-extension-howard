@@ -43,12 +43,18 @@ dev_tools: &dev_tools
   - 'development/ts-migration-dashboard/**/*'
   - 'development/generate-attributions/**/*'
 
+# CI / GITHUB FILES — workflow and repo config that doesn't affect the extension build.
+# If a CI-only PR does need E2E, use [force-e2e] tag or force-e2e label.
+ci_files: &ci_files
+  - '.github/**'
+
 # ALL FILTERED FILES - non E2E related files
 non_e2e_related_files:
   - *documentation_files
   - *test_files
   - *config_files
   - *dev_tools
+  - *ci_files
 
 # E2E test files — changes require running E2E even when builds are reused
 e2e_test_files:
