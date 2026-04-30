@@ -1,7 +1,7 @@
 # Filter rules for determining `main` workflow requirements
 # Used with dorny/paths-filter action
 #
-# Each filter creates two outputs:
+# Each filter produces two outputs:
 # - {filter_name}: 'true'/'false' if any changed files match any filter rules
 # - {filter_name}_count: number of matching files
 #
