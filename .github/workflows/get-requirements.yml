@@ -3,12 +3,6 @@ name: Get workflow and job requirements
 on:
   workflow_call:
     outputs:
-      needs-locales:
-        description: Whether locales-only checks are needed
-        value: ${{ jobs.detect-changes.outputs.needs-locales }}
-      skip-everything:
-        description: Whether everything should be skipped
-        value: ${{ jobs.detect-changes.outputs.skip-everything }}
       builds-from-run:
         description: The github.run_id to get builds from
         value: ${{ jobs.detect-changes.outputs.builds-from-run }}
@@ -18,12 +12,24 @@ on:
       skip-builds:
         description: Whether builds were skipped without hash verification (blocks merge)
         value: ${{ jobs.detect-changes.outputs.skip-builds }}
+      needs-locales:
+        description: Whether locales-only checks are needed
+        value: ${{ jobs.detect-changes.outputs.needs-locales }}
+      just-repository-health-checks:
+        description: Whether repository health checks are needed
+        value: ${{ jobs.detect-changes.outputs.just-repository-health-checks }}
+      skip-everything:
+        description: Whether everything should be skipped
+        value: ${{ jobs.detect-changes.outputs.skip-everything }}
       needs-lint:
         description: Whether lint job is needed
         value: ${{ jobs.detect-changes.outputs.needs-lint }}
       needs-unit-and-integration:
         description: Whether unit and integration tests are needed
         value: ${{ jobs.detect-changes.outputs.needs-unit-and-integration }}
+      needs-storybook:
+        description: Whether storybook tests are needed
+        value: ${{ jobs.detect-changes.outputs.needs-storybook }}
       needs-releases:
         description: Whether releases job is needed
         value: ${{ jobs.detect-changes.outputs.needs-releases }}
@@ -33,12 +39,6 @@ on:
       needs-e2e:
         description: Whether E2E tests are needed
         value: ${{ jobs.detect-changes.outputs.needs-e2e }}
-      needs-storybook:
-        description: Whether storybook tests are needed
-        value: ${{ jobs.detect-changes.outputs.needs-storybook }}
-      just-repository-health-checks:
-        description: Whether repository health checks are needed
-        value: ${{ jobs.detect-changes.outputs.just-repository-health-checks }}
 
 env:
   # For a `pull_request` event, the head commit hash is `github.event.pull_request.head.sha`.
@@ -64,18 +64,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
-      needs-locales: ${{ steps.set-needs-locales.outputs.needs-locales || 'false' }}
-      skip-everything: ${{ steps.set-skip-everything.outputs.skip-everything || 'false' }}
       builds-from-run: ${{ steps.find-reusable-builds.outputs.builds-from-run || env.RUN_ID }}
       builds-from-sha: ${{ steps.find-reusable-builds.outputs.builds-from-sha || env.HEAD_COMMIT_HASH }}
       skip-builds: ${{ steps.build-overrides.outputs.skip == 'true' && steps.find-reusable-builds.outputs.builds-from-run != '' && 'true' || 'false' }}
+      needs-locales: ${{ steps.set-needs-locales.outputs.needs-locales || 'false' }}
+      just-repository-health-checks: ${{ steps.set-just-repository-health-checks.outputs.just-repository-health-checks || 'false' }}
+      skip-everything: ${{ steps.set-skip-everything.outputs.skip-everything || 'false' }}
       needs-lint: ${{ steps.set-needs-lint.outputs.needs-lint || 'false' }}
       needs-unit-and-integration: ${{ steps.set-needs-unit-and-integration.outputs.needs-unit-and-integration || 'false' }}
+      needs-storybook: ${{ steps.set-needs-storybook.outputs.needs-storybook || 'false' }}
       needs-releases: ${{ steps.set-needs-releases.outputs.needs-releases || 'false' }}
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false' }}
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false' }}
-      needs-storybook: ${{ steps.set-needs-storybook.outputs.needs-storybook || 'false' }}
-      just-repository-health-checks: ${{ steps.set-just-repository-health-checks.outputs.just-repository-health-checks || 'false' }}
     steps:
       - name: Check pull request merge queue status
         id: check-skip-merge-queue
