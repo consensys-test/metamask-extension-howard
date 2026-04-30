@@ -1,3 +1,4 @@
+// Scenario B: storybook file change with builds reused
 import React from 'react';
 import { AlertModal } from './alert-modal';
 import { Severity } from '../../../../helpers/constants/design-system';
