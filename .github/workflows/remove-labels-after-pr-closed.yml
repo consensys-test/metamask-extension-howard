@@ -26,18 +26,22 @@ jobs:
 
         run: |
           LABELS=(
-            "product-backlog"
-            "needs-design"
-            "design-in-progress"
-            "ready-for-dev"
-            "sprint-backlog"
-            "in-progress"
             "blocked"
+            "design-in-progress"
+            "force-builds"
+            "force-e2e"
+            "in-progress"
+            "issues-found"
+            "needs-design"
             "needs-dev-review"
             "needs-qa"
-            "issues-found"
+            "product-backlog"
+            "ready-for-dev"
             "ready-for-release"
             "retry-ci"
+            "skip-builds"
+            "skip-e2e"
+            "sprint-backlog"
           )
 
           for LABEL in "${LABELS[@]}"; do
