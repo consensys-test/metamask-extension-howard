@@ -70,6 +70,7 @@ dev_tools: &dev_tools
 # If a CI-only PR does need E2E, use [force-e2e] tag or force-e2e label.
 ci_files: &ci_files
   - '.github/**'
+  - '!.github/workflows/run-build.yml'
 
 # AI / EDITOR CONFIG — agent instructions and IDE settings, no runtime impact.
 editor_and_agent_files: &editor_and_agent_files

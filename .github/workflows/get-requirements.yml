@@ -98,8 +98,8 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            core.setOutput('SKIP', 'false');
-            core.setOutput('FORCE', 'false');
+            core.setOutput('skip', 'false');
+            core.setOutput('force', 'false');
 
             // Ignore overrides for cross-repo PRs (untrusted commit messages/labels)
             if (process.env.IS_CROSS_REPO_PR === 'true') {
@@ -136,7 +136,9 @@ jobs:
               labels = context.payload.pull_request.labels.map(l => l.name);
             } else if (eventName === 'merge_group') {
               const match = branch.match(/\/pr-(\d+)-/);
-              if (match) {
+              if (!match) {
+                core.warning(`Merge queue branch '${branch}' did not match expected pattern — cannot fetch PR labels`);
+              } else {
                 const { data: pr } = await github.rest.pulls.get({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -149,14 +151,14 @@ jobs:
 
             // force-e2e takes priority over skip-e2e
             if (msg.includes('[force-e2e]') || labels.includes('force-e2e')) {
-              core.setOutput('FORCE', 'true');
-              core.info('-> FORCE=true due to [force-e2e] tag or force-e2e label');
+              core.setOutput('force', 'true');
+              core.info('-> force=true due to [force-e2e] tag or force-e2e label');
               return;
             }
 
             if (msg.includes('[skip-e2e]') || labels.includes('skip-e2e')) {
-              core.setOutput('SKIP', 'true');
-              core.info('-> SKIP=true due to [skip-e2e] tag or skip-e2e label');
+              core.setOutput('skip', 'true');
+              core.info('-> skip=true due to [skip-e2e] tag or skip-e2e label');
               return;
             }
 
@@ -291,6 +293,10 @@ jobs:
         if: ${{ steps.compute-build-hash.outputs.build-hash }}
         run: |
           NAMES=$(grep -oP '(?<=build-name: )\S+' .github/workflows/main.yml | jq -Rsc 'split("\n") | map(select(length > 0))')
+          if [[ "$NAMES" == "[]" || -z "$NAMES" ]]; then
+            echo "::error::No build-name entries found in main.yml — cannot verify artifact completeness"
+            exit 1
+          fi
           echo "names=$NAMES" >> "$GITHUB_OUTPUT"
           echo "-> Required build artifacts: $NAMES"
 
@@ -477,7 +483,10 @@ jobs:
           # At this point we already know the *only* changed file is package.json.
           # Emit true only if the diff is exactly a single "version" line replacement.
           export GH_PAGER=cat
-          DIFF="$(gh pr diff "${PR_NUMBER}" || true)"
+          if ! DIFF="$(gh pr diff "${PR_NUMBER}")"; then
+            echo "WARNING: Failed to fetch PR diff — cannot detect version-only changes" >&2
+            exit 0
+          fi
           CHANGES="$(printf '%s\n' "$DIFF" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)"
           CHANGES_COUNT="$(printf '%s\n' "$CHANGES" | sed '/^$/d' | wc -l | tr -d ' ')"
 
@@ -620,8 +629,8 @@ jobs:
         id: set-needs-e2e
         if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
         env:
-          SKIP_E2E: ${{ steps.e2e-override.outputs.SKIP }}
-          FORCE_E2E: ${{ steps.e2e-override.outputs.FORCE }}
+          SKIP_E2E: ${{ steps.e2e-override.outputs.skip }}
+          FORCE_E2E: ${{ steps.e2e-override.outputs.force }}
           BUILDS_REUSED: ${{ steps.find-reusable-builds.outputs.builds-from-run != '' }}
           FILTER_E2E_TEST_FILES_COUNT: ${{ steps.filter.outputs.e2e_test_files_count }}
           FILTER_NON_E2E_RELATED_FILES_COUNT: ${{ steps.filter.outputs.non_e2e_related_files_count }}
