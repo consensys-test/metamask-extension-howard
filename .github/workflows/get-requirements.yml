@@ -110,16 +110,38 @@ jobs:
               return;
             }
 
-            // Check commit message for tags
-            const { stdout: msg } = await exec.getExecOutput(
-              'git', ['show', '--format=%B', '--no-patch', process.env.HEAD_COMMIT_HASH],
-              { silent: true },
-            );
+            // Check commit message for tags.
+            // In merge_group events the squash commit message includes the PR
+            // description, so [skip-e2e]/[force-e2e] tags would leak through.
+            // Only check commit messages for non-merge-queue events.
+            let msg = '';
+            if (eventName !== 'merge_group') {
+              const result = await exec.getExecOutput(
+                'git', ['show', '--format=%B', '--no-patch', process.env.HEAD_COMMIT_HASH],
+                { silent: true },
+              );
+              msg = result.stdout;
+            }
 
-            // Check PR labels
-            const labels = context.payload.pull_request
-              ? context.payload.pull_request.labels.map(l => l.name)
-              : [];
+            // Check PR labels.
+            // For merge_group events, extract the PR number from the branch name
+            // (format: gh-readonly-queue/<base>/pr-<number>-<sha>) and fetch labels
+            // via the API so that labels carry through to the merge queue.
+            let labels = [];
+            if (context.payload.pull_request) {
+              labels = context.payload.pull_request.labels.map(l => l.name);
+            } else if (eventName === 'merge_group') {
+              const match = branch.match(/\/pr-(\d+)-/);
+              if (match) {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: parseInt(match[1]),
+                });
+                labels = pr.labels.map(l => l.name);
+                core.info(`-> merge queue: resolved PR #${match[1]}, labels: [${labels.join(', ')}]`);
+              }
+            }
 
             // force-e2e takes priority over skip-e2e
             if (msg.includes('[force-e2e]') || labels.includes('force-e2e')) {
