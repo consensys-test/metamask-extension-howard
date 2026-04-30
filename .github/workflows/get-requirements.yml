@@ -502,7 +502,6 @@ jobs:
           }}
         run: echo "skip-everything=true" >> "$GITHUB_OUTPUT"
 
-      # This is very simple right now (and equivalent to !skip-everything)
       - name: Compute needs-lint flag
         id: set-needs-lint
         if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
@@ -579,7 +578,6 @@ jobs:
             echo "-> needs-storybook=false (reason: $REASON)"
           fi
 
-      # This is very simple right now, but is built to have future complexity
       - name: Compute needs-releases flag
         id: set-needs-releases
         # Skip on cross-repo PRs — releases need secrets not available to external contributors.
