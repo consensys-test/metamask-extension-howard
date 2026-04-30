@@ -1,7 +1,7 @@
 import { DIALOG_APPROVAL_TYPES } from '@metamask/snaps-rpc-methods';
 import { RestrictedMethods } from './permissions';
 
-/**
+// Application constants
  * A string representing the type of environment the application is currently running in
  * popup - When the user click's the icon in their browser's extension bar; the default view
  * notification - When the extension opens due to interaction with a Web3 enabled website
