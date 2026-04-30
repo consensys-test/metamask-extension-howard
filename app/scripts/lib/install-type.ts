@@ -1,8 +1,6 @@
 import browser from 'webextension-polyfill';
 import { INSTALL_TYPE, type InstallType } from '../../../shared/constants/app';
 
-// Bust the build hash
-
 /**
  * Cached install type value.
  *
