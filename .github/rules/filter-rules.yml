@@ -81,7 +81,8 @@ editor_and_agent_files: &editor_and_agent_files
   - '.storybook/**'
   - '.vscode/**'
 
-# ALL FILTERED FILES - non E2E related files
+# NON-E2E FILES — union of all file types that, when a PR touches ONLY
+# these, allow E2E tests to be skipped safely.
 non_e2e_related_files:
   - *documentation_files
   - *test_files
