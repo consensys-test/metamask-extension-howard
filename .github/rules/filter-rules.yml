@@ -90,6 +90,12 @@ non_e2e_related_files:
   - *ci_files
   - *editor_and_agent_files
 
+# Storybook files — stories, config, and snapshots that affect storybook tests
+storybook_files:
+  - '**/*.stories.*'
+  - '**/*.snap'
+  - '.storybook/**'
+
 # E2E test files — changes require running E2E even when builds are reused
 e2e_test_files:
   - 'test/e2e/**'

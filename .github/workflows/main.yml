@@ -149,7 +149,7 @@ jobs:
     needs:
       - get-requirements
       - prep-deps
-    if: ${{ needs.get-requirements.outputs.skip-everything != 'true' }}
+    if: ${{ needs.get-requirements.outputs.needs-storybook == 'true' }}
     uses: ./.github/workflows/test-storybook.yml
 
   validate-lavamoat-policies:

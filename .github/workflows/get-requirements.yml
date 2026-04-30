@@ -33,6 +33,9 @@ on:
       needs-e2e:
         description: Whether E2E tests are needed
         value: ${{ jobs.detect-changes.outputs.needs-e2e }}
+      needs-storybook:
+        description: Whether storybook tests are needed
+        value: ${{ jobs.detect-changes.outputs.needs-storybook }}
       just-repository-health-checks:
         description: Whether repository health checks are needed
         value: ${{ jobs.detect-changes.outputs.just-repository-health-checks }}
@@ -71,6 +74,7 @@ jobs:
       needs-releases: ${{ steps.set-needs-releases.outputs.needs-releases || 'false' }}
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false' }}
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false' }}
+      needs-storybook: ${{ steps.set-needs-storybook.outputs.needs-storybook || 'false' }}
       just-repository-health-checks: ${{ steps.set-just-repository-health-checks.outputs.just-repository-health-checks || 'false' }}
     steps:
       - name: Check pull request merge queue status
@@ -537,6 +541,42 @@ jobs:
             echo "-> needs-unit-and-integration=true${REASON:+ ($REASON)}"
           else
             echo "-> needs-unit-and-integration=false (reason: $REASON)"
+          fi
+
+      # Uses the build-reuse 2x2 matrix: skip only when builds are reused AND
+      # no storybook files changed. Storybook config (.storybook/**), story files
+      # (*.stories.*), and snapshots (*.snap) are excluded from the build hash,
+      # so a storybook-only PR has builds reused but still needs storybook tests.
+      - name: Compute needs-storybook flag
+        id: set-needs-storybook
+        if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
+        env:
+          BUILDS_REUSED: ${{ steps.find-reusable-builds.outputs.builds-from-run != '' }}
+          FILTER_STORYBOOK_COUNT: ${{ steps.filter.outputs.storybook_files_count }}
+        run: |
+          echo "=== Storybook skip decision ==="
+          echo "  Run-everything branch: $IS_RUN_EVERYTHING_BRANCH"
+          echo "  Builds reused: $BUILDS_REUSED"
+          echo "  Storybook files changed: $FILTER_STORYBOOK_COUNT"
+
+          NEEDS=true
+          REASON=""
+
+          # On main/stable, always run all tests (safety net)
+          if [[ "$IS_RUN_EVERYTHING_BRANCH" == "true" ]]; then
+            REASON="run-everything branch"
+
+          # Build-reuse 2x2 matrix: builds reused AND no storybook files changed
+          elif [[ "$BUILDS_REUSED" == "true" && "$FILTER_STORYBOOK_COUNT" == "0" ]]; then
+            NEEDS=false
+            REASON="builds reused and no storybook files changed (2x2 matrix)"
+          fi
+
+          echo "needs-storybook=$NEEDS" >> "$GITHUB_OUTPUT"
+          if [[ "$NEEDS" == "true" ]]; then
+            echo "-> needs-storybook=true${REASON:+ ($REASON)}"
+          else
+            echo "-> needs-storybook=false (reason: $REASON)"
           fi
 
       # This is very simple right now, but is built to have future complexity
