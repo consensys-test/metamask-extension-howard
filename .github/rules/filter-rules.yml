@@ -16,37 +16,70 @@ documentation_files: &documentation_files
 
 # LOW LEVEL TEST FILES
 test_files: &test_files
-  - '**/*.test.{js,ts,tsx,jsx}'
-  - '**/*.stories.*'
   - '**/*.snap'
-  - 'test/jest/**/*'
-  - 'test/unit-global/**/*'
-  - 'test/lib/**/*'
-  - 'test/stub/**/*'
+  - '**/*.stories.*'
+  - '**/*.test.{js,ts,tsx,jsx}'
+  - 'test/env.js'
   - 'test/integration/**/*'
+  - 'test/jest/**/*'
+  - 'test/lib/**/*'
+  - 'test/mocks/**/*'
+  - 'test/release-testing-ai-analyzer/**/*'
+  - 'test/setup.js'
+  - 'test/stub/**/*'
+  - 'test/unit-global/**/*'
 
 # CONFIG FILES
 config_files: &config_files
+  - '.depcheckrc.yml'
+  - '.editorconfig'
   - '.eslint*'
+  - '.git-blame-ignore-revs'
+  - '.gitattributes'
+  - '.madgerc'
+  - '.mocharc.js'
+  - '.prettierignore'
+  - '.prettierrc*'
+  - 'codecov.yml'
+  - 'coverage.json'
+  - 'crowdin.yml'
   - 'eslint.config.js'
   - 'oxfmt.config.mts'
+  - 'privacy-snapshot.json'
+  - 'sonar-project.properties'
   - 'stylelint.config.js'
   - 'tailwind.config.js'
-  - '.prettierrc*'
-  - '.prettierignore'
-  - 'sonar-project.properties'
-  - 'codecov.yml'
 
 # DEVELOPMENT TOOLS
 dev_tools: &dev_tools
+  - 'development/attributions-check.sh'
   - 'development/fitness-functions/**/*'
-  - 'development/ts-migration-dashboard/**/*'
   - 'development/generate-attributions/**/*'
+  - 'development/generate-attributions.sh'
+  - 'development/gource-viz.sh'
+  - 'development/lint-baseline.mts'
+  - 'development/lint-changed.mts'
+  - 'development/metamaskbot-build-announce/**/*'
+  - 'development/sentry-publish.js'
+  - 'development/sentry-upload-artifacts.sh'
+  - 'development/shellcheck.sh'
+  - 'development/sourcemap-validator.js'
+  - 'development/ts-migration-dashboard/**/*'
 
 # CI / GITHUB FILES — workflow and repo config that doesn't affect the extension build.
 # If a CI-only PR does need E2E, use [force-e2e] tag or force-e2e label.
 ci_files: &ci_files
   - '.github/**'
+
+# AI / EDITOR CONFIG — agent instructions and IDE settings, no runtime impact.
+editor_and_agent_files: &editor_and_agent_files
+  - '.agents/**'
+  - '.claude/**'
+  - '.cursor/**'
+  - '.devcontainer/**'
+  - '.husky/**'
+  - '.storybook/**'
+  - '.vscode/**'
 
 # ALL FILTERED FILES - non E2E related files
 non_e2e_related_files:
@@ -55,6 +88,7 @@ non_e2e_related_files:
   - *config_files
   - *dev_tools
   - *ci_files
+  - *editor_and_agent_files
 
 # E2E test files — changes require running E2E even when builds are reused
 e2e_test_files:
