@@ -178,6 +178,8 @@ jobs:
             ]);
             // Also exclude any top-level .eslintrc*.js variant.
             const eslintPattern = /^\.eslintrc(\.[a-z.-]+)?\.js$/;
+            // Colocated test/story/snapshot files never affect production builds.
+            const testFilePattern = /\.test\.[jt]sx?$|\.stories\.[jt]sx?$|\.snap$/;
 
             const { stdout: tree } = await exec.getExecOutput(
               'git', ['ls-tree', '-r', 'HEAD'],
@@ -191,6 +193,7 @@ jobs:
               if (excludedDirs.some(d => path.startsWith(d))) return false;
               if (excludedFiles.has(path)) return false;
               if (eslintPattern.test(path)) return false;
+              if (testFilePattern.test(path)) return false;
               return true;
             }).join('\n') + '\n';
 
