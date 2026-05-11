@@ -35,6 +35,129 @@ export type ParsedAdvisory = {
   dependents: string[];
 };
 
+/** Effective severities that block the build (moderate and above). */
+export const BLOCKING_SEVERITIES: ReadonlySet<YarnSeverity> = new Set([
+  'moderate',
+  'high',
+  'critical',
+]);
+
+export function advisoryIdentityKey(
+  advisory: Pick<ParsedAdvisory, 'id' | 'moduleName' | 'title' | 'url'>,
+): string {
+  const moduleName = advisory.moduleName.trim();
+  const ghsaId = advisory.url.match(/github\.com\/advisories\/(GHSA-[\w-]+)/iu);
+
+  if (ghsaId?.[1]) {
+    return `${moduleName}|ghsa:${ghsaId[1].toUpperCase()}`;
+  }
+
+  const normalizedUrl = advisory.url.trim().replace(/\/+$/u, '').toLowerCase();
+  if (normalizedUrl) {
+    return `${moduleName}|url:${normalizedUrl}`;
+  }
+
+  if (advisory.id !== null) {
+    return `${moduleName}|id:${advisory.id}`;
+  }
+
+  return `${moduleName}|title:${advisory.title.trim().toLowerCase()}`;
+}
+
+export function isBlockingAdvisory(advisory: ParsedAdvisory): boolean {
+  return (
+    advisory.affectsProduction &&
+    BLOCKING_SEVERITIES.has(advisory.effectiveSeverity)
+  );
+}
+
+export function uniqueAdvisoriesByIdentity(
+  advisories: ParsedAdvisory[],
+): ParsedAdvisory[] {
+  const seen = new Set<string>();
+  const result: ParsedAdvisory[] = [];
+
+  for (const advisory of advisories) {
+    const key = advisoryIdentityKey(advisory);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(advisory);
+  }
+
+  return result;
+}
+
+export function mergeAdvisoriesByIdentity(
+  advisories: ParsedAdvisory[],
+): ParsedAdvisory[] {
+  const merged = new Map<string, ParsedAdvisory>();
+
+  for (const advisory of advisories) {
+    const key = advisoryIdentityKey(advisory);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, {
+        ...advisory,
+        treeVersions: [...new Set(advisory.treeVersions)],
+        dependents: [...new Set(advisory.dependents)],
+      });
+      continue;
+    }
+
+    const primary =
+      advisory.affectsProduction && !existing.affectsProduction
+        ? advisory
+        : existing;
+    const affectsProduction =
+      existing.affectsProduction || advisory.affectsProduction;
+
+    merged.set(key, {
+      ...primary,
+      id: primary.id ?? existing.id ?? advisory.id,
+      affectsProduction,
+      isDevOnly: !affectsProduction,
+      treeVersions: [
+        ...new Set([...existing.treeVersions, ...advisory.treeVersions]),
+      ],
+      dependents: [
+        ...new Set([...existing.dependents, ...advisory.dependents]),
+      ],
+    });
+  }
+
+  return [...merged.values()];
+}
+
+export function diffAdvisories(
+  current: ParsedAdvisory[],
+  baseline: ParsedAdvisory[],
+): {
+  allNewAdvisories: ParsedAdvisory[];
+  newlyBlockingAdvisories: ParsedAdvisory[];
+} {
+  const baselineIdentityKeys = new Set(
+    baseline.map((advisory) => advisoryIdentityKey(advisory)),
+  );
+  const baselineBlockingIdentityKeys = new Set(
+    baseline
+      .filter(isBlockingAdvisory)
+      .map((advisory) => advisoryIdentityKey(advisory)),
+  );
+
+  return {
+    allNewAdvisories: current.filter(
+      (advisory) => !baselineIdentityKeys.has(advisoryIdentityKey(advisory)),
+    ),
+    newlyBlockingAdvisories: current.filter(
+      (advisory) =>
+        isBlockingAdvisory(advisory) &&
+        !baselineBlockingIdentityKeys.has(advisoryIdentityKey(advisory)),
+    ),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // GitHub Actions helpers
 // ---------------------------------------------------------------------------
@@ -67,13 +190,6 @@ export function writeStepSummary(text: string): void {
 export function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;]*m/g, '');
 }
-
-/** Effective severities that block the build (moderate and above). */
-export const BLOCKING_SEVERITIES: ReadonlySet<YarnSeverity> = new Set([
-  'moderate',
-  'high',
-  'critical',
-]);
 
 // ---------------------------------------------------------------------------
 // Advisory I/O

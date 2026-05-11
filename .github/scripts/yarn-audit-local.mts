@@ -1,7 +1,7 @@
 /**
  * Local counterpart of the CI audit pipeline.  Runs `yarn audit`, downloads
- * the baseline from CloudFront, and diffs to show only NEW advisories
- * introduced by your changes — matching CI behavior.
+ * the baseline from CloudFront, and diffs to show only release-blocking
+ * advisories introduced by your changes — matching CI behavior.
  *
  * Usage:
  *   yarn audit
@@ -14,7 +14,7 @@ import {
   AUDIT_CURRENT_FILE,
   AUDIT_RAW_DEV,
   AUDIT_RAW_PROD,
-  BLOCKING_SEVERITIES,
+  diffAdvisories,
   extractNativeBlocks,
   readAdvisories,
   type ParsedAdvisory,
@@ -134,25 +134,14 @@ async function main() {
     return;
   }
 
-  // -----------------------------------------------------------------------
-  // Step 3 — Diff: new advisories at moderate+ severity (by GHSA ID)
-  // -----------------------------------------------------------------------
-  const baselineIds = new Set(
-    baseline.map((a) => a.id).filter((id): id is number => id !== null),
-  );
-  // Advisories with null IDs are intentionally excluded — they represent
-  // malformed data that cannot be reliably diffed against the baseline.
-  const newAdvisories = current.filter(
-    (a) =>
-      a.id !== null &&
-      !baselineIds.has(a.id as number) &&
-      a.affectsProduction &&
-      BLOCKING_SEVERITIES.has(a.effectiveSeverity),
+  const { newlyBlockingAdvisories: newAdvisories } = diffAdvisories(
+    current,
+    baseline,
   );
 
   if (newAdvisories.length === 0) {
     console.log(
-      'yarn audit: passed — no new advisories at moderate or higher severity.',
+      'yarn audit: passed — no new or newly blocking production advisories at moderate or higher severity.',
     );
     return;
   }

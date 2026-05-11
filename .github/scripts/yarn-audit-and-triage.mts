@@ -11,6 +11,7 @@ import {
   type YarnSeverity,
   formatAdvisoryTree,
   githubAnnotate,
+  mergeAdvisoriesByIdentity,
   normalizeSeverity,
   writeStepSummary,
 } from './shared/audit-utils.mts';
@@ -176,12 +177,6 @@ function extractAuditLeaves(
   return results;
 }
 
-function advisoryKey(
-  advisory: Pick<ParsedAdvisory, 'id' | 'moduleName' | 'url' | 'title'>,
-): string {
-  return `${advisory.id ?? 'no-id'}|${advisory.moduleName}|${advisory.url}|${advisory.title}`;
-}
-
 function runYarnAudit(): { prod: unknown[]; dev: unknown[] } {
   const prodText = spawnYarnAudit('production');
   const devText = spawnYarnAudit('development');
@@ -243,6 +238,27 @@ function formatAdvisoryLine(advisory: ParsedAdvisory): string {
   const url = advisory.url ? ` ${advisory.url}` : '';
 
   return `[${scope}] ${sev}${downgraded} ${advisory.moduleName} ${id} — ${advisory.title}${url}`;
+}
+
+function applySeverityPolicy(advisory: ParsedAdvisory): ParsedAdvisory {
+  const isDevOnly = !advisory.affectsProduction;
+  const issueText = `${advisory.title} ${advisory.moduleName}`;
+  const matchedIssueRule =
+    advisory.originalSeverity === 'high' &&
+    isDevOnly &&
+    isRedosOrDosIssue(issueText)
+      ? 'redos-dos-downgrade'
+      : 'none';
+
+  return {
+    ...advisory,
+    isDevOnly,
+    matchedIssueRule,
+    effectiveSeverity:
+      matchedIssueRule === 'redos-dos-downgrade'
+        ? 'low'
+        : advisory.originalSeverity,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -402,51 +418,16 @@ export function main() {
     affectsProduction: true,
     isDevOnly: false,
   }));
-  const devParsed = extractAdvisories(audit.dev);
+  const devParsed = extractAdvisories(audit.dev).map((advisory) => ({
+    ...advisory,
+    affectsProduction: false,
+    isDevOnly: true,
+  }));
 
-  const prodKeys = new Set(prodParsed.map((a) => advisoryKey(a)));
-
-  const merged: ParsedAdvisory[] = [];
-  const seen = new Set<string>();
-
-  for (const advisory of devParsed) {
-    const key = advisoryKey(advisory);
-    const affectsProduction = prodKeys.has(key);
-    const isDevOnly = !affectsProduction;
-
-    const issueText = `${advisory.title} ${advisory.moduleName}`;
-    const matchedIssueRule =
-      advisory.originalSeverity === 'high' &&
-      isDevOnly &&
-      isRedosOrDosIssue(issueText)
-        ? 'redos-dos-downgrade'
-        : 'none';
-
-    const effectiveSeverity =
-      matchedIssueRule === 'redos-dos-downgrade'
-        ? 'low'
-        : advisory.originalSeverity;
-
-    merged.push({
-      ...advisory,
-      affectsProduction,
-      isDevOnly,
-      matchedIssueRule,
-      effectiveSeverity,
-    });
-    seen.add(key);
-  }
-
-  for (const advisory of prodParsed) {
-    const key = advisoryKey(advisory);
-    if (seen.has(key)) {
-      continue;
-    }
-    merged.push(advisory);
-    seen.add(key);
-  }
-
-  const advisories = merged;
+  const advisories = mergeAdvisoriesByIdentity([
+    ...prodParsed,
+    ...devParsed,
+  ]).map(applySeverityPolicy);
 
   // Write the current advisories to disk for use by the audit-diff step.
   writeFileSync(
