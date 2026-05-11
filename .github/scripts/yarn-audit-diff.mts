@@ -51,6 +51,25 @@ function sevLabel(a: ParsedAdvisory): string {
   return (a.effectiveSeverity ?? 'unknown').toUpperCase();
 }
 
+function buildAdvisoryTreeText(advisories: ParsedAdvisory[]): string {
+  const nativeResult = spawnSync('yarn npm audit --recursive --all', {
+    encoding: 'utf8',
+    shell: true,
+  });
+  const native = `${nativeResult.stdout ?? ''}${nativeResult.stderr ?? ''}`;
+  if (!native.trim()) {
+    return advisories.map(formatAdvisoryTree).join('\n\n');
+  }
+
+  const advisoryIds = new Set(
+    advisories.map((a) => a.id).filter((id): id is number => id !== null),
+  );
+  const blocks = extractNativeBlocks(native, advisoryIds).map(stripAnsi);
+  return blocks.length > 0
+    ? blocks.join('\n')
+    : advisories.map(formatAdvisoryTree).join('\n\n');
+}
+
 /** Parse the PR number from GITHUB_REF, or null if not a PR event. */
 function getPrNumber(): string | null {
   const ref = process.env.GITHUB_REF; // refs/pull/NNN/merge
@@ -98,10 +117,32 @@ function prChangesYarnLock(): boolean {
   }
 }
 
+type PrDependencyDiff = {
+  changedPackages: Set<string> | null;
+  reason: string;
+};
+
+type AdvisoryPartition = {
+  actionableAdvisories: ParsedAdvisory[];
+  ambientAdvisories: ParsedAdvisory[];
+  reason: string;
+  actionableMatches: Map<string, string[]>;
+};
+
+function extractPackageNameFromDescriptor(descriptor: string): string | null {
+  const match = descriptor
+    .trim()
+    .match(
+      /^"?((?:@[^/@\s",:]+\/)?[^@"\s,:]+)@(?:npm|patch|workspace|file|portal|link|exec|git|github|virtual):/iu,
+    );
+
+  return match?.[1] ?? null;
+}
+
 function extractPackageNamesFromYarnLockLine(line: string): string[] {
   const packageNames = new Set<string>();
   const descriptorPattern =
-    /"?((?:@[^/@\s",:]+\/)?[^@"\s,:]+)@(?:npm|patch|workspace|file|portal|link|exec|git|github):/giu;
+    /"?((?:@[^/@\s",:]+\/)?[^@"\s,:]+)@(?:npm|patch|workspace|file|portal|link|exec|git|github|virtual):/giu;
   let match: RegExpExecArray | null;
 
   while ((match = descriptorPattern.exec(line)) !== null) {
@@ -111,11 +152,18 @@ function extractPackageNamesFromYarnLockLine(line: string): string[] {
   return [...packageNames];
 }
 
+function extractDependencyNameFromYarnLockLine(line: string): string | null {
+  const match = line.match(/^\s+((?:@[^/@\s",:]+\/)?[^@"\s,:]+):\s/u);
+
+  return match?.[1] ?? null;
+}
+
 function parseChangedPackagesFromYarnLockDiff(
   yarnLockDiff: string,
 ): Set<string> | null {
   const changedPackages = new Set<string>();
   let currentPackages = new Set<string>();
+  let dependencyBlockIndent: number | null = null;
 
   for (const line of yarnLockDiff.split(/\r?\n/u)) {
     if (line.startsWith('--- ') || line.startsWith('+++ ')) {
@@ -129,8 +177,26 @@ function parseChangedPackagesFromYarnLockDiff(
 
     const content = line.slice(1);
     const trimmed = content.trim();
+    const indent = content.length - content.trimStart().length;
+
+    if (
+      dependencyBlockIndent !== null &&
+      trimmed !== '' &&
+      indent <= dependencyBlockIndent
+    ) {
+      dependencyBlockIndent = null;
+    }
+
     if (trimmed === '__metadata:') {
       currentPackages = new Set<string>();
+      dependencyBlockIndent = null;
+      continue;
+    }
+
+    if (
+      /^(?:dependencies|peerDependencies|optionalDependencies):$/u.test(trimmed)
+    ) {
+      dependencyBlockIndent = indent;
       continue;
     }
 
@@ -143,6 +209,13 @@ function parseChangedPackagesFromYarnLockDiff(
         }
       }
       continue;
+    }
+
+    if (dependencyBlockIndent !== null && indent > dependencyBlockIndent) {
+      const dependencyName = extractDependencyNameFromYarnLockLine(content);
+      if (dependencyName && (marker === '+' || marker === '-')) {
+        changedPackages.add(dependencyName);
+      }
     }
 
     if (marker !== '+' && marker !== '-') {
@@ -170,34 +243,15 @@ function parseChangedPackagesFromYarnLockDiff(
   return changedPackages;
 }
 
-/**
- * Given a list of advisories, check whether the PR's yarn.lock diff actually
- * touches any of the vulnerable packages. Returns true if we can confirm at
- * least one advisory package was changed, or if we can't determine (safe
- * fallback).
- *
- * This allows us to distinguish:
- *   - yarn.lock changed AND advisory package touched → genuinely introduced
- *   - yarn.lock changed but advisory package NOT touched → ambient CVE
- *
- * Uses the full PR diff (Accept: application/vnd.github.diff) instead of
- * the files-API patch field, which is truncated for diffs > ~300 lines.
- */
-function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): {
-  touchesAdvisoryPackages: boolean;
-  reason: string;
-} {
+function getPrChangedYarnLockPackages(): PrDependencyDiff {
   const repo = process.env.GITHUB_REPOSITORY;
   const prNumber = getPrNumber();
-  if (!repo || !prNumber || advisories.length === 0) {
+  if (!repo || !prNumber) {
     return {
-      touchesAdvisoryPackages: true,
+      changedPackages: null,
       reason: 'missing PR context',
     };
   }
-
-  // Collect the set of module names we care about.
-  const advisoryModules = new Set(advisories.map((a) => a.moduleName));
 
   try {
     // Fetch the full (untruncated) unified diff for this PR.
@@ -225,7 +279,7 @@ function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): {
         'yarn.lock section not found in PR diff — assuming packages changed.',
       );
       return {
-        touchesAdvisoryPackages: true,
+        changedPackages: null,
         reason: 'missing yarn.lock diff',
       };
     }
@@ -243,7 +297,7 @@ function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): {
         'Could not parse any package names from yarn.lock diff — assuming packages changed.',
       );
       return {
-        touchesAdvisoryPackages: true,
+        changedPackages: null,
         reason: 'unparsed yarn.lock diff',
       };
     }
@@ -253,7 +307,7 @@ function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): {
         'yarn.lock diff only changes metadata — no packages changed.',
       );
       return {
-        touchesAdvisoryPackages: false,
+        changedPackages,
         reason: 'the `yarn.lock` diff only changes metadata',
       };
     }
@@ -261,34 +315,96 @@ function prChangesAdvisoryPackages(advisories: ParsedAdvisory[]): {
     console.log(
       `Packages changed in yarn.lock: ${[...changedPackages].join(', ')}`,
     );
-    console.log(`Advisory packages: ${[...advisoryModules].join(', ')}`);
-
-    const overlap = [...advisoryModules].filter((mod) =>
-      changedPackages.has(mod),
-    );
-
-    if (overlap.length > 0) {
-      console.log(`PR changes advisory package(s): ${overlap.join(', ')}`);
-      return {
-        touchesAdvisoryPackages: true,
-        reason: `matched advisory package(s): ${overlap.sort().join(', ')}`,
-      };
-    }
-
-    console.log(
-      'PR changes yarn.lock but does NOT touch any advisory packages — ambient CVE.',
-    );
     return {
-      touchesAdvisoryPackages: false,
-      reason: `the changed packages do not include advisory packages (${changedPackages.size} package entries changed)`,
+      changedPackages,
+      reason: `${changedPackages.size} package/path entr${changedPackages.size === 1 ? 'y' : 'ies'} changed in \`yarn.lock\``,
     };
   } catch (error) {
     console.log(`Failed to parse yarn.lock diff: ${error}`);
     return {
-      touchesAdvisoryPackages: true,
+      changedPackages: null,
       reason: 'failed to inspect yarn.lock diff',
     };
   }
+}
+
+function getAdvisoryRelevantPackages(advisory: ParsedAdvisory): Set<string> {
+  const relevantPackages = new Set<string>([advisory.moduleName]);
+
+  for (const dependent of advisory.dependents) {
+    const packageName = extractPackageNameFromDescriptor(dependent);
+    if (packageName) {
+      relevantPackages.add(packageName);
+    }
+  }
+
+  return relevantPackages;
+}
+
+function partitionAdvisoriesByDependencyDiff(
+  advisories: ParsedAdvisory[],
+  dependencyDiff: PrDependencyDiff,
+): AdvisoryPartition {
+  if (dependencyDiff.changedPackages === null) {
+    return {
+      actionableAdvisories: advisories,
+      ambientAdvisories: [],
+      reason: `${dependencyDiff.reason}; treating advisories as actionable`,
+      actionableMatches: new Map(
+        advisories.map((advisory) => [
+          advisoryIdentityKey(advisory),
+          [advisory.moduleName],
+        ]),
+      ),
+    };
+  }
+
+  if (dependencyDiff.changedPackages.size === 0) {
+    return {
+      actionableAdvisories: [],
+      ambientAdvisories: advisories,
+      reason: dependencyDiff.reason,
+      actionableMatches: new Map(),
+    };
+  }
+
+  const actionableAdvisories: ParsedAdvisory[] = [];
+  const ambientAdvisories: ParsedAdvisory[] = [];
+  const actionableMatches = new Map<string, string[]>();
+
+  for (const advisory of advisories) {
+    const relevantPackages = getAdvisoryRelevantPackages(advisory);
+    const matchedPackages = [...relevantPackages]
+      .filter((packageName) => dependencyDiff.changedPackages?.has(packageName))
+      .sort();
+
+    if (matchedPackages.length > 0) {
+      actionableAdvisories.push(advisory);
+      actionableMatches.set(advisoryIdentityKey(advisory), matchedPackages);
+    } else {
+      ambientAdvisories.push(advisory);
+    }
+  }
+
+  if (actionableAdvisories.length === 0) {
+    return {
+      actionableAdvisories,
+      ambientAdvisories,
+      reason: `the changed packages do not include advisory packages or direct dependents (${dependencyDiff.changedPackages.size} package entries changed)`,
+      actionableMatches,
+    };
+  }
+
+  const matchedPackageNames = [
+    ...new Set([...actionableMatches.values()].flat()),
+  ].sort();
+
+  return {
+    actionableAdvisories,
+    ambientAdvisories,
+    reason: `matched changed package/path entr${matchedPackageNames.length === 1 ? 'y' : 'ies'}: ${matchedPackageNames.join(', ')}`,
+    actionableMatches,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -433,33 +549,6 @@ function triggerBaselineRefresh(): string | null {
     const msg = error instanceof Error ? error.message : String(error);
     console.log(`Failed to trigger baseline refresh: ${msg}`);
     return null;
-  }
-}
-
-/**
- * Add the `retry-ci` label to the current PR so the triage system can consume
- * it for exactly one follow-up retry.
- *
- * Best-effort: failures are logged but never fail the PR check.
- * Requires `pull-requests: write` permission on GITHUB_TOKEN.
- */
-function addRetryLabel(): boolean {
-  const repo = process.env.GITHUB_REPOSITORY;
-  const prNumber = getPrNumber();
-  if (!repo || !prNumber) {
-    return false;
-  }
-
-  try {
-    ghApi(`repos/${repo}/issues/${prNumber}/labels`, {
-      method: 'POST',
-      body: { labels: ['retry-ci'] },
-    });
-    console.log(`Added retry-ci label to PR #${prNumber}`);
-    return true;
-  } catch (error) {
-    console.log(`Failed to add retry-ci label: ${error}`);
-    return false;
   }
 }
 
@@ -799,36 +888,8 @@ async function main() {
         ? ` (${blockingAdvisories.length} release-blocking).`
         : '.'),
   );
-  for (const a of newAdvisories) {
-    const level = blockingAdvisories.includes(a) ? 'error' : 'warning';
-    console.log(
-      `::${level}::New or newly blocking advisory [${sevLabel(a)}]: ${a.moduleName} — ${a.title} (${a.url})`,
-    );
-  }
 
-  // Run the native (human-readable) audit on-demand — only when there are
-  // new advisories to report. This saves ~6s on the happy path (no new
-  // advisories) by not running it in the triage step unconditionally.
-  // Strip ANSI color codes — the output may contain them depending on the
-  // CI runner's terminal capabilities.
-  let treeText: string;
-  const nativeResult = spawnSync('yarn npm audit --recursive --all', {
-    encoding: 'utf8',
-    shell: true,
-  });
-  const native = `${nativeResult.stdout ?? ''}${nativeResult.stderr ?? ''}`;
-  if (native.trim()) {
-    const newIds = new Set(
-      newAdvisories.map((a) => a.id).filter((id): id is number => id !== null),
-    );
-    const blocks = extractNativeBlocks(native, newIds).map(stripAnsi);
-    treeText =
-      blocks.length > 0
-        ? blocks.join('\n')
-        : newAdvisories.map(formatAdvisoryTree).join('\n\n');
-  } else {
-    treeText = newAdvisories.map(formatAdvisoryTree).join('\n\n');
-  }
+  const treeText = buildAdvisoryTreeText(newAdvisories);
 
   const diffSummaryLines = [
     '',
@@ -844,130 +905,135 @@ async function main() {
     '',
   ];
 
-  // On push-to-main, create a GitHub tracking issue (before Slack so we can link it).
-  const issueResult = maybeCreateIssue(
-    newAdvisories,
-    blockingAdvisories,
-    treeText,
-  );
-
-  // On push-to-main, send a Slack notification so the team knows immediately.
-  // Skip if the issue already existed — that means we already notified for this
-  // exact set of advisories on a previous push.
-  if (!issueResult || issueResult.isNew) {
-    await postSlackNotification(
-      newAdvisories,
-      blockingAdvisories,
-      issueResult?.url ?? null,
-    );
-  } else {
-    console.log(
-      `Tracking issue already exists (${issueResult.url}) — skipping duplicate Slack notification.`,
-    );
-  }
-
-  // ----------------------------------------------------------------
-  // Auto-healing flow for ambient CVEs on PRs
-  // ----------------------------------------------------------------
-  // When a new CVE is published between the last push-to-main and a PR
-  // run, the advisory appears "new" even though the PR didn't introduce
-  // it. This is an "ambient CVE." The auto-healing flow:
-  //
-  //   1. Detect: compare current audit against the baseline artifact
-  //      from the most recent push-to-main run.
-  //   2. Classify: check whether the PR's yarn.lock diff actually
-  //      touches the advisory packages (two-level check below).
-  //   3. Refresh: re-run the health-checks job on main so it uploads a
-  //      fresh baseline that includes the ambient advisory.
-  //   4. Retry once: on the first attempt only, add the `retry-ci` label and
-  //      fail this run so triage consumes the label for one follow-up run.
-  //
-  // Cross-repo PRs skip steps 3-4 because the token is read-only.
-  // On push-to-main, the step always succeeds (baseline must be uploaded).
-  //
-  // Classification outcomes:
-  //   1. PR doesn't touch yarn.lock → ambient CVE, retry once if refreshed
-  //   2. PR touches yarn.lock but NOT the advisory packages → ambient, retry
-  //      once if refreshed
-  //   3. PR touches yarn.lock AND the advisory packages → fail
-  if (!isMainlineTrigger && blockingAdvisories.length > 0) {
-    const runAttempt = getRunAttempt();
-    const allowAutoRefresh = runAttempt === 1;
-
-    // Two-level check: does this PR change yarn.lock, and if so, does it
-    // touch any of the packages flagged by the advisories?
-    const touchesYarnLock = prChangesYarnLock();
-    const advisoryPackageCheck = touchesYarnLock
-      ? prChangesAdvisoryPackages(blockingAdvisories)
-      : {
-          touchesAdvisoryPackages: false,
-          reason: 'this PR does not change `yarn.lock`',
-        };
-    const touchesAdvisoryPkgs =
-      touchesYarnLock && advisoryPackageCheck.touchesAdvisoryPackages;
-
-    if (touchesAdvisoryPkgs) {
-      process.exitCode = 1;
-
-      // Rewrite summary — PR changed a package that has a CVE
-      diffSummaryLines[1] = `### yarn audit: **FAILED** — ${newAdvisories.length} new or newly blocking advisor${newAdvisories.length === 1 ? 'y' : 'ies'}`;
-      diffSummaryLines[3] =
-        `New or newly blocking advisories were found and this PR changes a package affected by a CVE. ` +
-        `Automatic baseline refresh is only used for ambient CVEs and is skipped for actionable dependency changes. ` +
-        'Run `yarn audit` locally to check whether these come from your dependency changes.';
-      diffSummaryLines.push(
-        `Dependency diff: ${advisoryPackageCheck.reason}`,
-        '',
-      );
-
-      githubAnnotate(
-        'warning',
-        'New or newly blocking advisories found and this PR changes a package affected by a CVE. ' +
-          'Baseline auto-refresh is skipped for actionable dependency changes. ' +
-          'Run `yarn audit` locally to check whether these come from your dependency changes.',
-      );
-    } else {
-      // Trigger a baseline refresh so subsequent runs aren't blocked by
-      // ambient CVEs. Only possible on same-repo PRs with actions:write.
-      let refreshUrl: string | null = null;
-      if (allowAutoRefresh && process.env.IS_CROSS_REPO_PR !== 'true') {
-        refreshUrl = triggerBaselineRefresh();
-      }
-
-      // Ambient CVEs: either yarn.lock wasn't touched, or it was touched
-      // but the advisory packages themselves weren't changed.
-      const { reason } = advisoryPackageCheck;
-      diffSummaryLines[1] = `### yarn audit: **passed** (ambient) — ${blockingAdvisories.length} pre-existing advisor${blockingAdvisories.length === 1 ? 'y' : 'ies'}`;
-      diffSummaryLines[3] =
-        `New or newly blocking advisories were detected compared to the baseline, but ${reason}` +
-        ' — these are ambient CVEs, not introduced by this PR.';
-      diffSummaryLines.push(`Dependency diff: ${reason}`, '');
-      if (refreshUrl) {
-        const retryLabelAdded = addRetryLabel();
-        if (retryLabelAdded) {
-          process.exitCode = 1;
-        }
-
-        diffSummaryLines.push(
-          `> **Baseline refresh triggered** — [view run](${refreshUrl}). ` +
-            (retryLabelAdded
-              ? 'This PR will be retried once after the baseline refresh starts.'
-              : 'Automatic retry was skipped because the retry label could not be added.'),
-          '',
-        );
-      }
-
-      githubAnnotate(
-        'warning',
-        `${blockingAdvisories.length} ambient advisor${blockingAdvisories.length === 1 ? 'y' : 'ies'} found (not introduced by this PR).` +
-          (refreshUrl ? ` Baseline refresh: ${refreshUrl}` : ''),
+  if (isMainlineTrigger) {
+    for (const a of newAdvisories) {
+      const level = blockingAdvisories.includes(a) ? 'error' : 'warning';
+      console.log(
+        `::${level}::New or newly blocking advisory [${sevLabel(a)}]: ${a.moduleName} — ${a.title} (${a.url})`,
       );
     }
+
+    // On push-to-main, create a GitHub tracking issue (before Slack so we can link it).
+    const issueResult = maybeCreateIssue(
+      newAdvisories,
+      blockingAdvisories,
+      treeText,
+    );
+
+    // On push-to-main, send a Slack notification so the team knows immediately.
+    // Skip if the issue already existed — that means we already notified for this
+    // exact set of advisories on a previous push.
+    if (!issueResult || issueResult.isNew) {
+      await postSlackNotification(
+        newAdvisories,
+        blockingAdvisories,
+        issueResult?.url ?? null,
+      );
+    } else {
+      console.log(
+        `Tracking issue already exists (${issueResult.url}) — skipping duplicate Slack notification.`,
+      );
+    }
+
+    diffSummaryLines.push('Run `yarn audit` locally to reproduce.', '');
+    writeStepSummary(diffSummaryLines.join('\n'));
+    return;
   }
 
-  // For mainline and genuine PR-introduced CVEs, add the local reproduce hint.
-  if (isMainlineTrigger || blockingAdvisories.length === 0) {
+  // ----------------------------------------------------------------
+  // PR classification for actionable vs ambient advisories
+  // ----------------------------------------------------------------
+  // When a new CVE is published between the last push-to-main and a PR
+  // run, the advisory appears "new" even though the PR didn't introduce it.
+  // This is an "ambient CVE." A single PR can also contain both ambient CVEs
+  // and advisories caused by its dependency changes, so we partition the set:
+  //
+  //   1. Actionable: the PR changed the advisory package, or a direct
+  //      dependent from the audit path.
+  //   2. Ambient: the PR did not touch the advisory package/path.
+  //
+  // Ambient-only PRs pass immediately. Same-repo PRs may still refresh the
+  // baseline once so subsequent runs diff against the newer advisory set.
+  const runAttempt = getRunAttempt();
+  const allowAutoRefresh = runAttempt === 1;
+  const touchesYarnLock = prChangesYarnLock();
+  const dependencyDiff = touchesYarnLock
+    ? getPrChangedYarnLockPackages()
+    : {
+        changedPackages: new Set<string>(),
+        reason: 'this PR does not change `yarn.lock`',
+      };
+  const advisoryPartition = partitionAdvisoriesByDependencyDiff(
+    blockingAdvisories,
+    dependencyDiff,
+  );
+  const { actionableAdvisories, ambientAdvisories } = advisoryPartition;
+
+  if (actionableAdvisories.length > 0) {
+    process.exitCode = 1;
+
+    const ambientSuffix =
+      ambientAdvisories.length > 0
+        ? ` (${ambientAdvisories.length} ambient advisor${ambientAdvisories.length === 1 ? 'y' : 'ies'} also detected)`
+        : '';
+
+    diffSummaryLines[1] =
+      `### yarn audit: **FAILED** — ${actionableAdvisories.length} actionable advisor${actionableAdvisories.length === 1 ? 'y' : 'ies'}` +
+      ambientSuffix;
+    diffSummaryLines[3] =
+      `New or newly blocking advisories were found and this PR changes an affected package/path. ` +
+      `Automatic baseline refresh is skipped while actionable dependency changes remain. ` +
+      'Run `yarn audit` locally to check whether these come from your dependency changes.';
+    diffSummaryLines.push(`Dependency diff: ${advisoryPartition.reason}`, '');
+    if (ambientAdvisories.length > 0) {
+      diffSummaryLines.push(
+        `${ambientAdvisories.length} advisor${ambientAdvisories.length === 1 ? 'y was' : 'ies were'} classified as ambient and did not cause this failure.`,
+        '',
+      );
+    }
     diffSummaryLines.push('Run `yarn audit` locally to reproduce.', '');
+
+    for (const advisory of actionableAdvisories) {
+      const matchedPackages = advisoryPartition.actionableMatches.get(
+        advisoryIdentityKey(advisory),
+      ) ?? [advisory.moduleName];
+      githubAnnotate(
+        'error',
+        `Actionable advisory [${sevLabel(advisory)}]: ${advisory.moduleName} — ${advisory.title} (${advisory.url}). Matched dependency diff: ${matchedPackages.join(', ')}`,
+      );
+    }
+    if (ambientAdvisories.length > 0) {
+      githubAnnotate(
+        'warning',
+        `${ambientAdvisories.length} ambient advisor${ambientAdvisories.length === 1 ? 'y' : 'ies'} also found (not introduced by this PR).`,
+      );
+    }
+  } else {
+    // Trigger a baseline refresh so subsequent runs aren't blocked by ambient
+    // CVEs. Only possible on same-repo PRs with actions:write.
+    let refreshUrl: string | null = null;
+    if (allowAutoRefresh && process.env.IS_CROSS_REPO_PR !== 'true') {
+      refreshUrl = triggerBaselineRefresh();
+    }
+
+    diffSummaryLines[1] = `### yarn audit: **passed** (ambient) — ${ambientAdvisories.length} pre-existing advisor${ambientAdvisories.length === 1 ? 'y' : 'ies'}`;
+    diffSummaryLines[3] =
+      `New or newly blocking advisories were detected compared to the baseline, but ${advisoryPartition.reason}` +
+      ' — these are ambient CVEs, not introduced by this PR.';
+    diffSummaryLines.push(`Dependency diff: ${advisoryPartition.reason}`, '');
+    if (refreshUrl) {
+      diffSummaryLines.push(
+        `> **Baseline refresh triggered** — [view run](${refreshUrl}). ` +
+          'Subsequent PR runs will diff against the updated baseline.',
+        '',
+      );
+    }
+
+    githubAnnotate(
+      'warning',
+      `${ambientAdvisories.length} ambient advisor${ambientAdvisories.length === 1 ? 'y' : 'ies'} found (not introduced by this PR).` +
+        (refreshUrl ? ` Baseline refresh: ${refreshUrl}` : ''),
+    );
   }
 
   writeStepSummary(diffSummaryLines.join('\n'));
