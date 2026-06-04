@@ -103,6 +103,7 @@
     "read ECONNRESET", // TCP read failure (more specific than ECONNRESET alone)
     "resource temporarily unavailable", // file descriptor / process limit exhaustion
     "socket hang up", // HTTP connection dropped mid-request
+    "sonarcloud\\.io.*failed with HTTP \\d+", // SonarScanner CLI hitting api/scanner.sonarcloud.io with 4xx/5xx (JRE metadata or JRE binary download)
     "tar: Error is not recoverable", // fatal tar extraction failure (corrupted or non-archive input)
     "The requested URL returned error: 429", // GitHub raw content / API rate limit (curl error)
     "Upload progress stalled", // GitHub artifact upload timeout (actions/upload-artifact)
