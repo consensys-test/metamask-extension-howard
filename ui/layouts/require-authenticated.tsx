@@ -16,6 +16,7 @@ export const RequireAuthenticated = () => {
   }
 
   if (!isUnlocked) {
+    console.log('TRY CODEOWNERS'); 
     return <Navigate to={UNLOCK_ROUTE} state={{ from: location }} replace />;
   }
 
