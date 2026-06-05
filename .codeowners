@@ -202,7 +202,7 @@ shared/lib/deep-links/routes/musd.ts                @MetaMask/earn
 # --- Extension Platform: build, dev tooling, CI, background, platform infra. ---
 
 # Lint.
-.editorconfig                                       @MetaMask/extension-platform
+.editorconfig                                       @consensys-test/consensys-test-write
 .eslintrc.js                                        @MetaMask/extension-platform
 .eslintrc.*.js                                      @MetaMask/extension-platform
 .prettierignore                                     @MetaMask/extension-platform
