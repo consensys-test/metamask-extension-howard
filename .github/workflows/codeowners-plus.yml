@@ -35,13 +35,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
-
-      - name: Fetch base ref for codeowners-plus
-        run: |
-          git fetch --depth=1 origin "$BASE_SHA"
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # codeowners-plus runs `git diff base...head` (symmetric difference),
+          # which needs the merge-base. fetch-depth: 0 gives the full commit
+          # graph; filter: tree:0 makes it a partial clone so blobs/trees are
+          # fetched lazily, dramatically faster than a full clone on this repo.
+          fetch-depth: 0
+          filter: tree:0
 
       - name: Run Codeowners Plus
         uses: multimediallc/codeowners-plus@v1.9.1
