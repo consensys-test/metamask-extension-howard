@@ -45,7 +45,10 @@ jobs:
       - name: Run Codeowners Plus
         uses: multimediallc/codeowners-plus@v1.9.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Org-team review requests need a token with org Members:Read.
+          # GITHUB_TOKEN can't resolve cross-team identities; fall back to
+          # GITHUB_TOKEN if the PAT secret isn't configured (e.g. on forks).
+          github-token: ${{ secrets.CODEOWNERS_PLUS_TOKEN || secrets.GITHUB_TOKEN }}
           pr: ${{ github.event.pull_request.number }}
           verbose: true
           # Skip comments and review-requests on draft PRs; still posts status.
