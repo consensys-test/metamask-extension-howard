@@ -14,9 +14,11 @@ suppress_unowned_warning = true
 # authors who are themselves codeowners don't have to chase a second approver.
 allow_self_approval = true
 
-# Trial-only: surface annoyances by failing the check when required reviews
-# are missing — but the workflow's status check is intentionally NOT marked
-# required in branch protection, so this is only an informational signal.
+# Don't fail the codeowners-plus status check when reviews are missing; instead
+# have the action post a GitHub approval on behalf of the token owner once
+# every required group is satisfied. Lets the green check on the PR continue
+# to reflect "PR code is healthy" rather than "all required reviewers
+# approved", and lets native CODEOWNERS / branch protections do the gating.
 [enforcement]
-fail_check = true
-approval = false
+fail_check = false
+approval = true
