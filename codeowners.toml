@@ -16,3 +16,5 @@ suppress_unowned_warning = true
 [enforcement]
 fail_check = true
 approval = false
+
+allow_self_approval = true

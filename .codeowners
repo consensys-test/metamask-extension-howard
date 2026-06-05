@@ -15,4 +15,4 @@
 #   - '? path @owner' adds an optional (cc'd, non-blocking) reviewer.
 # See https://github.com/multimediallc/codeowners-plus for the full spec.
 
-.editorconfig                                       @consensys-test/release-team
+.editorconfig                                       @consensys-test/release-team @HowardBraham
