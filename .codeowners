@@ -16,3 +16,4 @@
 # See https://github.com/multimediallc/codeowners-plus for the full spec.
 
 .editorconfig                                       @consensys-test/release-team @HowardBraham
+ui/layouts/require-authenticated.tsx                @consensys-test/release-team @HowardBraham
