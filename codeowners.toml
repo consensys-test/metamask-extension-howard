@@ -10,11 +10,13 @@ detailed_reviewers = true
 # comments while we're shaking things out.
 suppress_unowned_warning = true
 
+# Treat the PR author as satisfying any OR ownership group they belong to, so
+# authors who are themselves codeowners don't have to chase a second approver.
+allow_self_approval = true
+
 # Trial-only: surface annoyances by failing the check when required reviews
 # are missing — but the workflow's status check is intentionally NOT marked
 # required in branch protection, so this is only an informational signal.
 [enforcement]
 fail_check = true
 approval = false
-
-allow_self_approval = true
