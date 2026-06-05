@@ -1,0 +1,48 @@
+name: Codeowners Plus
+
+# Trial integration of multimediallc/codeowners-plus alongside the existing
+# .github/CODEOWNERS. Runs as a parallel, informational check; the status
+# check is intentionally NOT marked required in branch protection so that
+# people can evaluate it without it blocking merges.
+#
+# Spec: https://github.com/multimediallc/codeowners-plus
+# Companion rerun workflow: codeowners-plus-rerun.yml
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+      - unlabeled
+
+concurrency:
+  group: codeowners-plus-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  codeowners-plus:
+    name: Run Codeowners Plus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          # codeowners-plus needs full history to resolve base/head ownership.
+          fetch-depth: 0
+
+      - name: Run Codeowners Plus
+        uses: multimediallc/codeowners-plus@v1.9.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr: ${{ github.event.pull_request.number }}
+          verbose: true
+          # Skip comments and review-requests on draft PRs; still posts status.
+          quiet: ${{ github.event.pull_request.draft }}

@@ -1,0 +1,18 @@
+# Configuration for multimediallc/codeowners-plus.
+# See: https://github.com/multimediallc/codeowners-plus
+
+# Show a collapsible per-file owners list in the PR comment. Helpful for a big
+# owner graph like this one — reviewers can quickly see why they were tagged.
+detailed_reviewers = true
+
+# Don't yell about unowned files during the trial. The translated rule set may
+# legitimately leave some paths unowned, and we don't want noise in PR
+# comments while we're shaking things out.
+suppress_unowned_warning = true
+
+# Trial-only: surface annoyances by failing the check when required reviews
+# are missing — but the workflow's status check is intentionally NOT marked
+# required in branch protection, so this is only an informational signal.
+[enforcement]
+fail_check = true
+approval = false
