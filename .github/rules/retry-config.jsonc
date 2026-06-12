@@ -146,9 +146,11 @@
     "shellcheck reported issue", // actionlint/shellcheck: shell script issues in workflow YAML
     "snapshots? failed", // Jest snapshot assertion mismatch
     "SyntaxError:", // JS/TS parse error (bad syntax, duplicate declaration, unexpected token)
+    "useSelector\\(\\(state\\) =>", // Integration console baseline: React-Redux selector identity warning surfaced with concrete source line in log
     "test at .*\\.test\\.[tj]sx?:\\d+:\\d+\\n.*✖", // node:test runner: failure location followed by ✖ marker (2-line match ensures only failures are caught)
     "Test Files.*failed", // Vitest summary line: one or more test files failed
     "Test Suites:.*failed", // Jest summary line: one or more test suites failed
+    "Token exchange failed: 403 Forbidden", // Publish prerelease: deterministic policy/permission denial from token exchange service
     "Unable to resolve action", // GitHub Actions can't resolve a composite/reusable action (deleted tag or missing ref)
     "Working tree dirty", // git working tree has uncommitted changes after a build/generate step
     "yarn audit FAILED", // yarn audit found a production vulnerability
