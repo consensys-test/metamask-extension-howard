@@ -77,6 +77,7 @@
     "Back off \\d+(\\.\\d+)? seconds before retry", // npm registry throttle (e.g. "Back off 16.402 seconds before retry")
     "binaries\\.sonarsource\\.com.*\\n.*Action failed: Unexpected HTTP response", // SonarScanner CDN flake (4xx/5xx downloading scanner-cli zip)
     "Command failed after \\d+ attempts", // Prepare dependencies: yarn install retries exhausted
+    "Could not find the pullrequest with key", // SonarCloud PR analysis race: PR exists in GitHub but is not yet visible to SonarCloud
     "Could not resolve host", // DNS resolution failure
     "EAI_AGAIN", // Node.js DNS lookup timed out
     "ECONNREFUSED", // TCP connection refused (service not listening)
@@ -106,6 +107,7 @@
     "sonarcloud\\.io.*failed with HTTP \\d+", // SonarScanner CLI hitting api/scanner.sonarcloud.io with 4xx/5xx (JRE metadata or JRE binary download)
     "tar: Error is not recoverable", // fatal tar extraction failure (corrupted or non-archive input)
     "The requested URL returned error: 429", // GitHub raw content / API rate limit (curl error)
+    "Unhandled error: HttpError: <!DOCTYPE html>", // GitHub API returned an HTML error page instead of JSON
     "Upload progress stalled", // GitHub artifact upload timeout (actions/upload-artifact)
     "vkCreateInstance failed with VK_ERROR_INCOMPATIBLE_DRIVER", // GPU driver issue on runner for headless Chrome
     "VulkanError.cpp", // GPU driver crash in headless Chrome
@@ -122,7 +124,8 @@
     "\\.github/workflows/.*\\.yml:\\d+:\\d+:", // actionlint: any workflow lint error (expression, shellcheck, syntax, etc.)
     "\\*\\*\\w+\\*\\*: \\d+ unused messages", // verify-locale-strings: locale files have unused message keys (e.g. "**de**: 43 unused messages")
     "BASELINE VIOLATIONS DETECTED", // lint-baseline.mts: new violations added to already-baselined files
-    "Can't walk dependency graph", // ts-migration-dashboard build (Browserify/module-deps): unresolvable import/require chain
+    "Can't find stylesheet to import", // Sass compilation error: missing or invalid stylesheet import
+    "Can't walk dependency graph", // Browserify build: broken import/require chain
     "Cannot find module", // Node.js require/import of missing package or path
     "Code style issues found", // oxlint --check or ESLint formatting rule failure
     "compiled with \\d+ errors?", // Webpack build errors
@@ -133,18 +136,23 @@
     "Error occurred when checking code style", // oxfmt parse error checking formatting
     "Failed to build the preview", // Storybook: Webpack compilation error building story preview
     "Format issues found in above \\d+ files", // Prettier or oxfmt --check: files need reformatting
+    "I18nProvider: Support for defaultProps", // Unit console baseline check: React defaultProps warning count changed
     "Invalid code fence parameters", // build: malformed code fence in source (BEGIN:, END:)
     "Invalid package.json", // malformed package.json (parse error during yarn install)
     "LavaMoat - required.*package not in allowlist", // LavaMoat policy: dependency not in allowlist (node builtin or regular package)
+    "Lint errors encountered for transformed file", // Browserify build: ESLint errors in post-transform output
     "Module not found", // Webpack: import of nonexistent module
     "NEW FILES \\(not in baseline\\)", // lint-baseline.mts: new files with violations not yet baselined
     "No build-name entries found in main.yml", // filter-files-changed: main.yml missing expected build-name fields
     "no platform directories.*found in dist", // build verification: platform folders missing from output
     "Not a valid commit name", // git can't resolve a commit SHA (shallow clone, force-pushed, or pruned ref)
     "packageManager.*current global version", // Corepack not enabled: workflow uses wrong Yarn version (needs corepack enable)
+    "Post comment failed with status '(Forbidden|Unauthorized)'", // Publish prerelease: GitHub comment denied because issue is locked or token lacks permission
     "ReferenceError:", // JS runtime error: undefined variable or function
+    "runInChildProcess for task .* encountered an error", // Browserify build: a build sub-task crashed
     "shellcheck reported issue", // actionlint/shellcheck: shell script issues in workflow YAML
     "snapshots? failed", // Jest snapshot assertion mismatch
+    "Syntax Error", // JS/TS parser error emitted with spaced wording rather than SyntaxError
     "SyntaxError:", // JS/TS parse error (bad syntax, duplicate declaration, unexpected token)
     "useSelector\\(\\(state\\) =>", // Integration console baseline: React-Redux selector identity warning surfaced with concrete source line in log
     "test at .*\\.test\\.[tj]sx?:\\d+:\\d+\\n.*✖", // node:test runner: failure location followed by ✖ marker (2-line match ensures only failures are caught)
