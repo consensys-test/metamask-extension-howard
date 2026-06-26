@@ -264,7 +264,10 @@ describe('start() entry point', () => {
 
     const { cherryPicks } = getMocks();
     expect(cherryPicks.extractWhatsInRc).toHaveBeenCalled();
-    expect(cherryPicks.buildWhatsInRcSection).toHaveBeenCalled();
+    expect(cherryPicks.buildWhatsInRcSection).toHaveBeenCalledWith(
+      expect.any(Object),
+      '99',
+    );
 
     const { commentBody } =
       getMocks().utils.postCommentWithMetamaskBot.mock.calls[0][0];
@@ -296,6 +299,7 @@ describe('start() entry point', () => {
 
     expect(cherryPicks.buildWhatsInRcFailureSection).toHaveBeenCalledWith(
       'git command failed',
+      '99',
     );
   });
 });

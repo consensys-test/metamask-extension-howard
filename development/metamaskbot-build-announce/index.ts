@@ -87,10 +87,10 @@ async function start(): Promise<void> {
     commentBody += await buildSectionWithFallback(async () => {
       try {
         const result = extractWhatsInRc();
-        return buildWhatsInRcSection(result) || null;
+        return buildWhatsInRcSection(result, RUN_ID) || null;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return buildWhatsInRcFailureSection(message);
+        return buildWhatsInRcFailureSection(message, RUN_ID);
       }
     }, "What's in this RC");
   }
