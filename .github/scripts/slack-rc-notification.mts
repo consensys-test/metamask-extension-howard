@@ -28,6 +28,10 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseChangelog } from '@metamask/auto-changelog';
+import {
+  getBuildLinks,
+  type BuildLinks,
+} from '../../development/metamaskbot-build-announce/build-links.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, '..', '..');
@@ -42,8 +46,8 @@ type SlackPayload = {
 };
 
 type MainBrowserLinks = {
-  browserify: { chrome: string; firefox: string };
-  webpack: { chrome: string; firefox: string };
+  browserify: BuildLinks['browserify']['main'];
+  webpack: BuildLinks['webpack']['main'];
 };
 
 function escapeSlackMrkdwn(text: string | undefined | null): string {
@@ -78,16 +82,13 @@ function getExtensionMainBuildLinks(
   hostUrl: string,
   packageVersion: string,
 ): MainBrowserLinks {
-  const artifactHostUrl = hostUrl.replace(/\/$/, '');
+  const buildLinks = getBuildLinks({
+    hostUrl: hostUrl.replace(/\/$/, ''),
+    version: packageVersion,
+  });
   return {
-    browserify: {
-      chrome: `${artifactHostUrl}/build-dist-browserify/builds/metamask-chrome-${packageVersion}.zip`,
-      firefox: `${artifactHostUrl}/build-dist-mv2-browserify/builds/metamask-firefox-${packageVersion}.zip`,
-    },
-    webpack: {
-      chrome: `${artifactHostUrl}/build-dist-webpack/builds/metamask-chrome-${packageVersion}.zip`,
-      firefox: `${artifactHostUrl}/build-dist-mv2-webpack/builds/metamask-firefox-${packageVersion}.zip`,
-    },
+    browserify: buildLinks.browserify.main,
+    webpack: buildLinks.webpack.main,
   };
 }
 

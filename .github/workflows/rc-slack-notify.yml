@@ -112,6 +112,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             .github/scripts/slack-rc-notification.mts
+            development/metamaskbot-build-announce/build-links.ts
             package.json
             CHANGELOG.md
           sparse-checkout-cone-mode: false
@@ -145,4 +146,6 @@ jobs:
           # AWS_CLOUDFRONT_URL: full origin (https://…); if empty, artifact links are skipped.
           HOST_URL: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ steps.notif.outputs.run_id }}
           PR_NUMBER: ${{ steps.gate.outputs.pr_number || '' }}
+          # build-links.ts is a shared TypeScript helper; keep Node's typeless .ts warning out of the Actions log.
+          NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
         run: node ./.github/scripts/slack-rc-notification.mts
