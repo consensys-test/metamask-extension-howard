@@ -102,15 +102,33 @@ jobs:
             echo "semver=${GATE_SEMVER}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout and setup
+      - name: Checkout Slack notification inputs
         if: >-
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
-        uses: MetaMask/action-checkout-and-setup@v3
+        uses: actions/checkout@v7
         with:
-          is-high-risk-environment: false
-          skip-allow-scripts: true
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.head_sha || github.event.workflow_run.head_sha }}
+          sparse-checkout: |
+            .nvmrc
+            .github/scripts/slack-rc-notification.mts
+            package.json
+            CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Node.js
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install Slack notification dependency
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
+        run: npm install --prefix .github/scripts --no-save --ignore-scripts --no-audit --no-fund --package-lock=false @metamask/auto-changelog@5.3.1
 
       - name: Post RC Slack notification
         if: >-
@@ -127,4 +145,4 @@ jobs:
           # AWS_CLOUDFRONT_URL: full origin (https://…); if empty, artifact links are skipped.
           HOST_URL: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ steps.notif.outputs.run_id }}
           PR_NUMBER: ${{ steps.gate.outputs.pr_number || '' }}
-        run: yarn exec tsx ./.github/scripts/slack-rc-notification.mts
+        run: node ./.github/scripts/slack-rc-notification.mts

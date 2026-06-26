@@ -4,23 +4,22 @@
  * Posts a Block Kit message when a release-candidate Main workflow completes, aligned with
  * metamask-mobile/scripts/slack-rc-notification.mjs (bot token + chat.postMessage).
  *
- * Build URLs use `getBuildLinks` from development/metamaskbot-build-announce/artifacts.ts
- * (main Chrome/Firefox for Webpack + deprecated Browserify fallback).
+ * Build URLs include main Chrome/Firefox Webpack artifacts plus the deprecated Browserify fallback.
  *
  * Local / manual testing
  * ----------------------
  * Dry-run (no Slack API):
  *   DRY_RUN=1 SEMVER=13.26.0 GITHUB_RUN_ID=12345678 \
  *   HOST_URL='https://<cloudfront>/metamask-extension/12345678' \
- *   ./node_modules/.bin/tsx ./.github/scripts/slack-rc-notification.ts
+ *   node ./.github/scripts/slack-rc-notification.mts
  *
  * Post to a specific channel (first non-empty wins):
  *   SLACK_RC_CHANNEL, SLACK_CHANNEL, or TEST_CHANNEL (Mobile parity)
  *   Example:
  *   SEMVER=… GITHUB_RUN_ID=… SLACK_BOT_TOKEN='xoxb-…' SLACK_CHANNEL='#my-test' HOST_URL=… \
- *   ./node_modules/.bin/tsx ./.github/scripts/slack-rc-notification.ts
+ *   node ./.github/scripts/slack-rc-notification.mts
  *
- * Requires `yarn install` at repo root for `@metamask/auto-changelog`.
+ * Requires `@metamask/auto-changelog`.
  *
  * @see metamask-mobile/scripts/slack-rc-notification.mjs
  */
@@ -29,10 +28,6 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseChangelog } from '@metamask/auto-changelog';
-import packageJson from '../../package.json';
-import artifactsModule from '../../development/metamaskbot-build-announce/artifacts';
-
-const { getBuildLinks } = artifactsModule;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, '..', '..');
@@ -83,14 +78,32 @@ function getExtensionMainBuildLinks(
   hostUrl: string,
   packageVersion: string,
 ): MainBrowserLinks {
-  const full = getBuildLinks({
-    hostUrl: hostUrl.replace(/\/$/, ''),
-    version: packageVersion,
-  });
+  const artifactHostUrl = hostUrl.replace(/\/$/, '');
   return {
-    browserify: full.browserify.main,
-    webpack: full.webpack.main,
+    browserify: {
+      chrome: `${artifactHostUrl}/build-dist-browserify/builds/metamask-chrome-${packageVersion}.zip`,
+      firefox: `${artifactHostUrl}/build-dist-mv2-browserify/builds/metamask-firefox-${packageVersion}.zip`,
+    },
+    webpack: {
+      chrome: `${artifactHostUrl}/build-dist-webpack/builds/metamask-chrome-${packageVersion}.zip`,
+      firefox: `${artifactHostUrl}/build-dist-mv2-webpack/builds/metamask-firefox-${packageVersion}.zip`,
+    },
   };
+}
+
+function getPackageVersion(): string | null {
+  const packageJsonPath = path.join(REPO_ROOT, 'package.json');
+
+  try {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
+      version?: unknown;
+    };
+    return typeof packageJson.version === 'string' ? packageJson.version : null;
+  } catch (error) {
+    const err = error as Error;
+    console.error(`Failed to read package.json: ${err.message}`);
+    return null;
+  }
 }
 
 /**
@@ -468,7 +481,7 @@ async function main(): Promise<void> {
   const trimmedHostUrl = process.env.HOST_URL?.trim() ?? '';
   const channelOverride = getChannelOverride();
 
-  const packageVersion = packageJson.version ?? semver;
+  const packageVersion = getPackageVersion() ?? semver;
 
   const hostUrlOk = trimmedHostUrl !== '' && isValidUrl(trimmedHostUrl);
 
