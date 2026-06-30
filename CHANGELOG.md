@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Display a VIP tag when using a VIP referral code. (#43527)
+- Display a VIP tag when using a VIP referral code! (#43527)
 - Adds `metamask-aep[bot]` to the CLA Signature Bot allowlist in `.github/workflows/cla.yml`. (#43237)
 - Enabled ERC-7715 requests over the Multichain API and MetaMask Connect (#43513)
 - Remove CTA button under notification (#43685)
