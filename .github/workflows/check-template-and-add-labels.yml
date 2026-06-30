@@ -40,16 +40,7 @@ jobs:
         with:
           sparse-checkout: |
             .github
-            .nvmrc
           sparse-checkout-cone-mode: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Install script dependencies
-        run: npm install --no-save @actions/core@^3.0.1 @actions/github@^9.1.1
 
       - name: Get planning token
         id: planning-token
@@ -84,9 +75,17 @@ jobs:
 
       - name: Check template and add labels
         id: check-template-and-add-labels
+        uses: actions/github-script@v9
         env:
-          LABEL_TOKEN: ${{ steps.label-token.outputs.token || github.token }}
           # Test repos cannot read MetaMask org membership. Treat authors as
           # external there so the rest of the label/template path can run.
           SKIP_ORG_MEMBERSHIP_CHECK: ${{ github.repository_owner != 'MetaMask' }}
-        run: node ./.github/scripts/check-template-and-add-labels.mts
+        with:
+          github-token: ${{ steps.label-token.outputs.token || github.token }}
+          script: |
+            const { join } = await import('node:path');
+            const { pathToFileURL } = await import('node:url');
+            const scriptPath = join(process.env.GITHUB_WORKSPACE, '.github/scripts/check-template-and-add-labels.mts');
+            const { main } = await import(pathToFileURL(scriptPath).href);
+
+            await main({ github, context, core });

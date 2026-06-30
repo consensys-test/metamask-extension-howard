@@ -1,5 +1,8 @@
-import * as core from '@actions/core';
-import { context, getOctokit } from '@actions/github';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import type * as actionsCore from '@actions/core';
+import type * as actionsGithub from '@actions/github';
 import type { GitHub } from '@actions/github/lib/utils';
 
 import { retrieveIssue } from './shared/issue.mts';
@@ -42,29 +45,33 @@ const knownBots = [
 // Issues/PRs from these actors still get full template and label checks; we only skip the org check.
 const loginsExemptFromOrgCheck = ['issuebridge'];
 
-main().catch((error: Error): void => {
-  console.error(error);
-  process.exit(1);
-});
+type Core = Pick<typeof actionsCore, 'error' | 'setFailed'>;
+type Context = typeof actionsGithub.context;
+type Octokit = InstanceType<typeof GitHub>;
 
-async function main(): Promise<void> {
-  // "GITHUB_TOKEN" is an automatically generated, repository-specific access token provided by GitHub Actions.
-  // We can't use "GITHUB_TOKEN" here, as its permissions don't allow neither to create new labels
-  // nor to retrieve the list of organisations a user belongs to.
-  // In our case, we may want to create "regression-prod-x.y.z" label when it doesn't already exist.
-  // We may also want to retrieve the list of organisations a user belongs to.
-  // As a consequence, we need to create our own "LABEL_TOKEN" with "repo" and "read:org" permissions.
-  // Such a token allows both to create new labels and fetch user's list of organisations.
-  const personalAccessToken = process.env.LABEL_TOKEN;
-  if (!personalAccessToken) {
-    core.setFailed('LABEL_TOKEN not found');
+type MainOptions = {
+  core: Core;
+  context: Context;
+  github: Octokit;
+};
+
+let core: Core;
+let context: Context;
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  runFromCommandLine().catch((error: Error): void => {
+    console.error(error);
     process.exit(1);
-  }
-
-  // Initialise octokit, required to call Github GraphQL API
-  const octokit: InstanceType<typeof GitHub> = getOctokit(personalAccessToken, {
-    previews: ['bane'], // The "bane" preview is required for adding, updating, creating and deleting labels.
   });
+}
+
+export async function main(options: MainOptions): Promise<void> {
+  core = options.core;
+  context = options.context;
+  const octokit = options.github;
 
   // Retrieve labelable object (i.e. a pull request or an issue) info from context
   const labelableRepoOwner = context.repo.owner;
@@ -263,6 +270,34 @@ async function main(): Promise<void> {
   }
 }
 
+async function runFromCommandLine(): Promise<void> {
+  // "GITHUB_TOKEN" is an automatically generated, repository-specific access token provided by GitHub Actions.
+  // We can't use "GITHUB_TOKEN" here, as its permissions don't allow neither to create new labels
+  // nor to retrieve the list of organisations a user belongs to.
+  // In our case, we may want to create "regression-prod-x.y.z" label when it doesn't already exist.
+  // We may also want to retrieve the list of organisations a user belongs to.
+  // As a consequence, we need to create our own "LABEL_TOKEN" with "repo" and "read:org" permissions.
+  // Such a token allows both to create new labels and fetch user's list of organisations.
+  const personalAccessToken = process.env.LABEL_TOKEN;
+  if (!personalAccessToken) {
+    console.error('LABEL_TOKEN not found');
+    process.exit(1);
+  }
+
+  const [coreModule, githubModule] = await Promise.all([
+    import('@actions/core'),
+    import('@actions/github'),
+  ]);
+
+  await main({
+    core: coreModule,
+    context: githubModule.context,
+    github: githubModule.getOctokit(personalAccessToken, {
+      previews: ['bane'], // The "bane" preview is required for adding, updating, creating and deleting labels.
+    }),
+  });
+}
+
 // This helper function checks if body matches one of the issue or PR templates ('general-issue.yml' or 'bug-report.yml' or 'pull-request-template.md')
 function extractTemplateTypeFromBody(body: string): TemplateType {
   for (const [templateType, template] of templates) {
@@ -416,21 +451,21 @@ function extractReleaseVersionFromBugReportIssueBody(
 
 // This function adds the "needs-triage" label to the issue if it doesn't have it
 async function addNeedsTriageLabelToIssue(
-  octokit: InstanceType<typeof GitHub>,
+  octokit: Octokit,
   issue: Labelable,
 ): Promise<void> {
   await addLabelToLabelable(octokit, issue, needsTriageLabel);
 }
 // This function adds the "area-Sentry" label to the issue if it doesn't have it
 async function addAreaSentryLabelToIssue(
-  octokit: InstanceType<typeof GitHub>,
+  octokit: Octokit,
   issue: Labelable,
 ): Promise<void> {
   await addLabelToLabelable(octokit, issue, areaSentryLabel);
 }
 // This function adds the correct regression label to the issue, and removes other ones
 async function addRegressionLabelToIssue(
-  octokit: InstanceType<typeof GitHub>,
+  octokit: Octokit,
   issue: Labelable,
 ): Promise<void> {
   // Extract regression stage from bug report issue body (if existing)
@@ -484,7 +519,7 @@ async function addRegressionLabelToIssue(
 
 // This function checks if user belongs to MetaMask organization on Github
 async function userBelongsToMetaMaskOrg(
-  octokit: InstanceType<typeof GitHub>,
+  octokit: Octokit,
   username: string,
 ): Promise<boolean> {
   const userBelongsToMetaMaskOrgQuery = `
@@ -555,7 +590,7 @@ function hasChangelogEntry(body: string): boolean {
 
 // This function checks if issue has both team and severity labels and removes needs-triage label if present
 async function checkAndRemoveNeedsTriageIfFullyLabeled(
-  octokit: InstanceType<typeof GitHub>,
+  octokit: Octokit,
   issue: Labelable,
 ): Promise<void> {
   let hasTeamLabel = false;
