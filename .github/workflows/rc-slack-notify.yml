@@ -110,32 +110,24 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.head_sha || github.event.workflow_run.head_sha }}
           sparse-checkout: |
-            .nvmrc
             .github/scripts/slack-rc-notification.mts
             development/metamaskbot-build-announce/build-links.ts
             package.json
             CHANGELOG.md
           sparse-checkout-cone-mode: false
 
-      - name: Set up Node.js
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-
       - name: Install Slack notification dependency
         if: >-
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
-        run: npm install --prefix .github/scripts --no-save --ignore-scripts --no-audit --no-fund --package-lock=false @metamask/auto-changelog@5.3.1
+        run: npm install --prefix .github/scripts --no-save --ignore-scripts --no-audit --no-fund --no-update-notifier --package-lock=false @metamask/auto-changelog@5.3.1
 
       - name: Post RC Slack notification
         if: >-
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
         continue-on-error: true
+        uses: actions/github-script@v9
         env:
           SEMVER: ${{ steps.notif.outputs.semver }}
           GITHUB_RUN_ID: ${{ steps.notif.outputs.run_id }}
@@ -148,4 +140,16 @@ jobs:
           PR_NUMBER: ${{ steps.gate.outputs.pr_number || '' }}
           # build-links.ts is a shared TypeScript helper; keep Node's typeless .ts warning out of the Actions log.
           NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
-        run: node ./.github/scripts/slack-rc-notification.mts
+        with:
+          script: |
+            const { join } = await import('node:path');
+            const { pathToFileURL } = await import('node:url');
+            const scriptPath = join(
+              process.env.GITHUB_WORKSPACE,
+              '.github/scripts/slack-rc-notification.mts',
+            );
+            const { main } = await import(pathToFileURL(scriptPath).href);
+
+            await main().catch((error) => {
+              console.error('⚠️ Unexpected error (non-critical):', error);
+            });

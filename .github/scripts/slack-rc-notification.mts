@@ -26,7 +26,7 @@
 
 import { readFileSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { parseChangelog } from '@metamask/auto-changelog';
 import {
   getBuildLinks,
@@ -445,7 +445,7 @@ function getChannelOverride(): string | undefined {
   return raw || undefined;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const dryRun = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 
   const semver = process.env.SEMVER;
@@ -570,6 +570,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
+function handleUnexpectedError(error: unknown): void {
   console.error('⚠️ Unexpected error (non-critical):', error);
-});
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(handleUnexpectedError);
+}
