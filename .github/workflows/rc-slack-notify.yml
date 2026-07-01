@@ -102,19 +102,29 @@ jobs:
             echo "semver=${GATE_SEMVER}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout Slack notification inputs
+      - name: Checkout Slack notification tooling from default branch
         if: >-
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.head_sha || github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.repository.default_branch }}
           sparse-checkout: |
             .github/scripts/slack-rc-notification.mts
             development/metamaskbot-build-announce/build-links.ts
-            package.json
-            CHANGELOG.md
           sparse-checkout-cone-mode: false
+
+      - name: Checkout release notification inputs from release branch
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'workflow_run' && steps.gate.outputs.skip == 'false')
+        env:
+          HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.head_sha || github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "${HEAD_SHA}"
+          git show "${HEAD_SHA}:package.json" > package.json
+          git show "${HEAD_SHA}:CHANGELOG.md" > CHANGELOG.md
 
       - name: Install Slack notification dependency
         if: >-
