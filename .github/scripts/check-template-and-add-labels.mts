@@ -86,10 +86,13 @@ export async function main({
 
   // If author is not part of the MetaMask organisation, add external contributor label.
   // Skip org check for loginsExemptFromOrgCheck (e.g. issuebridge): GraphQL user(login) does not resolve apps, and we treat them as internal.
+  // Repositories outside the MetaMask org cannot read MetaMask org membership,
+  // so they set SKIP_ORG_MEMBERSHIP_CHECK and intentionally label authors as external.
   if (
     !knownBots.includes(labelable?.author) &&
     !loginsExemptFromOrgCheck.includes(labelable?.author) &&
-    !(await userBelongsToMetaMaskOrg(octokit, labelable?.author))
+    (process.env.SKIP_ORG_MEMBERSHIP_CHECK === 'true' ||
+      !(await userBelongsToMetaMaskOrg(octokit, labelable?.author)))
   ) {
     await addLabelToLabelable(octokit, labelable, externalContributorLabel);
   }
