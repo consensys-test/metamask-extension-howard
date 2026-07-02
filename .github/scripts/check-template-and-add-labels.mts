@@ -92,7 +92,6 @@ export async function main({
     !(await userBelongsToMetaMaskOrg(octokit, labelable?.author))
   ) {
     await addLabelToLabelable(octokit, labelable, externalContributorLabel);
-    addLabelToCachedLabelable(labelable, externalContributorLabel);
   }
 
   // Check if labelable's body matches one of the issue or PR templates ('general-issue.yml' or 'bug-report.yml' or 'pull-request-template.md').
@@ -269,20 +268,6 @@ function extractTemplateTypeFromBody(body: string): TemplateType {
   }
 
   return TemplateType.None;
-}
-
-function addLabelToCachedLabelable(labelable: Labelable, label: Label): void {
-  if (labelable.labels?.some(({ name }) => name === label.name)) {
-    return;
-  }
-
-  labelable.labels = [
-    ...(labelable.labels ?? []),
-    {
-      id: '',
-      name: label.name,
-    },
-  ];
 }
 
 function shouldCheckPullRequestLabels(
