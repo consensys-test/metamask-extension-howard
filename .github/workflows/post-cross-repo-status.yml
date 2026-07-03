@@ -1,29 +1,35 @@
-# Posts the required "All jobs pass" commit status for cross-repo (fork) PRs.
+# Posts the required "All jobs pass" commit status for cross-repo PRs.
+#
+# Two distinct concepts (see PR #42187 — don't conflate them):
+#   - CROSS-REPO PR: the PR's HEAD lives in a different repo than the base
+#     (head.repo.full_name != github.repository). GitHub treats these as
+#     untrusted and hands the pull_request workflow a READ-ONLY token,
+#     regardless of the `permissions:` block. This is the case we handle.
+#   - FORK: the current repo itself is a fork of upstream
+#     (github.event.repository.fork). Not relevant to this workflow.
 #
 # Why this workflow exists
 # ------------------------
-# For `pull_request` events raised from a fork, GitHub downgrades the
-# GITHUB_TOKEN to read-only regardless of the `permissions:` block. That
-# means main.yml's `ci-status-gate` job can compute the result but CANNOT
-# call `createCommitStatus` — so its "Post commit status" step is guarded
-# off for cross-repo PRs (it would throw "Resource not accessible by
-# integration").
+# Because cross-repo PRs get a read-only token, main.yml's `ci-status-gate`
+# job can compute the result but CANNOT call `createCommitStatus` — its
+# "Post commit status" step is guarded off for cross-repo PRs (it would
+# throw "Resource not accessible by integration").
 #
 # The consequence: the branch-protection-required "All jobs pass" status
-# is never posted for fork PRs, so it stays pending forever and the PR can
-# never be merged.
+# is never posted for cross-repo PRs, so it stays pending forever and the
+# PR can never be merged.
 #
 # `workflow_run` runs in the BASE repo context with a full-access token
 # (the same reason triage-and-retry-system.yml can call `gh run rerun`),
-# so it CAN post commit statuses even for fork PRs. This workflow fires
-# when "Main" completes for a cross-repo PR and mirrors main.yml's
+# so it CAN post commit statuses even for cross-repo PRs. This workflow
+# fires when "Main" completes for a cross-repo PR and mirrors main.yml's
 # conclusion into the "All jobs pass" commit status.
 #
 # Scope
 # -----
 # - Only cross-repo runs: same-repo PRs and merge_group runs already get
 #   their status posted directly by ci-status-gate.yml.
-# - Only pull_request runs: forks can't open merge_group runs.
+# - Only pull_request runs: a cross-repo HEAD can't open merge_group runs.
 # - Maps the workflow_run conclusion to a commit status state:
 #     success            -> success
 #     failure / timed_out / anything else -> failure
@@ -31,7 +37,7 @@
 #   Skipped/neutral shouldn't occur for a whole workflow_run, so they are
 #   treated as failure to stay safe (never leave the check green by mistake).
 
-name: Post fork commit status
+name: Post cross-repo commit status
 
 on:
   workflow_run:
@@ -43,7 +49,7 @@ permissions:
 
 jobs:
   post-status:
-    name: Post "All jobs pass" status for fork PRs
+    name: Post "All jobs pass" status for cross-repo PRs
     # Only cross-repo pull_request runs need this rescue. Same-repo PRs and
     # merge_group runs get their status from ci-status-gate.yml directly.
     if: >-
