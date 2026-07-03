@@ -66,6 +66,31 @@ jobs:
       CONCLUSION: ${{ github.event.workflow_run.conclusion }}
       RUN_ID: ${{ github.event.workflow_run.id }}
     steps:
+      # TEMPORARY DEBUG — remove before the real upstream PR.
+      # Dumps the workflow_run context fields this workflow relies on so we can
+      # confirm, from a live cross-repo run, that:
+      #   - head_repository / repository are populated (the `if` guard depends
+      #     on head_repository.full_name being non-empty)
+      #   - head_sha is the PR head commit we want to attach the status to
+      #   - conclusion is a value our success/failure mapping handles
+      - name: Debug workflow_run context
+        env:
+          DBG_EVENT: ${{ github.event.workflow_run.event }}
+          DBG_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          DBG_BASE_REPO: ${{ github.event.workflow_run.repository.full_name }}
+          DBG_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          echo "event:           '$DBG_EVENT'"
+          echo "head_repository: '$DBG_HEAD_REPO'"
+          echo "repository:      '$DBG_BASE_REPO'"
+          echo "head_branch:     '$DBG_HEAD_BRANCH'"
+          echo "head_sha:        '$HEAD_SHA'"
+          echo "conclusion:      '$CONCLUSION'"
+          echo "run_id:          '$RUN_ID'"
+          if [[ -z "$DBG_HEAD_REPO" ]]; then
+            echo "::warning::head_repository.full_name is EMPTY — the cross-repo guard matched via empty != base. Verify this is actually a cross-repo run."
+          fi
+
       - name: Post commit status
         run: |
           if [[ "$CONCLUSION" == "success" ]]; then
