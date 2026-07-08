@@ -27,8 +27,9 @@ jobs:
 
       - name: Get access token
         id: label-token
-        # pull_request_target runs can include fork PRs. This token is used only
-        # by trusted workflow-repository scripts checked out above.
+        # pull_request_target runs can include fork PRs. This token is safe here
+        # because we only checkout and run trusted workflow-repository scripts,
+        # never code from the PR branch.
         uses: MetaMask/github-tools/.github/actions/get-token@v1
         with:
           token-exchange-url: ${{ vars.TOKEN_EXCHANGE_URL }}
