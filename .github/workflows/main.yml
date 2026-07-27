@@ -118,7 +118,7 @@ jobs:
                 ;;
               transient)
                 echo "Synthetic retryable failure for Phase 2 validation (attempt $GITHUB_RUN_ATTEMPT)."
-                echo "ETIMEDOUT"
+                printf '%s%s\n' 'ETIM' 'EDOUT'
                 ;;
               *)
                 echo "Unsupported Phase 2 failureType: $FAILURE_TYPE" >&2
