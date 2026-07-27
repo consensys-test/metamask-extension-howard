@@ -87,6 +87,20 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Check Phase 2 retry-budget test override
+        id: phase2-retry-budget-test
+        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        run: |
+          CONFIG=.github/test/phase2-retry-budget.json
+          if [[ ! -f "$CONFIG" ]]; then
+            exit 0
+          fi
+
+          if [[ "$(jq -r '.skipEverything' "$CONFIG")" == "true" ]]; then
+            echo "skip-everything=true" >> "$GITHUB_OUTPUT"
+            echo "Phase 2 retry-budget test override enabled."
+          fi
+
       - name: Fetch HEAD commit for message checks
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
         run: git fetch --depth=1 origin "${HEAD_COMMIT_HASH}"
@@ -550,6 +564,7 @@ jobs:
           ${{
             env.IS_RUN_EVERYTHING_BRANCH == 'false' && (
               steps.check-skip-merge-queue.outputs.up-to-date == 'true' ||
+              steps.phase2-retry-budget-test.outputs.skip-everything == 'true' ||
               steps.set-needs-locales.outputs.needs-locales == 'true' ||
               steps.set-just-repository-health-checks.outputs.just-repository-health-checks == 'true' ||
               steps.set-just-package-json-version.outputs.just-package-json-version == 'true'

@@ -90,6 +90,33 @@ jobs:
       - get-requirements
     uses: MetaMask/github-tools/.github/workflows/lint-workflows.yml@v1
 
+  phase2-retry-budget-test:
+    name: build-phase2-retry-budget-test
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'phase2-retry-test-'))
+    needs:
+      - get-requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run configured retry-budget failure
+        run: |
+          CONFIG=.github/test/phase2-retry-budget.json
+          if [[ ! -f "$CONFIG" ]]; then
+            echo "No Phase 2 retry-budget test configuration; skipping."
+            exit 0
+          fi
+
+          FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt' "$CONFIG")
+          if (( GITHUB_RUN_ATTEMPT <= FAIL_THROUGH_ATTEMPT )); then
+            echo "Synthetic retryable failure for Phase 2 validation (attempt $GITHUB_RUN_ATTEMPT)."
+            echo "ETIMEDOUT"
+            exit 1
+          fi
+
+          echo "Synthetic Phase 2 retry-budget test passes on attempt $GITHUB_RUN_ATTEMPT."
+
   test-lint:
     name: Test lint
     if: ${{ needs.get-requirements.outputs.needs-lint == 'true' }}
@@ -570,6 +597,7 @@ jobs:
       - locales-changed-only
       - prep-deps
       - lint-workflows
+      - phase2-retry-budget-test
       - test-lint
       - repository-health-checks
       - test-storybook
