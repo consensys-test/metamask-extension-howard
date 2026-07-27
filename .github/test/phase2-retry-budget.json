@@ -1,4 +1,5 @@
 {
   "failThroughAttempt": 1,
-  "skipEverything": true
+  "skipEverything": true,
+  "scenario": "automatic-retry-preserves-retry-ci"
 }
