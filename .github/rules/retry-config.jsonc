@@ -104,6 +104,7 @@
     "OOMKilled", // Linux OOM killer terminated the process
     "re-run this check after the baseline refresh completes", // yarn-audit-diff: ambient CVEs triggered a baseline refresh
     "read ECONNRESET", // TCP read failure (more specific than ECONNRESET alone)
+    "Recv failure: Connection reset by peer", // curl TLS connection reset while downloading workflow metadata
     "resource temporarily unavailable", // file descriptor / process limit exhaustion
     "socket hang up", // HTTP connection dropped mid-request
     "sonarcloud\\.io.*failed with HTTP \\d+", // SonarScanner CLI hitting api/scanner.sonarcloud.io with 4xx/5xx (JRE metadata or JRE binary download)
