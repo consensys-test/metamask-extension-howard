@@ -1,5 +1,6 @@
 {
-  "failThroughAttempt": 4,
+  "failThroughAttempt": 1,
+  "failureType": "deterministic",
   "skipEverything": true,
-  "scenario": "terminal-attempt-four-with-retry-ci"
+  "scenario": "non-retryable-attempt-one-with-retry-ci"
 }
