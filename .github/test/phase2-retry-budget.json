@@ -1,5 +1,5 @@
 {
-  "failThroughAttempt": 2,
+  "failThroughAttempt": 3,
   "skipEverything": true,
-  "scenario": "retry-ci-funds-attempt-two-rerun"
+  "scenario": "retry-ci-funds-attempt-three-rerun"
 }
