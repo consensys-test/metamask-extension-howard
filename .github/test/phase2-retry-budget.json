@@ -1,6 +1,6 @@
 {
   "failThroughAttempt": 1,
-  "failureType": "deterministic",
+  "failureType": "transient",
   "skipEverything": true,
-  "scenario": "non-retryable-attempt-one-with-retry-ci"
+  "scenario": "merge-queue-automatic-retry-and-successful-resolution"
 }
