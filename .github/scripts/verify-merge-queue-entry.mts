@@ -35,6 +35,7 @@ if (!owner || !repository) {
 const scenario13Config = existsSync(SCENARIO13_CONFIG_PATH)
   ? (JSON.parse(readFileSync(SCENARIO13_CONFIG_PATH, 'utf8')) as {
       failFirstLookupForPr?: string;
+      failAllLookupsForPr?: string;
     })
   : undefined;
 let queueEntryLookupAttempts = 0;
@@ -61,6 +62,12 @@ const verification = await verifyMergeQueueRetry({
     console.log(
       `Merge queue entry lookup attempt ${queueEntryLookupAttempts} for PR #${PR_NUMBER}.`,
     );
+    if (scenario13Config?.failAllLookupsForPr === PR_NUMBER) {
+      console.warn(
+        'Scenario 14: simulating the configured merge queue lookup failure.',
+      );
+      throw new Error('Scenario 14 simulated merge queue lookup failure');
+    }
     if (
       scenario13Config?.failFirstLookupForPr === PR_NUMBER &&
       queueEntryLookupAttempts === 1
