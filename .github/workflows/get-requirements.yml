@@ -309,6 +309,7 @@ jobs:
           ${{
             env.IS_RUN_EVERYTHING_BRANCH != 'true' &&
             !startsWith(env.BRANCH, 'release/') &&
+            steps.compute-build-hash.outputs.build-hash &&
             steps.check-skip-merge-queue.outputs.up-to-date != 'true' &&
             steps.build-overrides.outputs.force != 'true'
           }}
