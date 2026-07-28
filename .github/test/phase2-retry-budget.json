@@ -1,6 +1,6 @@
 {
-  "failThroughAttempt": 1,
+  "failThroughAttempt": 2,
   "failureType": "transient",
   "skipEverything": true,
-  "scenario": "merge-queue-automatic-retry-and-successful-resolution"
+  "scenario": "merge-queue-terminal-attempt-two-without-retry-ci"
 }
