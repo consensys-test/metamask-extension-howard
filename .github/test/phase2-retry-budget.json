@@ -6,6 +6,7 @@
     "failThroughAttempt": 1,
     "failureType": "transient"
   },
+  "skipBuildHash": true,
   "skipEverything": true,
-  "scenario": "scenario-13-transient-merge-queue-verification"
+  "scenario": "scenario-15-missing-reusable-build-hash"
 }

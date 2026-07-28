@@ -181,6 +181,19 @@ jobs:
 
             core.info('-> no E2E overrides found');
 
+      - name: Check Phase 2 build-hash test override
+        id: phase2-build-hash-test
+        run: |
+          CONFIG=.github/test/phase2-retry-budget.json
+          if [[ ! -f "$CONFIG" ]]; then
+            exit 0
+          fi
+
+          if [[ "$(jq -r '.skipBuildHash' "$CONFIG")" == "true" ]]; then
+            echo "skip-build-hash=true" >> "$GITHUB_OUTPUT"
+            echo "Phase 2 build-hash test override enabled."
+          fi
+
       # Compute a content hash of all build-affecting source files.
       # Used to detect when builds can be reused from a prior run.
       # IMPORTANT: We hash from GITHUB_SHA (the merge commit for PRs, the
@@ -193,7 +206,7 @@ jobs:
       # added, it is automatically included (worst case: unnecessary rebuild).
       - name: Compute build-source hash
         id: compute-build-hash
-        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' && steps.phase2-build-hash-test.outputs.skip-build-hash != 'true' }}
         uses: actions/github-script@v8
         with:
           script: |
