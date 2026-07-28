@@ -3,9 +3,9 @@
     "failThroughAttempt": 0
   },
   "mergeGroup": {
-    "failThroughAttempt": 1,
-    "failureType": "deterministic"
+    "failThroughAttempt": 4,
+    "failureType": "transient"
   },
   "skipEverything": true,
-  "scenario": "merge-queue-non-retryable-attempt-one"
+  "scenario": "merge-queue-hard-cap-attempt-four-with-retry-ci"
 }
