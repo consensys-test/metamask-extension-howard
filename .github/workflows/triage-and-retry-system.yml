@@ -148,6 +148,8 @@ jobs:
 
       - name: Verify current merge queue entry
         id: verify-queue-entry
+        # The verifier posts a terminal failure status for stale or
+        # unverified entries; the retry step runs only for current entries.
         if: >-
           ${{
             steps.classify.outputs.will-retry == 'true'

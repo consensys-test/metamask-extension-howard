@@ -56,6 +56,7 @@ export async function verifyMergeQueueRetry({
     return entryVerification;
   }
 
+  // The queue ref can disappear after the entry lookup, so check it last.
   return (await refExists())
     ? entryVerification
     : { state: 'stale', headSha: entryVerification.headSha };
