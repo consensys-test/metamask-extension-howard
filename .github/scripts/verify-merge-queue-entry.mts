@@ -8,7 +8,7 @@
  * so the merge queue can eject rather than remaining pending.
  */
 
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 import { verifyMergeQueueRetry } from './shared/merge-queue-entry.mts';
@@ -18,6 +18,8 @@ const PR_NUMBER = process.env.PR_NUMBER ?? '';
 const HEAD_SHA = process.env.HEAD_SHA ?? '';
 const HEAD_BRANCH = process.env.HEAD_BRANCH ?? '';
 const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT ?? '';
+const SCENARIO13_CONFIG_PATH =
+  '.github/test/scenario13-merge-queue-verification.json';
 
 // These values describe the original failed workflow run, not the triage
 // workflow. They are provided by triage-and-retry-system.yml.
@@ -29,6 +31,13 @@ const [owner, repository] = REPO.split('/');
 if (!owner || !repository) {
   throw new Error(`Invalid repository: ${REPO}`);
 }
+
+const scenario13Config = existsSync(SCENARIO13_CONFIG_PATH)
+  ? (JSON.parse(readFileSync(SCENARIO13_CONFIG_PATH, 'utf8')) as {
+      failFirstLookupForPr?: string;
+    })
+  : undefined;
+let queueEntryLookupAttempts = 0;
 
 // The entry's head commit is more precise than checking merely whether the PR
 // has some queue entry: GitHub may have rebuilt the entry on a newer SHA while
@@ -48,6 +57,14 @@ const query = `query($owner: String!, $repository: String!, $prNumber: Int!) {
 const verification = await verifyMergeQueueRetry({
   expectedHeadSha: HEAD_SHA,
   getHeadSha: async () => {
+    queueEntryLookupAttempts += 1;
+    if (
+      scenario13Config?.failFirstLookupForPr === PR_NUMBER &&
+      queueEntryLookupAttempts === 1
+    ) {
+      throw new Error('Scenario 13 simulated merge queue lookup failure');
+    }
+
     // GraphQL/CLI failures throw and are retried by verifyMergeQueueEntry.
     // A valid response with no entry intentionally returns null instead, which
     // is a confirmed stale result rather than an API failure.
