@@ -7,5 +7,5 @@
     "failureType": "transient"
   },
   "skipEverything": true,
-  "scenario": "merge-queue-terminal-attempt-two-without-retry-ci"
+  "scenario": "merge-queue-label-escalation-attempt-two"
 }
