@@ -1,0 +1,11 @@
+{
+  "pullRequest": {
+    "failThroughAttempt": 0
+  },
+  "mergeGroup": {
+    "failThroughAttempt": 1,
+    "failureType": "transient"
+  },
+  "skipEverything": true,
+  "scenario": "scenario-13-transient-merge-queue-verification"
+}
