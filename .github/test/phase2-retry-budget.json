@@ -3,10 +3,9 @@
     "failThroughAttempt": 0
   },
   "mergeGroup": {
-    "failThroughAttempt": 2,
-    "failureType": "transient",
-    "forceLabelLookupFailureAtAttempt": 2
+    "failThroughAttempt": 1,
+    "failureType": "transient"
   },
   "skipEverything": true,
-  "scenario": "merge-queue-label-lookup-failure-attempt-two"
+  "scenario": "merge-queue-cancelled-retry-attempt-two"
 }
