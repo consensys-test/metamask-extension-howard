@@ -7,5 +7,5 @@
     "failureType": "transient"
   },
   "skipEverything": true,
-  "scenario": "merge-queue-cancelled-retry-attempt-two"
+  "scenario": "merge-queue-manual-dequeue-attempt-one"
 }
