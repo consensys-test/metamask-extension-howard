@@ -58,10 +58,16 @@ const verification = await verifyMergeQueueRetry({
   expectedHeadSha: HEAD_SHA,
   getHeadSha: async () => {
     queueEntryLookupAttempts += 1;
+    console.log(
+      `Merge queue entry lookup attempt ${queueEntryLookupAttempts} for PR #${PR_NUMBER}.`,
+    );
     if (
       scenario13Config?.failFirstLookupForPr === PR_NUMBER &&
       queueEntryLookupAttempts === 1
     ) {
+      console.warn(
+        'Scenario 13: simulating the configured first merge queue lookup failure.',
+      );
       throw new Error('Scenario 13 simulated merge queue lookup failure');
     }
 
@@ -102,10 +108,15 @@ const verification = await verifyMergeQueueRetry({
       throw new Error(response.errors.map(({ message }) => message).join('; '));
     }
 
-    return (
+    const queueEntryHeadSha =
       response.data?.repository?.pullRequest?.mergeQueueEntry?.headCommit?.oid ??
-      null
+      null;
+    console.log(
+      queueEntryHeadSha
+        ? `Merge queue entry lookup attempt ${queueEntryLookupAttempts} returned ${queueEntryHeadSha}.`
+        : `Merge queue entry lookup attempt ${queueEntryLookupAttempts} returned no queue entry.`,
     );
+    return queueEntryHeadSha;
   },
   refExists: async () => {
     try {
@@ -114,8 +125,10 @@ const verification = await verifyMergeQueueRetry({
       execFileSync('gh', ['api', `repos/${REPO}/git/ref/heads/${HEAD_BRANCH}`], {
         stdio: 'ignore',
       });
+      console.log(`Merge queue ref ${HEAD_BRANCH} still exists.`);
       return true;
     } catch {
+      console.warn(`Merge queue ref ${HEAD_BRANCH} no longer exists.`);
       return false;
     }
   },
