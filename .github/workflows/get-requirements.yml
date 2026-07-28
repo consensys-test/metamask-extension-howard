@@ -87,13 +87,16 @@ jobs:
         uses: MetaMask/github-tools/.github/actions/check-skip-merge-queue@v1
 
       - uses: actions/checkout@v6
-        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        if: >-
+          ${{
+            steps.check-skip-merge-queue.outputs.up-to-date != 'true'
+            || env.EVENT_NAME == 'merge_group'
+          }}
         with:
           fetch-depth: 1
 
       - name: Check Phase 2 retry-budget test override
         id: phase2-retry-budget-test
-        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
         run: |
           CONFIG=.github/test/phase2-retry-budget.json
           if [[ ! -f "$CONFIG" ]]; then
