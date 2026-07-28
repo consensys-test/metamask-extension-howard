@@ -3,9 +3,10 @@
     "failThroughAttempt": 0
   },
   "mergeGroup": {
-    "failThroughAttempt": 4,
-    "failureType": "transient"
+    "failThroughAttempt": 2,
+    "failureType": "transient",
+    "forceLabelLookupFailureAtAttempt": 2
   },
   "skipEverything": true,
-  "scenario": "merge-queue-hard-cap-attempt-four-with-retry-ci"
+  "scenario": "merge-queue-label-lookup-failure-attempt-two"
 }
