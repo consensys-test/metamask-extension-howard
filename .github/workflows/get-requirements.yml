@@ -21,6 +21,9 @@ on:
       skip-everything:
         description: Whether everything should be skipped
         value: ${{ jobs.detect-changes.outputs.skip-everything }}
+      phase2-force-label-lookup-failure-attempt:
+        description: Test-only merge-group attempt that simulates a retry-ci label lookup failure
+        value: ${{ jobs.detect-changes.outputs.phase2-force-label-lookup-failure-attempt }}
       needs-lint:
         description: Whether lint job is needed
         value: ${{ jobs.detect-changes.outputs.needs-lint }}
@@ -70,6 +73,7 @@ jobs:
       needs-locales: ${{ steps.set-needs-locales.outputs.needs-locales || 'false' }}
       just-repository-health-checks: ${{ steps.set-just-repository-health-checks.outputs.just-repository-health-checks || 'false' }}
       skip-everything: ${{ steps.set-skip-everything.outputs.skip-everything || 'false' }}
+      phase2-force-label-lookup-failure-attempt: ${{ steps.phase2-retry-budget-test.outputs.force-label-lookup-failure-attempt || '' }}
       needs-lint: ${{ steps.set-needs-lint.outputs.needs-lint || 'false' }}
       needs-unit-and-integration: ${{ steps.set-needs-unit-and-integration.outputs.needs-unit-and-integration || 'false' }}
       needs-storybook: ${{ steps.set-needs-storybook.outputs.needs-storybook || 'false' }}
@@ -100,6 +104,7 @@ jobs:
             echo "skip-everything=true" >> "$GITHUB_OUTPUT"
             echo "Phase 2 retry-budget test override enabled."
           fi
+          echo "force-label-lookup-failure-attempt=$(jq -r '.mergeGroup.forceLabelLookupFailureAtAttempt // ""' "$CONFIG")" >> "$GITHUB_OUTPUT"
 
       - name: Fetch HEAD commit for message checks
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}

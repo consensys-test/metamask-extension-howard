@@ -644,4 +644,5 @@ jobs:
     with:
       needs-json: ${{ toJson(needs) }}
       skip-builds: ${{ needs.get-requirements.outputs.skip-builds }}
+      phase2-force-label-lookup-failure-attempt: ${{ needs.get-requirements.outputs.phase2-force-label-lookup-failure-attempt }}
     secrets: inherit
