@@ -1,7 +1,10 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { verifyMergeQueueEntry } from './merge-queue-entry.mts';
+import {
+  verifyMergeQueueEntry,
+  verifyMergeQueueRetry,
+} from './merge-queue-entry.mts';
 
 describe('verifyMergeQueueEntry', () => {
   it('returns current when the queue entry matches the failed run SHA', async () => {
@@ -77,5 +80,40 @@ describe('verifyMergeQueueEntry', () => {
 
     assert.deepStrictEqual(result, { state: 'unverified' });
     assert.strictEqual(calls, 3);
+  });
+});
+
+describe('verifyMergeQueueRetry', () => {
+  it('returns stale when the queue ref disappears after entry verification', async () => {
+    const result = await verifyMergeQueueRetry({
+      expectedHeadSha: 'current-sha',
+      getHeadSha: async () => 'current-sha',
+      refExists: async () => false,
+      sleep: async () => undefined,
+    });
+
+    assert.deepStrictEqual(result, {
+      state: 'stale',
+      headSha: 'current-sha',
+    });
+  });
+
+  it('does not check the queue ref when the entry is stale', async () => {
+    let refChecks = 0;
+    const result = await verifyMergeQueueRetry({
+      expectedHeadSha: 'current-sha',
+      getHeadSha: async () => 'replacement-sha',
+      refExists: async () => {
+        refChecks += 1;
+        return true;
+      },
+      sleep: async () => undefined,
+    });
+
+    assert.deepStrictEqual(result, {
+      state: 'stale',
+      headSha: 'replacement-sha',
+    });
+    assert.strictEqual(refChecks, 0);
   });
 });

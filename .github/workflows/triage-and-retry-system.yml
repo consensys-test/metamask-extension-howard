@@ -166,44 +166,17 @@ jobs:
       # was attempted but didn't go through.
       - name: Retry (if retry budget available)
         id: retry
-        if: ${{ steps.classify.outputs.will-retry == 'true' }}
+        if: >-
+          ${{
+            steps.classify.outputs.will-retry == 'true'
+            && (
+              env.WORKFLOW_EVENT != 'merge_group'
+              || steps.verify-queue-entry.outputs.state == 'current'
+            )
+          }}
         run: |
           PR="${{ steps.classify.outputs.pr-number }}"
           CONSUME_RETRY_LABEL="${{ steps.classify.outputs.consume-retry-label }}"
-
-          if [[ "$WORKFLOW_EVENT" == "merge_group" ]]; then
-            QUEUE_ENTRY_STATE="${{ steps.verify-queue-entry.outputs.state }}"
-            FAILURE_DESCRIPTION=''
-
-            case "$QUEUE_ENTRY_STATE" in
-              current)
-                # The ref can disappear after the GraphQL lookup, so verify it
-                # immediately before rerunning the failed workflow.
-                if ! gh api "repos/$REPO/git/ref/heads/$HEAD_BRANCH" >/dev/null 2>&1; then
-                  FAILURE_DESCRIPTION='Merge queue entry was replaced — skipping retry'
-                fi
-                ;;
-              stale)
-                FAILURE_DESCRIPTION='Merge queue entry was replaced — skipping retry'
-                ;;
-              unverified)
-                FAILURE_DESCRIPTION='Could not verify merge queue entry — skipping retry'
-                ;;
-              *)
-                FAILURE_DESCRIPTION='Merge queue entry verification did not run — skipping retry'
-                ;;
-            esac
-
-            if [[ -n "$FAILURE_DESCRIPTION" ]]; then
-              echo "::warning::$FAILURE_DESCRIPTION"
-              gh api "repos/$REPO/statuses/$HEAD_SHA" \
-                --method POST \
-                -f state=failure \
-                -f context="All jobs pass" \
-                -f description="$FAILURE_DESCRIPTION"
-              exit 0
-            fi
-          fi
 
           echo "Rerunning failed jobs..."
           gh run rerun "$MAIN_RUN_ID" --failed --repo "$REPO"

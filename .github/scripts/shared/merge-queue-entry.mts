@@ -12,6 +12,11 @@ export interface VerifyMergeQueueEntryOptions {
   sleep?: (milliseconds: number) => Promise<void>;
 }
 
+export interface VerifyMergeQueueRetryOptions
+  extends VerifyMergeQueueEntryOptions {
+  refExists: () => Promise<boolean>;
+}
+
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 function defaultSleep(milliseconds: number): Promise<void> {
@@ -40,4 +45,18 @@ export async function verifyMergeQueueEntry({
   }
 
   return { state: 'unverified' };
+}
+
+export async function verifyMergeQueueRetry({
+  refExists,
+  ...entryOptions
+}: VerifyMergeQueueRetryOptions): Promise<MergeQueueEntryVerification> {
+  const entryVerification = await verifyMergeQueueEntry(entryOptions);
+  if (entryVerification.state !== 'current') {
+    return entryVerification;
+  }
+
+  return (await refExists())
+    ? entryVerification
+    : { state: 'stale', headSha: entryVerification.headSha };
 }
