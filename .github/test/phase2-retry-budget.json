@@ -3,9 +3,9 @@
     "failThroughAttempt": 0
   },
   "mergeGroup": {
-    "failThroughAttempt": 2,
+    "failThroughAttempt": 3,
     "failureType": "transient"
   },
   "skipEverything": true,
-  "scenario": "merge-queue-label-escalation-attempt-two"
+  "scenario": "merge-queue-label-escalation-attempts-two-and-three"
 }
