@@ -1,6 +1,11 @@
 {
-  "failThroughAttempt": 2,
-  "failureType": "transient",
+  "pullRequest": {
+    "failThroughAttempt": 0
+  },
+  "mergeGroup": {
+    "failThroughAttempt": 2,
+    "failureType": "transient"
+  },
   "skipEverything": true,
   "scenario": "merge-queue-terminal-attempt-two-without-retry-ci"
 }

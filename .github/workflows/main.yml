@@ -108,8 +108,14 @@ jobs:
             exit 0
           fi
 
-          FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt' "$CONFIG")
-          FAILURE_TYPE=$(jq -r '.failureType // "transient"' "$CONFIG")
+          if [[ "$GITHUB_EVENT_NAME" == 'merge_group' ]]; then
+            EVENT_CONFIG='.mergeGroup'
+          else
+            EVENT_CONFIG='.pullRequest'
+          fi
+
+          FAIL_THROUGH_ATTEMPT=$(jq -r "$EVENT_CONFIG.failThroughAttempt // 0" "$CONFIG")
+          FAILURE_TYPE=$(jq -r "$EVENT_CONFIG.failureType // \"transient\"" "$CONFIG")
           if (( GITHUB_RUN_ATTEMPT <= FAIL_THROUGH_ATTEMPT )); then
             case "$FAILURE_TYPE" in
               deterministic)
