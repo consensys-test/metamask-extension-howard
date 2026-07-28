@@ -1,0 +1,12 @@
+{
+  "pullRequest": {
+    "failThroughAttempt": 0
+  },
+  "mergeGroup": {
+    "failThroughAttempt": 1,
+    "failureType": "transient"
+  },
+  "skipBuildHash": true,
+  "skipEverything": true,
+  "scenario": "scenario-15-missing-reusable-build-hash"
+}
