@@ -150,4 +150,36 @@ describe('getRetryBudget', () => {
     expect(decision.retryMode).toBe('none');
     expect(decision.willRetry).toBe(false);
   });
+
+  it('automatically retries release branch pushes without a PR', () => {
+    const decision = getRetryBudget({
+      attempt: 1,
+      allowAutomaticRetryWithoutPr: true,
+      hasPr: false,
+      hasRetryLabel: false,
+      isRetryable: true,
+    });
+
+    expect(decision.atRetryLimit).toBe(false);
+    expect(decision.consumeRetryLabel).toBe(false);
+    expect(decision.retryLimit).toBe(2);
+    expect(decision.retryLimitSource).toBe('default');
+    expect(decision.retryMode).toBe('automatic');
+    expect(decision.willRetry).toBe(true);
+  });
+
+  it('stops release branch pushes at the automatic retry limit', () => {
+    const decision = getRetryBudget({
+      attempt: 2,
+      allowAutomaticRetryWithoutPr: true,
+      hasPr: false,
+      hasRetryLabel: false,
+      isRetryable: true,
+    });
+
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(2);
+    expect(decision.retryMode).toBe('none');
+    expect(decision.willRetry).toBe(false);
+  });
 });

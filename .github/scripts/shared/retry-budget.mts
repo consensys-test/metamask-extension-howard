@@ -16,6 +16,8 @@ export type RetryLimitSource = 'default' | 'retry-ci';
 export interface RetryBudgetInput {
   /** GitHub Actions run_attempt from the failed Main workflow. */
   attempt: number | string;
+  /** Allow the default retry for selected push events without an originating PR. */
+  allowAutomaticRetryWithoutPr?: boolean;
   /** Whether this run can be associated with an originating PR. */
   hasPr: boolean;
   /** Whether the originating PR currently has the retry-ci label. */
@@ -58,6 +60,7 @@ export function parseAttempt(attempt: number | string): number {
 
 export function getRetryBudget({
   attempt,
+  allowAutomaticRetryWithoutPr = false,
   hasPr,
   hasRetryLabel,
   isRetryable,
@@ -73,12 +76,12 @@ export function getRetryBudget({
   const retryLimitSource: RetryLimitSource = hasRetryLabel || usedRetryCiBudget
     ? 'retry-ci'
     : 'default';
-  // Pushes and other runs without an originating PR are observation-only.
-  // A retry also requires a retryable classification and a current label for
-  // retries beyond the automatic attempt 1 -> 2 transition.
+  // Most runs without an originating PR are observation-only. Selected push
+  // events (currently release branches) can opt into the default attempt 1 ->
+  // 2 retry, but cannot use the PR-label-funded extension.
   const willRetry =
     isRetryable &&
-    hasPr &&
+    (hasPr || allowAutomaticRetryWithoutPr) &&
     attemptNumber < retryLimit &&
     (attemptNumber < DEFAULT_RETRY_MAX_ATTEMPT || hasRetryLabel);
   const retryMode: RetryMode = !willRetry
@@ -91,7 +94,10 @@ export function getRetryBudget({
     attemptNumber,
     // Do not call a non-retryable failure "at limit"; that distinction drives
     // the human-readable classifier report and terminal status description.
-    atRetryLimit: isRetryable && hasPr && attemptNumber >= retryLimit,
+    atRetryLimit:
+      isRetryable &&
+      (hasPr || allowAutomaticRetryWithoutPr) &&
+      attemptNumber >= retryLimit,
     consumeRetryLabel: retryMode === 'label',
     retryLimit,
     retryLimitSource,
