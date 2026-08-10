@@ -61,6 +61,10 @@ import {
   RETRY_CI_LABEL_MAX_ATTEMPT,
   type RetryBudgetDecision,
 } from './shared/retry-budget.mts';
+import {
+  E2E_QUALITY_GATE_FAILURE_MARKER,
+  hasE2eQualityGateFailure,
+} from './shared/e2e-quality-gate.mts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -356,6 +360,19 @@ function classifyJob(job: Job): JobClassification {
   }
 
   if (category === 'alwaysRetryable') {
+    if (hasE2eQualityGateFailure(getJobLogs(jobId))) {
+      return {
+        jobName,
+        jobId,
+        category,
+        jobRetryable: false,
+        reason: 'Changed or new E2E test failed its quality gate',
+        errorSnippet: E2E_QUALITY_GATE_FAILURE_MARKER,
+        unmatched,
+        deterministic: true,
+      };
+    }
+
     return {
       jobName,
       jobId,
@@ -819,9 +836,12 @@ function checkRetryLabel(prNum: string): boolean {
 const prNumber = resolvePrNumber();
 const targetBranch = resolveTargetBranch();
 const hasPR = Boolean(prNumber);
+const isReleasePush =
+  WORKFLOW_EVENT === 'push' && HEAD_BRANCH.startsWith('release/');
 const hasRetryLabel = checkRetryLabel(prNumber);
 const retryBudget = getRetryBudget({
   attempt: ATTEMPT,
+  allowAutomaticRetryWithoutPr: isReleasePush,
   hasPr: hasPR,
   hasRetryLabel,
   isRetryable,
@@ -834,6 +854,7 @@ const willRetry = retryBudget.willRetry;
 //
 //   isRetryable    — did classification determine all failures are retryable?
 //   hasPR          — is there an originating PR? (false for push events)
+//   isReleasePush  — release pushes get the default retry without a PR
 //   retryBudget    — default retries through attempt 2, retry-ci through attempt 4
 //
 // Attempt 1 retries automatically. Attempts 2 and 3 require retry-ci and
@@ -882,6 +903,16 @@ function resolveDecision(
       return {
         key: 'retryable-no-label',
         label: `⏸️ Retryable, but no retry-ci label on PR #${pr}`,
+      };
+    if (budget.willRetry && budget.retryMode === 'automatic')
+      return {
+        key: 'will-retry',
+        label: `♻️ Will retry automatically (default retry budget: attempt ${budget.attemptNumber} of ${DEFAULT_RETRY_MAX_ATTEMPT})`,
+      };
+    if (budget.atRetryLimit)
+      return {
+        key: 'retryable-no-pr',
+        label: `⏸️ Retryable, but the default retry budget ended at attempt ${budget.retryLimit}`,
       };
     return {
       key: 'retryable-no-pr',
