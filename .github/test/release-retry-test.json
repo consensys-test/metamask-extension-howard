@@ -1,0 +1,6 @@
+{
+  "failThroughAttempt": 1,
+  "failureType": "transient",
+  "skipEverything": true,
+  "scenario": "release-attempt-1-automatic-retry"
+}
