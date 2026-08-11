@@ -1,0 +1,6 @@
+{
+  "failThroughAttempt": 1,
+  "failureType": "deterministic",
+  "scenario": "release-non-retryable-failure-is-terminal",
+  "skipEverything": true
+}

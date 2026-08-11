@@ -255,12 +255,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - chore: Set `core-platform` as codeowners of `LegacyBackgroundApiService` (#43625)
 - perf(6557): Memoize swaps default token selector and remove redundant deep/shallow equality in `useTokensToSearch` (#43609)
 - Enabled ERC-7715 requests over the Multichain API and MetaMask Connect (#43513)
+## [999.999.999]
+
+### Changed
+
+- Test RC Slack notification workflow. (#72)
 
 ## [13.37.0]
 
 ### Added
 
-- Display a VIP tag when using a VIP referral code. (#43527)
+- Display a VIP tag when using a VIP referral code! (#43527)
 - Adds `metamask-aep[bot]` to the CLA Signature Bot allowlist in `.github/workflows/cla.yml`. (#43237)
 - Enabled ERC-7715 requests over the Multichain API and MetaMask Connect (#43513)
 - Remove CTA button under notification (#43685)
@@ -2852,6 +2857,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [13.38.2]: https://github.com/MetaMask/metamask-extension/compare/v13.38.1...v13.38.2
 [13.38.1]: https://github.com/MetaMask/metamask-extension/compare/v13.38.0...v13.38.1
 [13.38.0]: https://github.com/MetaMask/metamask-extension/compare/v13.37.0...v13.38.0
+[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v999.999.999...HEAD
+[999.999.999]: https://github.com/MetaMask/metamask-extension/compare/v13.37.0...v999.999.999
 [13.37.0]: https://github.com/MetaMask/metamask-extension/compare/v13.36.0...v13.37.0
 [13.36.0]: https://github.com/MetaMask/metamask-extension/compare/v13.35.1...v13.36.0
 [13.35.1]: https://github.com/MetaMask/metamask-extension/compare/v13.35.0...v13.35.1

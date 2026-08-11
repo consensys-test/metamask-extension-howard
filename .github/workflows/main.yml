@@ -90,6 +90,42 @@ jobs:
       - get-requirements
     uses: MetaMask/github-tools/.github/workflows/lint-workflows.yml@v1
 
+  release-retry-test:
+    name: release-retry-test
+    if: ${{ startsWith(github.ref_name, 'release/') }}
+    needs:
+      - get-requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run configured release failure
+        run: |
+          CONFIG=.github/test/release-retry-test.json
+          FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt // 0' "$CONFIG")
+          FAILURE_TYPE=$(jq -r '.failureType // "transient"' "$CONFIG")
+          if (( GITHUB_RUN_ATTEMPT > FAIL_THROUGH_ATTEMPT )); then
+            echo "Release retry test passes on attempt $GITHUB_RUN_ATTEMPT."
+            exit 0
+          fi
+
+          case "$FAILURE_TYPE" in
+            deterministic)
+              echo "Synthetic deterministic release failure (attempt $GITHUB_RUN_ATTEMPT)."
+              echo 'Working tree dirty'
+              ;;
+            transient)
+              echo "Synthetic retryable release failure (attempt $GITHUB_RUN_ATTEMPT)."
+              printf '%s%s\n' 'ETIM' 'EDOUT'
+              ;;
+            *)
+              echo "Unsupported release retry failureType: $FAILURE_TYPE" >&2
+              exit 2
+              ;;
+          esac
+          exit 1
+
   test-lint:
     name: Test lint
     if: ${{ needs.get-requirements.outputs.needs-lint == 'true' }}
@@ -708,6 +744,7 @@ jobs:
       - locales-changed-only
       - prep-deps
       - lint-workflows
+      - release-retry-test
       - test-lint
       - repository-health-checks
       - test-storybook
