@@ -6,7 +6,6 @@ import yargs from 'yargs/yargs';
 import { loadBuildTypesConfig } from '../../development/lib/build-type.js';
 import { exitWithError } from '../../development/lib/exit-with-error.js';
 import { runInShell } from '../../development/lib/run-command.js';
-import { formatE2eQualityGateFailureMarker } from '../../.github/scripts/shared/e2e-quality-gate.mts';
 import {
   getTestPathsForTestDir,
   runningOnGitHubActions,
@@ -255,14 +254,7 @@ async function main(): Promise<void> {
       const qualityGateArg = isTestChangedOrNew
         ? ['--stop-after-one-failure']
         : [];
-      try {
-        await runInShell('node', [...args, ...qualityGateArg, testFile]);
-      } catch (error) {
-        if (isTestChangedOrNew) {
-          console.error(formatE2eQualityGateFailureMarker(testFile));
-        }
-        throw error;
-      }
+      await runInShell('node', [...args, ...qualityGateArg, testFile]);
     }
   }
 }

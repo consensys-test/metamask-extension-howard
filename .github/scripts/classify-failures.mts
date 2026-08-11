@@ -62,7 +62,7 @@ import {
   type RetryBudgetDecision,
 } from './shared/retry-budget.mts';
 import {
-  E2E_QUALITY_GATE_FAILURE_MARKER,
+  E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE,
   hasE2eQualityGateFailure,
 } from './shared/e2e-quality-gate.mts';
 
@@ -302,9 +302,20 @@ function getFailedJobs(): Job[] {
 
 function getAnnotations(jobId: number): Annotation[] {
   try {
-    return JSON.parse(
-      ghApi(`${repoApi}/check-runs/${jobId}/annotations`),
-    ) as Annotation[];
+    const raw = ghApi(`${repoApi}/check-runs/${jobId}/annotations`, {
+      paginate: true,
+      jq: '.[]',
+    });
+    return raw
+      .split('\n')
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line) as Annotation];
+        } catch {
+          return [];
+        }
+      });
   } catch {
     return [];
   }
@@ -360,14 +371,14 @@ function classifyJob(job: Job): JobClassification {
   }
 
   if (category === 'alwaysRetryable') {
-    if (hasE2eQualityGateFailure(getJobLogs(jobId))) {
+    if (hasE2eQualityGateFailure(getAnnotations(jobId))) {
       return {
         jobName,
         jobId,
         category,
         jobRetryable: false,
         reason: 'Changed or new E2E test failed its quality gate',
-        errorSnippet: E2E_QUALITY_GATE_FAILURE_MARKER,
+        errorSnippet: E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE,
         unmatched,
         deterministic: true,
       };
@@ -836,13 +847,15 @@ function checkRetryLabel(prNum: string): boolean {
 const prNumber = resolvePrNumber();
 const targetBranch = resolveTargetBranch();
 const hasPR = Boolean(prNumber);
-const isReleasePush =
-  WORKFLOW_EVENT === 'push' && HEAD_BRANCH.startsWith('release/');
+const retryContext = hasPR
+  ? 'pr'
+  : WORKFLOW_EVENT === 'push' && HEAD_BRANCH.startsWith('release/')
+    ? 'release-push'
+    : 'observation';
 const hasRetryLabel = checkRetryLabel(prNumber);
 const retryBudget = getRetryBudget({
   attempt: ATTEMPT,
-  allowAutomaticRetryWithoutPr: isReleasePush,
-  hasPr: hasPR,
+  context: retryContext,
   hasRetryLabel,
   isRetryable,
 });
@@ -854,7 +867,7 @@ const willRetry = retryBudget.willRetry;
 //
 //   isRetryable    — did classification determine all failures are retryable?
 //   hasPR          — is there an originating PR? (false for push events)
-//   isReleasePush  — release pushes get the default retry without a PR
+//   retryContext   — PRs and release pushes can retry; other events observe
 //   retryBudget    — default retries through attempt 2, retry-ci through attempt 4
 //
 // Attempt 1 retries automatically. Attempts 2 and 3 require retry-ci and
@@ -931,7 +944,10 @@ function resolveDecision(
     };
   return {
     key: 'not-retryable-no-pr',
-    label: '❌ Non-retryable, no originating PR (observation only)',
+    label:
+      retryContext === 'release-push'
+        ? '❌ Non-retryable release push'
+        : '❌ Non-retryable, no originating PR (observation only)',
   };
 }
 const { key: decision, label: decisionLabel } = resolveDecision(
@@ -942,15 +958,17 @@ const { key: decision, label: decisionLabel } = resolveDecision(
   prNumber,
 );
 
-if (atMaxAttempts && hasPR && isRetryable) {
+if (atMaxAttempts && isRetryable) {
   console.log(
-    `PR #${prNumber}: attempt ${retryBudget.attemptNumber} reached the ${retryBudget.retryLimitSource} retry limit (${retryBudget.retryLimit}) — will not retry`,
+    `${hasPR ? `PR #${prNumber}` : `Release branch ${HEAD_BRANCH}`}: attempt ${retryBudget.attemptNumber} reached the ${retryBudget.retryLimitSource} retry limit (${retryBudget.retryLimit}) — will not retry`,
   );
 } else {
   console.log(
     prNumber
       ? `PR #${prNumber}: retry-ci label ${hasRetryLabel ? 'present' : 'absent'}, retry-mode=${retryBudget.retryMode} → will-retry=${willRetry}`
-      : `No originating PR for event '${WORKFLOW_EVENT}' → will-retry=false`,
+      : retryContext === 'release-push'
+        ? `Release branch ${HEAD_BRANCH}: retry-mode=${retryBudget.retryMode} → will-retry=${willRetry}`
+        : `No originating PR for event '${WORKFLOW_EVENT}' → will-retry=false`,
   );
 }
 

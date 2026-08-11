@@ -18,7 +18,7 @@ describe('getRetryBudget', () => {
     expect(
       getRetryBudget({
         attempt: 1,
-        hasPr: true,
+        context: 'pr',
         hasRetryLabel: false,
         isRetryable: true,
       }),
@@ -37,7 +37,7 @@ describe('getRetryBudget', () => {
   it('does not consume retry-ci when attempt 1 is inside the default budget', () => {
     const decision = getRetryBudget({
       attempt: 1,
-      hasPr: true,
+      context: 'pr',
       hasRetryLabel: true,
       isRetryable: true,
     });
@@ -50,7 +50,7 @@ describe('getRetryBudget', () => {
   it('stops at attempt 2 without retry-ci', () => {
     const decision = getRetryBudget({
       attempt: 2,
-      hasPr: true,
+      context: 'pr',
       hasRetryLabel: false,
       isRetryable: true,
     });
@@ -65,7 +65,7 @@ describe('getRetryBudget', () => {
     for (const attempt of [2, 3]) {
       const decision = getRetryBudget({
         attempt,
-        hasPr: true,
+        context: 'pr',
         hasRetryLabel: true,
         isRetryable: true,
       });
@@ -81,7 +81,7 @@ describe('getRetryBudget', () => {
   it('stops at attempt 4 even with retry-ci', () => {
     const decision = getRetryBudget({
       attempt: 4,
-      hasPr: true,
+      context: 'pr',
       hasRetryLabel: true,
       isRetryable: true,
     });
@@ -96,7 +96,7 @@ describe('getRetryBudget', () => {
   it('preserves the retry-ci ceiling after the label-funded retry consumes the label', () => {
     const decision = getRetryBudget({
       attempt: 3,
-      hasPr: true,
+      context: 'pr',
       hasRetryLabel: false,
       isRetryable: true,
     });
@@ -112,7 +112,7 @@ describe('getRetryBudget', () => {
   it('reports the retry-ci ceiling at attempt 4 after the label was consumed', () => {
     const decision = getRetryBudget({
       attempt: 4,
-      hasPr: true,
+      context: 'pr',
       hasRetryLabel: false,
       isRetryable: true,
     });
@@ -128,7 +128,7 @@ describe('getRetryBudget', () => {
   it('does not retry non-retryable failures', () => {
     const decision = getRetryBudget({
       attempt: 1,
-      hasPr: true,
+      context: 'pr',
       hasRetryLabel: true,
       isRetryable: false,
     });
@@ -141,7 +141,7 @@ describe('getRetryBudget', () => {
   it('does not retry runs without an originating PR', () => {
     const decision = getRetryBudget({
       attempt: 1,
-      hasPr: false,
+      context: 'observation',
       hasRetryLabel: false,
       isRetryable: true,
     });
@@ -154,8 +154,7 @@ describe('getRetryBudget', () => {
   it('automatically retries release branch pushes without a PR', () => {
     const decision = getRetryBudget({
       attempt: 1,
-      allowAutomaticRetryWithoutPr: true,
-      hasPr: false,
+      context: 'release-push',
       hasRetryLabel: false,
       isRetryable: true,
     });
@@ -171,8 +170,7 @@ describe('getRetryBudget', () => {
   it('stops release branch pushes at the automatic retry limit', () => {
     const decision = getRetryBudget({
       attempt: 2,
-      allowAutomaticRetryWithoutPr: true,
-      hasPr: false,
+      context: 'release-push',
       hasRetryLabel: false,
       isRetryable: true,
     });
@@ -180,6 +178,21 @@ describe('getRetryBudget', () => {
     expect(decision.atRetryLimit).toBe(true);
     expect(decision.retryLimit).toBe(2);
     expect(decision.retryMode).toBe('none');
+    expect(decision.willRetry).toBe(false);
+  });
+
+  it('keeps release pushes terminal after attempt 2', () => {
+    const decision = getRetryBudget({
+      attempt: 3,
+      context: 'release-push',
+      hasRetryLabel: true,
+      isRetryable: true,
+    });
+
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(2);
+    expect(decision.retryLimitSource).toBe('default');
+    expect(decision.usedRetryCiBudget).toBe(false);
     expect(decision.willRetry).toBe(false);
   });
 });

@@ -1,10 +1,26 @@
-export const E2E_QUALITY_GATE_FAILURE_MARKER =
-  'E2E_CHANGED_OR_NEW_TEST_FAILURE';
+export const E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE =
+  'E2E quality gate failure';
 
-export function formatE2eQualityGateFailureMarker(testPath: string): string {
-  return `${E2E_QUALITY_GATE_FAILURE_MARKER}: ${testPath}`;
+export type CheckAnnotation = {
+  title?: string;
+};
+
+export function getE2eQualityGateFailurePaths({
+  changedOrNewTests,
+  failedTests,
+}: {
+  changedOrNewTests: string[];
+  failedTests: string[];
+}): string[] {
+  const failedTestPaths = new Set(failedTests);
+  return changedOrNewTests.filter((testPath) => failedTestPaths.has(testPath));
 }
 
-export function hasE2eQualityGateFailure(logs: string): boolean {
-  return logs.includes(E2E_QUALITY_GATE_FAILURE_MARKER);
+export function hasE2eQualityGateFailure(
+  annotations: CheckAnnotation[],
+): boolean {
+  return annotations.some(
+    (annotation) =>
+      annotation.title === E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE,
+  );
 }
