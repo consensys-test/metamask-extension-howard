@@ -100,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Run configured retryable failure
+      - name: Run configured release failure
         run: |
           CONFIG=.github/test/release-retry-test.json
           FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt // 0' "$CONFIG")
@@ -110,13 +110,20 @@ jobs:
             exit 0
           fi
 
-          if [[ "$FAILURE_TYPE" != 'transient' ]]; then
-            echo "Unsupported release retry failureType: $FAILURE_TYPE" >&2
-            exit 2
-          fi
-
-          echo "Synthetic retryable release failure (attempt $GITHUB_RUN_ATTEMPT)."
-          printf '%s%s\n' 'ETIM' 'EDOUT'
+          case "$FAILURE_TYPE" in
+            deterministic)
+              echo "Synthetic deterministic release failure (attempt $GITHUB_RUN_ATTEMPT)."
+              echo 'Working tree dirty'
+              ;;
+            transient)
+              echo "Synthetic retryable release failure (attempt $GITHUB_RUN_ATTEMPT)."
+              printf '%s%s\n' 'ETIM' 'EDOUT'
+              ;;
+            *)
+              echo "Unsupported release retry failureType: $FAILURE_TYPE" >&2
+              exit 2
+              ;;
+          esac
           exit 1
 
   test-lint:

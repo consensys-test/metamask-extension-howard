@@ -1,6 +1,6 @@
 {
-  "failThroughAttempt": 0,
-  "failureType": "transient",
-  "scenario": "release-stale-head-watch-successor",
+  "failThroughAttempt": 1,
+  "failureType": "deterministic",
+  "scenario": "release-non-retryable-failure-is-terminal",
   "skipEverything": true
 }
