@@ -12,14 +12,13 @@ export const RETRY_CI_LABEL_MAX_ATTEMPT = 4;
 
 export type RetryMode = 'automatic' | 'label' | 'none';
 export type RetryLimitSource = 'default' | 'retry-ci';
+export type RetryContext = 'pr' | 'release-push' | 'observation';
 
 export interface RetryBudgetInput {
   /** GitHub Actions run_attempt from the failed Main workflow. */
   attempt: number | string;
-  /** Allow the default retry for selected push events without an originating PR. */
-  allowAutomaticRetryWithoutPr?: boolean;
-  /** Whether this run can be associated with an originating PR. */
-  hasPr: boolean;
+  /** Identifies whether the event can use a retry budget. */
+  context: RetryContext;
   /** Whether the originating PR currently has the retry-ci label. */
   hasRetryLabel: boolean;
   /** Whether all non-optional failed jobs were classified as retryable. */
@@ -29,7 +28,7 @@ export interface RetryBudgetInput {
 export interface RetryBudgetDecision {
   /** Sanitized one-indexed attempt number used for all policy comparisons. */
   attemptNumber: number;
-  /** True only for retryable PR failures that have exhausted their budget. */
+  /** True only for retryable events that have exhausted their retry budget. */
   atRetryLimit: boolean;
   /** True only when this retry spends the retry-ci label authorization. */
   consumeRetryLabel: boolean;
@@ -60,8 +59,7 @@ export function parseAttempt(attempt: number | string): number {
 
 export function getRetryBudget({
   attempt,
-  allowAutomaticRetryWithoutPr = false,
-  hasPr,
+  context,
   hasRetryLabel,
   isRetryable,
 }: RetryBudgetInput): RetryBudgetDecision {
@@ -69,21 +67,26 @@ export function getRetryBudget({
   // Attempts above the default ceiling can only be created by a prior
   // retry-ci-funded rerun. The label is removed after that rerun succeeds,
   // so preserve the selected ceiling for later reporting and terminal status.
-  const usedRetryCiBudget = attemptNumber > DEFAULT_RETRY_MAX_ATTEMPT;
-  const retryLimit = hasRetryLabel || usedRetryCiBudget
+  const canUseRetryCiBudget = context === 'pr';
+  const usedRetryCiBudget =
+    canUseRetryCiBudget && attemptNumber > DEFAULT_RETRY_MAX_ATTEMPT;
+  const usesRetryCiBudget = hasRetryLabel || usedRetryCiBudget;
+  const retryLimit =
+    canUseRetryCiBudget && usesRetryCiBudget
     ? RETRY_CI_LABEL_MAX_ATTEMPT
     : DEFAULT_RETRY_MAX_ATTEMPT;
-  const retryLimitSource: RetryLimitSource = hasRetryLabel || usedRetryCiBudget
-    ? 'retry-ci'
-    : 'default';
-  // Most runs without an originating PR are observation-only. Selected push
-  // events (currently release branches) can opt into the default attempt 1 ->
-  // 2 retry, but cannot use the PR-label-funded extension.
+  const retryLimitSource: RetryLimitSource =
+    canUseRetryCiBudget && usesRetryCiBudget
+      ? 'retry-ci'
+      : 'default';
+  const canRetry = context === 'pr' || context === 'release-push';
+  const needsRetryCiLabel =
+    context === 'pr' && attemptNumber >= DEFAULT_RETRY_MAX_ATTEMPT;
   const willRetry =
     isRetryable &&
-    (hasPr || allowAutomaticRetryWithoutPr) &&
+    canRetry &&
     attemptNumber < retryLimit &&
-    (attemptNumber < DEFAULT_RETRY_MAX_ATTEMPT || hasRetryLabel);
+    (!needsRetryCiLabel || hasRetryLabel);
   const retryMode: RetryMode = !willRetry
     ? 'none'
     : attemptNumber < DEFAULT_RETRY_MAX_ATTEMPT
@@ -96,7 +99,7 @@ export function getRetryBudget({
     // the human-readable classifier report and terminal status description.
     atRetryLimit:
       isRetryable &&
-      (hasPr || allowAutomaticRetryWithoutPr) &&
+      canRetry &&
       attemptNumber >= retryLimit,
     consumeRetryLabel: retryMode === 'label',
     retryLimit,

@@ -3,7 +3,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { hideBin } from 'yargs/helpers';
 import yargs from 'yargs/yargs';
-import { formatE2eQualityGateFailureMarker } from '../../.github/scripts/shared/e2e-quality-gate.mts';
 import { exitWithError } from '../../development/lib/exit-with-error.js';
 import { runInShell } from '../../development/lib/run-command.js';
 import {
@@ -208,23 +207,16 @@ async function main(): Promise<void> {
   }
 
   for (const [runCount, qualityGateSpecs] of specsByRunCount) {
-    try {
-      await runPlaywright({
-        specs: qualityGateSpecs,
-        project,
-        extraArgs: [
-          `--repeat-each=${runCount}`,
-          '--retries=0',
-          '--max-failures=1',
-        ],
-        outputFile: `test/test-results/e2e/junit-pw-${shardLabel}-qg.xml`,
-      });
-    } catch (error) {
-      for (const spec of qualityGateSpecs) {
-        console.error(formatE2eQualityGateFailureMarker(spec));
-      }
-      throw error;
-    }
+    await runPlaywright({
+      specs: qualityGateSpecs,
+      project,
+      extraArgs: [
+        `--repeat-each=${runCount}`,
+        '--retries=0',
+        '--max-failures=1',
+      ],
+      outputFile: `test/test-results/e2e/junit-pw-${shardLabel}-qg.xml`,
+    });
   }
 }
 

@@ -169,8 +169,7 @@ jobs:
       # -- Retry retryable failures when a retry budget is available --
       # The classify step decides whether this is an automatic retry or a
       # retry-ci-funded retry, then outputs whether retry-ci should be consumed.
-      # Release pushes can use only the automatic attempt 1 -> 2 retry; their
-      # empty PR number is never used unless label consumption is requested.
+      # Release pushes can use only the automatic attempt 1 -> 2 retry.
       #
       # Order matters: rerun BEFORE removing the label. If the rerun API
       # call fails, the label stays on the PR — signaling that the retry
@@ -202,6 +201,23 @@ jobs:
             fi
 
             echo "PR #$PR head still matches failed run $HEAD_SHA"
+          fi
+
+          # Release branches use branch-scoped concurrency with cancellation
+          # enabled. Only rerun while this failed SHA remains the branch head,
+          # otherwise the retry could cancel CI for a newer release commit.
+          if [[ "$WORKFLOW_EVENT" == 'push' && "$HEAD_BRANCH" == release/* ]]; then
+            if ! CURRENT_HEAD=$(gh api "repos/$REPO/git/ref/heads/$HEAD_BRANCH" --jq '.object.sha' 2>/dev/null); then
+              echo "::warning::Could not verify release branch $HEAD_BRANCH head — skipping retry"
+              exit 0
+            fi
+
+            if [[ "$CURRENT_HEAD" != "$HEAD_SHA" ]]; then
+              echo "Release branch $HEAD_BRANCH advanced from $HEAD_SHA to $CURRENT_HEAD — skipping stale retry"
+              exit 0
+            fi
+
+            echo "Release branch $HEAD_BRANCH head still matches failed run $HEAD_SHA"
           fi
 
           echo "Rerunning failed jobs..."
