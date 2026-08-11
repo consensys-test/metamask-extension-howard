@@ -671,18 +671,20 @@ jobs:
           echo "Commit SHA: $HEAD_COMMIT_HASH"
 
           curl -X POST \
+            --fail-with-body \
+            --silent \
+            --show-error \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token $DISPATCH_TOKEN" \
             https://api.github.com/repos/MetaMask/extension-regression-validation-poc/dispatches \
-            -d '{
-              "event_type": "release_pr_updated",
-              "client_payload": {
-                "run_id": "'"$BUILDS_FROM_RUN"'",
-                "version": "'"$VERSION"'",
-                "branch": "'"$BRANCH"'",
-                "commit_sha": "'"$HEAD_COMMIT_HASH"'"
-              }
-            }'
+            --data-binary "$(
+              jq -n \
+                --arg run_id "$BUILDS_FROM_RUN" \
+                --arg version "$VERSION" \
+                --arg branch "$BRANCH" \
+                --arg commit_sha "$HEAD_COMMIT_HASH" \
+                '{event_type: "release_pr_updated", client_payload: {run_id: $run_id, version: $version, branch: $branch, commit_sha: $commit_sha}}'
+            )"
 
           echo "Regression validation triggered successfully"
 

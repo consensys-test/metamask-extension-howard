@@ -300,24 +300,27 @@ function getFailedJobs(): Job[] {
   return jobs.filter((j) => j.conclusion === 'failure');
 }
 
-function getAnnotations(jobId: number): Annotation[] {
+function getAnnotations(jobId: number): {
+  annotations: Annotation[];
+  available: boolean;
+} {
   try {
     const raw = ghApi(`${repoApi}/check-runs/${jobId}/annotations`, {
       paginate: true,
       jq: '.[]',
     });
-    return raw
-      .split('\n')
-      .filter(Boolean)
-      .flatMap((line) => {
-        try {
-          return [JSON.parse(line) as Annotation];
-        } catch {
-          return [];
-        }
-      });
+    const annotations: Annotation[] = [];
+    for (const line of raw.split('\n')) {
+      if (!line) continue;
+      try {
+        annotations.push(JSON.parse(line) as Annotation);
+      } catch {
+        console.warn(`Skipping malformed annotation JSON for job ${jobId}`);
+      }
+    }
+    return { annotations, available: true };
   } catch {
-    return [];
+    return { annotations: [], available: false };
   }
 }
 
@@ -371,7 +374,20 @@ function classifyJob(job: Job): JobClassification {
   }
 
   if (category === 'alwaysRetryable') {
-    if (hasE2eQualityGateFailure(getAnnotations(jobId))) {
+    const annotationResult = getAnnotations(jobId);
+    if (!annotationResult.available) {
+      return {
+        jobName,
+        jobId,
+        category,
+        jobRetryable: false,
+        reason: 'Could not verify E2E quality-gate annotations',
+        unmatched,
+        deterministic: true,
+      };
+    }
+
+    if (hasE2eQualityGateFailure(annotationResult.annotations)) {
       return {
         jobName,
         jobId,
@@ -406,7 +422,7 @@ function classifyJob(job: Job): JobClassification {
   }
 
   // retryableOnTransientError: check annotations, then logs
-  const annotations = getAnnotations(jobId);
+  const { annotations } = getAnnotations(jobId);
   const annotationText = annotations
     .map((a) => `${a.message ?? ''} ${a.title ?? ''}`)
     .join('\n');

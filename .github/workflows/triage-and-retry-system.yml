@@ -70,6 +70,15 @@ on:
     workflows: ['Main']
     types: [completed]
 
+concurrency:
+  # Release Main runs use Main-refs/heads/release/* with cancellation enabled.
+  # Sharing that group lets a newer release push cancel stale triage before it
+  # can request a rerun; the retry step still verifies HEAD_SHA.
+  group: >-
+    ${{ github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'release/') && format('Main-refs/heads/{0}', github.event.workflow_run.head_branch) || format('Triage-{0}', github.event.workflow_run.id) }}
+  cancel-in-progress: >-
+    ${{ github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'release/') }}
+
 jobs:
   classify-and-retry:
     name: Classify & retry
