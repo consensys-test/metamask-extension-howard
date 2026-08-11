@@ -66,6 +66,7 @@ import {
   E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE,
   hasE2eQualityGateFailure,
 } from './shared/e2e-quality-gate.mts';
+import { partitionRetryableBlockerCascadeJobs } from './shared/failure-classification.mts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -814,8 +815,26 @@ if (blockedBy) {
   console.log(
     `\n  ♻️  Blocker(s) retryable — tagging ${otherJobs.length} downstream job(s) as cascade.\n`,
   );
+  const { jobsToClassify: alwaysRetryableJobs, jobsToCascade: cascadeJobs } =
+    partitionRetryableBlockerCascadeJobs({
+      jobs: otherJobs,
+      getCategory: (jobName) => matchCategory(jobName).category,
+    });
+
+  // A structured quality-gate annotation is deterministic evidence that a
+  // changed/new E2E test failed. It must still veto a retry when an unrelated
+  // blocker is retryable, so inspect E2E jobs before cascading the rest.
+  for (const job of alwaysRetryableJobs) {
+    console.log(`  Classifying after retryable blocker: ${job.name}`);
+    const result = classifyJob(job);
+    classifications.push(result);
+    console.log(
+      `    → ${result.jobRetryable ? '✅ retryable' : '❌ non-retryable'}: ${result.reason}`,
+    );
+  }
+
   tagCascade(
-    otherJobs,
+    cascadeJobs,
     true,
     `Cascade — will resolve when blocker retries (${blockerNames})`,
   );
