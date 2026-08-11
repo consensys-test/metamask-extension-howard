@@ -1,6 +1,6 @@
 {
-  "failThroughAttempt": 1,
+  "failThroughAttempt": 2,
   "failureType": "transient",
-  "skipEverything": true,
-  "scenario": "release-attempt-1-automatic-retry"
+  "scenario": "release-attempt-2-is-terminal",
+  "skipEverything": true
 }
