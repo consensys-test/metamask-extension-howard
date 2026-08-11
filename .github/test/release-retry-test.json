@@ -1,6 +1,6 @@
 {
-  "failThroughAttempt": 1,
+  "failThroughAttempt": 0,
   "failureType": "transient",
-  "scenario": "release-stale-head-skips-rerun",
+  "scenario": "release-stale-head-successor",
   "skipEverything": true
 }
