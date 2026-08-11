@@ -1,5 +1,3 @@
-import { hasE2eQualityGateFailure, type CheckAnnotation } from "./e2e-quality-gate.mts";
-
 export type FailureCategory = "alwaysRetryable" | "retryableOnTransientError" | "optional";
 
 export type FailureJob = {
@@ -30,8 +28,4 @@ export function partitionRetryableBlockerCascadeJobs({
     },
     { jobsToClassify: [], jobsToCascade: [] },
   );
-}
-
-export function isAlwaysRetryableFailureRetryable(annotations: CheckAnnotation[]): boolean {
-  return !hasE2eQualityGateFailure(annotations);
 }

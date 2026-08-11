@@ -1,8 +1,4 @@
-import {
-  isAlwaysRetryableFailureRetryable,
-  partitionRetryableBlockerCascadeJobs,
-} from "./failure-classification.mts";
-import { E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE } from "./e2e-quality-gate.mts";
+import { partitionRetryableBlockerCascadeJobs } from "./failure-classification.mts";
 
 describe("partitionRetryableBlockerCascadeJobs", () => {
   it("classifies E2E jobs instead of cascading them after a retryable blocker", () => {
@@ -26,13 +22,5 @@ describe("partitionRetryableBlockerCascadeJobs", () => {
       { name: "ci-status-gate / CI status gate (controls all-jobs-pass)" },
       { name: "build-dist-webpack" },
     ]);
-  });
-});
-
-describe("isAlwaysRetryableFailureRetryable", () => {
-  it("returns false for an E2E quality-gate failure annotation", () => {
-    expect(
-      isAlwaysRetryableFailureRetryable([{ title: E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE }]),
-    ).toStrictEqual(false);
   });
 });
