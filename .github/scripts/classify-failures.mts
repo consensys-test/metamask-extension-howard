@@ -49,6 +49,7 @@
 
 import { appendFileSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -328,7 +329,24 @@ const LOG_TAIL_LINES = 500;
 
 function getJobLogs(jobId: number): string {
   try {
-    const full = ghApi(`${repoApi}/actions/jobs/${jobId}/logs`);
+    const full = execFileSync(
+      'gh',
+      [
+        'run',
+        'view',
+        MAIN_RUN_ID,
+        '--repo',
+        REPO,
+        '--log',
+        '--job',
+        String(jobId),
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, NO_COLOR: '1' },
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
     // Only search the tail — error summaries appear at the end and this
     // avoids false positives from earlier benign output.
     const lines = full.split('\n');
