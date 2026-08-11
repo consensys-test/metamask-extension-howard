@@ -329,6 +329,8 @@ const LOG_TAIL_LINES = 500;
 
 function getJobLogs(jobId: number): string {
   try {
+    // The raw job-log API can make gh reject GitHub Actions' ANSI-bearing
+    // response. `gh run view` is the CLI-supported per-job log path.
     const full = execFileSync(
       'gh',
       [
@@ -343,6 +345,8 @@ function getJobLogs(jobId: number): string {
       ],
       {
         encoding: 'utf8',
+        // Disable CLI color without removing runner output used below to
+        // classify transient failures.
         env: { ...process.env, NO_COLOR: '1' },
         maxBuffer: 10 * 1024 * 1024,
       },
