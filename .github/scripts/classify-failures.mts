@@ -964,7 +964,7 @@ function resolveDecision(
         key: 'retryable-no-label',
         label: `⏸️ Retryable, but the default retry budget ended at attempt ${budget.retryLimit}`,
       };
-    if (hasPr && budget.usedRetryCiBudget)
+    if (hasPr && budget.wasFundedByRetryCi)
       return {
         key: 'retryable-retry-ci-consumed',
         label: `⏸️ Retryable, but retry-ci was consumed by an earlier retry; add it again to retry attempt ${budget.attemptNumber + 1}`,

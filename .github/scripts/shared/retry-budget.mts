@@ -37,7 +37,7 @@ export interface RetryBudgetDecision {
   /** Explains whether the default or retry-ci limit was selected. */
   retryLimitSource: RetryLimitSource;
   /** True when this run could only have been reached with retry-ci funding. */
-  usedRetryCiBudget: boolean;
+  wasFundedByRetryCi: boolean;
   /** Distinguishes automatic, label-funded, and terminal decisions. */
   retryMode: RetryMode;
   /** Whether triage should call gh run rerun --failed. */
@@ -67,18 +67,17 @@ export function getRetryBudget({
   // Attempts above the default ceiling can only be created by a prior
   // retry-ci-funded rerun. The label is removed after that rerun succeeds,
   // so preserve the selected ceiling for later reporting and terminal status.
-  const canUseRetryCiBudget = context === 'pr';
-  const usedRetryCiBudget =
-    canUseRetryCiBudget && attemptNumber > DEFAULT_RETRY_MAX_ATTEMPT;
-  const usesRetryCiBudget = hasRetryLabel || usedRetryCiBudget;
+  const isPullRequest = context === 'pr';
+  const isPastDefaultLimit = attemptNumber > DEFAULT_RETRY_MAX_ATTEMPT;
+  const wasFundedByRetryCi = isPullRequest && isPastDefaultLimit;
+  const usesRetryCiBudget =
+    isPullRequest && (hasRetryLabel || wasFundedByRetryCi);
   const retryLimit =
-    canUseRetryCiBudget && usesRetryCiBudget
+    usesRetryCiBudget
     ? RETRY_CI_LABEL_MAX_ATTEMPT
     : DEFAULT_RETRY_MAX_ATTEMPT;
   const retryLimitSource: RetryLimitSource =
-    canUseRetryCiBudget && usesRetryCiBudget
-      ? 'retry-ci'
-      : 'default';
+    usesRetryCiBudget ? 'retry-ci' : 'default';
   const canRetry = context === 'pr' || context === 'release-push';
   const needsRetryCiLabel =
     context === 'pr' && attemptNumber >= DEFAULT_RETRY_MAX_ATTEMPT;
@@ -105,7 +104,7 @@ export function getRetryBudget({
     retryLimit,
     retryLimitSource,
     retryMode,
-    usedRetryCiBudget,
+    wasFundedByRetryCi,
     willRetry,
   };
 }

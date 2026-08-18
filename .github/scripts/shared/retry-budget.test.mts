@@ -29,7 +29,7 @@ describe('getRetryBudget', () => {
       retryLimit: 2,
       retryLimitSource: 'default',
       retryMode: 'automatic',
-      usedRetryCiBudget: false,
+      wasFundedByRetryCi: false,
       willRetry: true,
     });
   });
@@ -89,7 +89,7 @@ describe('getRetryBudget', () => {
     expect(decision.atRetryLimit).toBe(true);
     expect(decision.retryLimit).toBe(4);
     expect(decision.retryMode).toBe('none');
-    expect(decision.usedRetryCiBudget).toBe(true);
+    expect(decision.wasFundedByRetryCi).toBe(true);
     expect(decision.willRetry).toBe(false);
   });
 
@@ -105,7 +105,7 @@ describe('getRetryBudget', () => {
     expect(decision.retryLimit).toBe(4);
     expect(decision.retryLimitSource).toBe('retry-ci');
     expect(decision.retryMode).toBe('none');
-    expect(decision.usedRetryCiBudget).toBe(true);
+    expect(decision.wasFundedByRetryCi).toBe(true);
     expect(decision.willRetry).toBe(false);
   });
 
@@ -121,7 +121,7 @@ describe('getRetryBudget', () => {
     expect(decision.retryLimit).toBe(4);
     expect(decision.retryLimitSource).toBe('retry-ci');
     expect(decision.retryMode).toBe('none');
-    expect(decision.usedRetryCiBudget).toBe(true);
+    expect(decision.wasFundedByRetryCi).toBe(true);
     expect(decision.willRetry).toBe(false);
   });
 
@@ -192,7 +192,7 @@ describe('getRetryBudget', () => {
     expect(decision.atRetryLimit).toBe(true);
     expect(decision.retryLimit).toBe(2);
     expect(decision.retryLimitSource).toBe('default');
-    expect(decision.usedRetryCiBudget).toBe(false);
+    expect(decision.wasFundedByRetryCi).toBe(false);
     expect(decision.willRetry).toBe(false);
   });
 });
