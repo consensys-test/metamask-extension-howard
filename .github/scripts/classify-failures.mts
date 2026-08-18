@@ -79,6 +79,7 @@ interface Job {
 }
 
 interface Annotation {
+  annotation_level?: 'notice' | 'warning' | 'failure';
   message?: string;
   title?: string;
   path?: string;

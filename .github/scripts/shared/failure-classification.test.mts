@@ -1,11 +1,15 @@
 import { partitionRetryableBlockerCascadeJobs } from "./failure-classification.mts";
 
 describe("partitionRetryableBlockerCascadeJobs", () => {
-  it("classifies E2E jobs instead of cascading them after a retryable blocker", () => {
+  it("classifies E2E jobs without losing their concrete type", () => {
     const jobs = [
-      { name: "e2e-chrome" },
-      { name: "ci-status-gate / CI status gate (controls all-jobs-pass)" },
-      { name: "build-dist-webpack" },
+      { id: 1, name: "e2e-chrome", conclusion: "failure" },
+      {
+        id: 2,
+        name: "ci-status-gate / CI status gate (controls all-jobs-pass)",
+        conclusion: "failure",
+      },
+      { id: 3, name: "build-dist-webpack", conclusion: "failure" },
     ];
 
     const result = partitionRetryableBlockerCascadeJobs({
@@ -17,10 +21,9 @@ describe("partitionRetryableBlockerCascadeJobs", () => {
       },
     });
 
-    expect(result.jobsToClassify).toEqual([{ name: "e2e-chrome" }]);
-    expect(result.jobsToCascade).toEqual([
-      { name: "ci-status-gate / CI status gate (controls all-jobs-pass)" },
-      { name: "build-dist-webpack" },
-    ]);
+    expect(result.jobsToClassify).toStrictEqual([jobs[0]]);
+    expect(result.jobsToClassify[0].id).toBe(1);
+    expect(result.jobsToCascade).toStrictEqual([jobs[1], jobs[2]]);
+    expect(result.jobsToCascade[0].conclusion).toBe("failure");
   });
 });

@@ -150,7 +150,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install Sentry SDK
-        run: npm install --no-save @sentry/node@^10.45.0
+        run: npm install --no-save @sentry/node@10.45.0
 
       - name: Get version from package.json
         run: |

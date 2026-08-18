@@ -4,19 +4,19 @@ export type FailureJob = {
   name: string;
 };
 
-export function partitionRetryableBlockerCascadeJobs({
+export function partitionRetryableBlockerCascadeJobs<JobType extends FailureJob>({
   jobs,
   getCategory,
 }: {
-  jobs: FailureJob[];
+  jobs: JobType[];
   getCategory: (jobName: string) => FailureCategory;
 }): {
-  jobsToClassify: FailureJob[];
-  jobsToCascade: FailureJob[];
+  jobsToClassify: JobType[];
+  jobsToCascade: JobType[];
 } {
   return jobs.reduce<{
-    jobsToClassify: FailureJob[];
-    jobsToCascade: FailureJob[];
+    jobsToClassify: JobType[];
+    jobsToCascade: JobType[];
   }>(
     (partition, job) => {
       if (getCategory(job.name) === "alwaysRetryable") {
