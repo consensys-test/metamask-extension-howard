@@ -24,8 +24,6 @@ export interface RetryBudgetInput {
   isRetryable: boolean;
   /** Last attempt that can automatically create a retry. */
   automaticRetryLimit?: number;
-  /** Last attempt that can create a retry using retry-ci. */
-  labelRetryLimit?: number;
 }
 
 export interface RetryBudgetDecision {
@@ -66,8 +64,8 @@ export function getRetryBudget({
   hasRetryLabel,
   isRetryable,
   automaticRetryLimit = DEFAULT_RETRY_MAX_ATTEMPT,
-  labelRetryLimit = RETRY_CI_LABEL_MAX_ATTEMPT,
 }: RetryBudgetInput): RetryBudgetDecision {
+  const labelRetryLimit = RETRY_CI_LABEL_MAX_ATTEMPT;
   const attemptNumber = parseAttempt(attempt);
   const isPullRequest = context === 'pr';
   const canRetry = context === 'pr' || context === 'release-push';
