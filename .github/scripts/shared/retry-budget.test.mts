@@ -47,6 +47,43 @@ describe('getRetryBudget', () => {
     expect(decision.willRetry).toBe(true);
   });
 
+  it('requires retry-ci before retrying a main-targeting PR E2E failure', () => {
+    const withoutLabel = getRetryBudget({
+      attempt: 1,
+      context: 'pr',
+      hasRetryLabel: false,
+      isRetryable: true,
+      requiresRetryCiLabel: true,
+    });
+    const withLabel = getRetryBudget({
+      attempt: 1,
+      context: 'pr',
+      hasRetryLabel: true,
+      isRetryable: true,
+      requiresRetryCiLabel: true,
+    });
+
+    expect(withoutLabel.willRetry).toBe(false);
+    expect(withoutLabel.retryMode).toBe('none');
+    expect(withLabel.willRetry).toBe(true);
+    expect(withLabel.retryMode).toBe('label');
+    expect(withLabel.consumeRetryLabel).toBe(true);
+  });
+
+  it('keeps the automatic retry for non-E2E failures on a main-targeting PR', () => {
+    const decision = getRetryBudget({
+      attempt: 1,
+      context: 'pr',
+      hasRetryLabel: false,
+      isRetryable: true,
+      requiresRetryCiLabel: false,
+    });
+
+    expect(decision.willRetry).toBe(true);
+    expect(decision.retryMode).toBe('automatic');
+    expect(decision.consumeRetryLabel).toBe(false);
+  });
+
   it('stops at attempt 2 without retry-ci', () => {
     const decision = getRetryBudget({
       attempt: 2,

@@ -585,6 +585,46 @@ function classifyJob(job: Job): JobClassification {
   };
 }
 
+function resolvePrNumber(): string {
+  if (WORKFLOW_EVENT === 'pull_request' && PR_NUMBER_FROM_EVENT) {
+    return PR_NUMBER_FROM_EVENT;
+  }
+  const match = HEAD_BRANCH.match(/gh-readonly-queue\/[^/]+\/pr-(\d+)-/);
+  if (WORKFLOW_EVENT === 'merge_group' && match) {
+    return match[1];
+  }
+  return '';
+}
+
+function resolveTargetBranch(prNum: string): {
+  targetBranch: string;
+  verified: boolean;
+} {
+  const mergeQueueBranch = HEAD_BRANCH.match(/^gh-readonly-queue\/([^/]+)\//);
+  if (WORKFLOW_EVENT === 'merge_group' && mergeQueueBranch) {
+    return { targetBranch: mergeQueueBranch[1], verified: true };
+  }
+
+  if (WORKFLOW_EVENT !== 'pull_request' || !prNum) {
+    return { targetBranch: HEAD_BRANCH, verified: true };
+  }
+
+  try {
+    const pullRequest = JSON.parse(ghApi(`${repoApi}/pulls/${prNum}`)) as {
+      base?: { ref?: string };
+    };
+    if (pullRequest.base?.ref) {
+      return { targetBranch: pullRequest.base.ref, verified: true };
+    }
+  } catch {
+    console.warn(
+      `Could not resolve the target branch for PR #${prNum}; requiring retry-ci for E2E failures.`,
+    );
+  }
+
+  return { targetBranch: '', verified: false };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -636,7 +676,7 @@ if (WORKFLOW_CONCLUSION === 'cancelled' && Number(ATTEMPT) > 1) {
 
   const Sentry = initSentry();
   if (Sentry) {
-    const branch = resolveTargetBranch();
+    const branch = resolveTargetBranch(resolvePrNumber()).targetBranch;
     const prNum = resolvePrNumber();
     Sentry.logger.info('Triage and Retry System: cancelled', {
       'ci.targetBranch': branch,
@@ -766,6 +806,13 @@ if (failedJobs.length === 0) {
 
 console.log(`Found ${failedJobs.length} failed job(s):\n`);
 
+const prNumber = resolvePrNumber();
+const { targetBranch, verified: isTargetBranchVerified } =
+  resolveTargetBranch(prNumber);
+const requiresRetryCiForE2e =
+  (WORKFLOW_EVENT === 'pull_request' || WORKFLOW_EVENT === 'merge_group') &&
+  (!isTargetBranchVerified || targetBranch === 'main');
+
 // Partition into blockers and non-blockers. If any blocker fails
 // non-transiently, stop early and tag all remaining jobs as cascade.
 const isBlocker = (name: string) => blockerRegexes.some((re) => re.test(name));
@@ -858,36 +905,8 @@ const isRetryable =
 console.log(`\nDecision: is-retryable=${isRetryable}`);
 
 // ---------------------------------------------------------------------------
-// Resolve originating PR and check for retry-ci label
+// Resolve retry authorization
 // ---------------------------------------------------------------------------
-
-function resolvePrNumber(): string {
-  if (WORKFLOW_EVENT === 'pull_request' && PR_NUMBER_FROM_EVENT) {
-    return PR_NUMBER_FROM_EVENT;
-  }
-  const match = HEAD_BRANCH.match(/gh-readonly-queue\/[^/]+\/pr-(\d+)-/);
-  if (WORKFLOW_EVENT === 'merge_group' && match) {
-    return match[1];
-  }
-  return '';
-}
-
-/**
- * Resolves the target branch name from HEAD_BRANCH.
- *
- * For merge_group events HEAD_BRANCH is the temporary merge queue branch,
- * e.g. `gh-readonly-queue/main/pr-12345-abc123`. Extract the target branch
- * (`main`) so the dashboard field shows something meaningful.
- *
- * For push and pull_request events HEAD_BRANCH is already the real name.
- */
-function resolveTargetBranch(): string {
-  const match = HEAD_BRANCH.match(/^gh-readonly-queue\/([^/]+)\//);
-  if (WORKFLOW_EVENT === 'merge_group' && match) {
-    return match[1];
-  }
-  return HEAD_BRANCH;
-}
 
 function checkRetryLabel(prNum: string): boolean {
   if (!prNum) return false;
@@ -902,8 +921,6 @@ function checkRetryLabel(prNum: string): boolean {
   }
 }
 
-const prNumber = resolvePrNumber();
-const targetBranch = resolveTargetBranch();
 const hasPR = Boolean(prNumber);
 const retryContext = hasPR
   ? 'pr'
@@ -916,6 +933,9 @@ const retryBudget = getRetryBudget({
   context: retryContext,
   hasRetryLabel,
   isRetryable,
+  requiresRetryCiLabel:
+    requiresRetryCiForE2e &&
+    classifications.some((job) => job.jobName.startsWith('e2e-')),
 });
 const atMaxAttempts = retryBudget.atRetryLimit;
 const willRetry = retryBudget.willRetry;
@@ -943,8 +963,14 @@ function resolveDecision(
   hasLabel: boolean,
   budget: RetryBudgetDecision,
   pr: string,
+  requiresRetryCiForE2e: boolean,
 ): { key: string; label: string } {
   if (retryable) {
+    if (hasPr && requiresRetryCiForE2e && !hasLabel)
+      return {
+        key: 'e2e-retry-ci-required',
+        label: `⏸️ Retryable E2E failure targeting main requires retry-ci on PR #${pr}`,
+      };
     if (hasPr && budget.willRetry && budget.retryMode === 'automatic')
       return {
         key: 'will-retry',
@@ -1014,6 +1040,8 @@ const { key: decision, label: decisionLabel } = resolveDecision(
   hasRetryLabel,
   retryBudget,
   prNumber,
+  requiresRetryCiForE2e &&
+    classifications.some((job) => job.jobName.startsWith('e2e-')),
 );
 
 if (atMaxAttempts && isRetryable) {

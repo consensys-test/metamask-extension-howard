@@ -23,6 +23,8 @@ export interface RetryBudgetInput {
   hasRetryLabel: boolean;
   /** Whether all non-optional failed jobs were classified as retryable. */
   isRetryable: boolean;
+  /** Whether a retryable failure must be explicitly authorized with retry-ci. */
+  requiresRetryCiLabel?: boolean;
 }
 
 export interface RetryBudgetDecision {
@@ -62,6 +64,7 @@ export function getRetryBudget({
   context,
   hasRetryLabel,
   isRetryable,
+  requiresRetryCiLabel = false,
 }: RetryBudgetInput): RetryBudgetDecision {
   const attemptNumber = parseAttempt(attempt);
   // Attempts above the default ceiling can only be created by a prior
@@ -85,12 +88,13 @@ export function getRetryBudget({
     isRetryable &&
     canRetry &&
     attemptNumber < retryLimit &&
-    (!needsRetryCiLabel || hasRetryLabel);
+    (!needsRetryCiLabel || hasRetryLabel) &&
+    (!requiresRetryCiLabel || hasRetryLabel);
   const retryMode: RetryMode = !willRetry
     ? 'none'
-    : attemptNumber < DEFAULT_RETRY_MAX_ATTEMPT
-      ? 'automatic'
-      : 'label';
+    : requiresRetryCiLabel || attemptNumber >= DEFAULT_RETRY_MAX_ATTEMPT
+      ? 'label'
+      : 'automatic';
 
   return {
     attemptNumber,
