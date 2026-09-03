@@ -4,7 +4,7 @@
   "failureMode": "test",
   "logChangedTestList": true,
   "retryableBlocker": false,
-  "scenario": "direct-main-e2e-without-retry-ci",
+  "scenario": "direct-main-e2e-with-retry-ci",
   "skipEverything": true,
   "skipQualityGate": false
 }
