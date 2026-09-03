@@ -83,9 +83,26 @@ jobs:
         uses: MetaMask/github-tools/.github/actions/check-skip-merge-queue@v1
 
       - uses: actions/checkout@v6
-        if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
+        if: >-
+          ${{
+            steps.check-skip-merge-queue.outputs.up-to-date != 'true'
+            || env.EVENT_NAME == 'merge_group'
+          }}
         with:
           fetch-depth: 1
+
+      - name: Check retry-policy test override
+        id: retry-policy-test
+        run: |
+          CONFIG=.github/test/retry-policy-test.json
+          if [[ ! -f "$CONFIG" ]] || [[ "$(jq -r '.enabled // false' "$CONFIG")" != 'true' ]]; then
+            exit 0
+          fi
+
+          if [[ "$(jq -r '.skipEverything // false' "$CONFIG")" == 'true' ]]; then
+            echo "skip-everything=true" >> "$GITHUB_OUTPUT"
+            echo "Retry-policy test override enabled."
+          fi
 
       - name: Fetch HEAD commit for message checks
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
@@ -550,6 +567,7 @@ jobs:
           ${{
             env.IS_RUN_EVERYTHING_BRANCH == 'false' && (
               steps.check-skip-merge-queue.outputs.up-to-date == 'true' ||
+              steps.retry-policy-test.outputs.skip-everything == 'true' ||
               steps.set-needs-locales.outputs.needs-locales == 'true' ||
               steps.set-just-repository-health-checks.outputs.just-repository-health-checks == 'true' ||
               steps.set-just-package-json-version.outputs.just-package-json-version == 'true'

@@ -90,6 +90,51 @@ jobs:
       - get-requirements
     uses: MetaMask/github-tools/.github/workflows/lint-workflows.yml@v1
 
+  retry-policy-test:
+    name: e2e-retry-policy-test
+    if: >-
+      ${{
+        github.event_name == 'merge_group'
+        || (
+          github.event_name == 'pull_request'
+          && startsWith(github.head_ref, 'retry-policy-test-')
+        )
+      }}
+    needs:
+      - get-requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run configured retry-policy failure
+        run: |
+          CONFIG=.github/test/retry-policy-test.json
+          if [[ ! -f "$CONFIG" ]] || [[ "$(jq -r '.enabled // false' "$CONFIG")" != 'true' ]]; then
+            echo "Retry-policy test is disabled."
+            exit 0
+          fi
+
+          FAIL_THROUGH_ATTEMPT="$(jq -r '.failThroughAttempt // 0' "$CONFIG")"
+          FAILURE_TYPE="$(jq -r '.failureType // "transient"' "$CONFIG")"
+          if (( GITHUB_RUN_ATTEMPT > FAIL_THROUGH_ATTEMPT )); then
+            echo "Retry-policy test passes on attempt $GITHUB_RUN_ATTEMPT."
+            exit 0
+          fi
+
+          echo "Synthetic retry-policy failure for ${GITHUB_EVENT_NAME} attempt $GITHUB_RUN_ATTEMPT."
+          if [[ "$FAILURE_TYPE" == 'transient' ]]; then
+            echo 'ETIMEDOUT'
+            exit 1
+          fi
+          if [[ "$FAILURE_TYPE" == 'deterministic' ]]; then
+            echo 'Working tree dirty'
+            exit 1
+          fi
+
+          echo "Unsupported retry-policy failureType: $FAILURE_TYPE" >&2
+          exit 2
+
   test-lint:
     name: Test lint
     if: ${{ needs.get-requirements.outputs.needs-lint == 'true' }}
@@ -572,6 +617,7 @@ jobs:
       - locales-changed-only
       - prep-deps
       - lint-workflows
+      - retry-policy-test
       - test-lint
       - repository-health-checks
       - test-storybook
