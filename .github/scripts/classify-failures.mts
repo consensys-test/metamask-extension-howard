@@ -810,7 +810,7 @@ const prNumber = resolvePrNumber();
 const { targetBranch, verified: isTargetBranchVerified } =
   resolveTargetBranch(prNumber);
 const requiresRetryCiForE2e =
-  (WORKFLOW_EVENT === 'pull_request' || WORKFLOW_EVENT === 'merge_group') &&
+  WORKFLOW_EVENT === 'pull_request' &&
   (!isTargetBranchVerified || targetBranch === 'main');
 
 // Partition into blockers and non-blockers. If any blocker fails
