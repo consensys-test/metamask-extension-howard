@@ -928,16 +928,19 @@ const retryContext = hasPR
     ? 'release-push'
     : 'observation';
 const hasRetryLabel = checkRetryLabel(prNumber);
+const hasMainTargetE2eFailure =
+  requiresRetryCiForE2e &&
+  classifications.some((job) => job.jobName.startsWith('e2e-'));
 const retryBudget = getRetryBudget({
   attempt: ATTEMPT,
   context: retryContext,
   hasRetryLabel,
   isRetryable,
-  requiresRetryCiLabel:
-    requiresRetryCiForE2e &&
-    classifications.some((job) => job.jobName.startsWith('e2e-')),
+  automaticRetryLimit: hasMainTargetE2eFailure
+    ? 1
+    : DEFAULT_RETRY_MAX_ATTEMPT,
 });
-const atMaxAttempts = retryBudget.atRetryLimit;
+const atRetryCiLimit = retryBudget.labelRetryLimitReached;
 const willRetry = retryBudget.willRetry;
 
 // The retry decision depends on the classification result, whether the run
@@ -963,10 +966,15 @@ function resolveDecision(
   hasLabel: boolean,
   budget: RetryBudgetDecision,
   pr: string,
-  requiresRetryCiForE2e: boolean,
+  hasMainTargetE2eFailure: boolean,
 ): { key: string; label: string } {
   if (retryable) {
-    if (hasPr && requiresRetryCiForE2e && !hasLabel)
+    if (
+      hasPr &&
+      hasMainTargetE2eFailure &&
+      budget.automaticRetryLimitReached &&
+      !hasLabel
+    )
       return {
         key: 'e2e-retry-ci-required',
         label: `⏸️ Retryable E2E failure targeting main requires retry-ci on PR #${pr}`,
@@ -981,20 +989,15 @@ function resolveDecision(
         key: 'will-retry',
         label: `♻️ Will retry (retry-ci label present; attempt ${budget.attemptNumber} of ${RETRY_CI_LABEL_MAX_ATTEMPT})`,
       };
-    if (hasPr && budget.atRetryLimit && budget.retryLimitSource === 'retry-ci')
+    if (hasPr && budget.labelRetryLimitReached)
       return {
         key: 'max-attempts-reached',
-        label: `🛑 Retryable, but attempt ${budget.attemptNumber} reached the retry-ci limit of ${budget.retryLimit}`,
+        label: `🛑 Retryable, but attempt ${budget.attemptNumber} reached the retry-ci limit of ${budget.labelRetryLimit}`,
       };
-    if (hasPr && budget.atRetryLimit)
+    if (hasPr && budget.automaticRetryLimitReached)
       return {
         key: 'retryable-no-label',
-        label: `⏸️ Retryable, but the default retry budget ended at attempt ${budget.retryLimit}`,
-      };
-    if (hasPr && budget.wasFundedByRetryCi)
-      return {
-        key: 'retryable-retry-ci-consumed',
-        label: `⏸️ Retryable, but retry-ci was consumed by an earlier retry; add it again to retry attempt ${budget.attemptNumber + 1}`,
+        label: `⏸️ Retryable, but the automatic retry budget ended at attempt ${budget.automaticRetryLimit}`,
       };
     if (hasPr)
       return {
@@ -1006,10 +1009,10 @@ function resolveDecision(
         key: 'will-retry',
         label: `♻️ Will retry automatically (default retry budget: attempt ${budget.attemptNumber} of ${DEFAULT_RETRY_MAX_ATTEMPT})`,
       };
-    if (budget.atRetryLimit)
+    if (budget.automaticRetryLimitReached)
       return {
         key: 'retryable-no-pr',
-        label: `⏸️ Retryable, but the default retry budget ended at attempt ${budget.retryLimit}`,
+        label: `⏸️ Retryable, but the automatic retry budget ended at attempt ${budget.automaticRetryLimit}`,
       };
     return {
       key: 'retryable-no-pr',
@@ -1040,13 +1043,12 @@ const { key: decision, label: decisionLabel } = resolveDecision(
   hasRetryLabel,
   retryBudget,
   prNumber,
-  requiresRetryCiForE2e &&
-    classifications.some((job) => job.jobName.startsWith('e2e-')),
+  hasMainTargetE2eFailure,
 );
 
-if (atMaxAttempts && isRetryable) {
+if (atRetryCiLimit && isRetryable) {
   console.log(
-    `${hasPR ? `PR #${prNumber}` : `Release branch ${HEAD_BRANCH}`}: attempt ${retryBudget.attemptNumber} reached the ${retryBudget.retryLimitSource} retry limit (${retryBudget.retryLimit}) — will not retry`,
+    `${hasPR ? `PR #${prNumber}` : `Release branch ${HEAD_BRANCH}`}: attempt ${retryBudget.attemptNumber} reached the retry-ci limit (${retryBudget.labelRetryLimit}) — will not retry`,
   );
 } else {
   console.log(
@@ -1083,8 +1085,10 @@ if (atMaxAttempts && isRetryable) {
 // posted one.
 if (WORKFLOW_EVENT === 'merge_group' && !willRetry) {
   const headSha = getRunHeadSha();
-  const description = atMaxAttempts
-    ? `Retry limit reached (attempt ${retryBudget.attemptNumber} of ${retryBudget.retryLimit})`
+  const description = retryBudget.labelRetryLimitReached
+    ? `Retry-ci limit reached (attempt ${retryBudget.attemptNumber} of ${retryBudget.labelRetryLimit})`
+    : retryBudget.automaticRetryLimitReached
+      ? `Automatic retry limit reached (attempt ${retryBudget.attemptNumber} of ${retryBudget.automaticRetryLimit})`
     : isRetryable
       ? 'Retryable failures, but no retry budget available'
       : 'Non-retryable failures detected';
@@ -1116,7 +1120,10 @@ if (GITHUB_OUTPUT) {
       `will-retry=${willRetry}`,
       `consume-retry-label=${retryBudget.consumeRetryLabel}`,
       `retry-mode=${retryBudget.retryMode}`,
-      `retry-limit=${retryBudget.retryLimit}`,
+      `automatic-retry-limit=${retryBudget.automaticRetryLimit}`,
+      `automatic-retry-limit-reached=${retryBudget.automaticRetryLimitReached}`,
+      `label-retry-limit=${retryBudget.labelRetryLimit}`,
+      `label-retry-limit-reached=${retryBudget.labelRetryLimitReached}`,
       `pr-number=${prNumber}`,
     ].join('\n') + '\n',
   );
@@ -1135,7 +1142,7 @@ const reportLines = [
   `**Run:** [${MAIN_RUN_ID}](${mainRunUrl})${ATTEMPT ? ` (attempt ${ATTEMPT})` : ''}`,
   `**Classification:** ${isRetryable ? '✅ All failures retryable' : '❌ Non-retryable failures detected'}`,
   `**Retry:** ${decisionLabel}`,
-  `**Retry mode:** ${retryBudget.retryMode} (limit ${retryBudget.retryLimit}, ${retryBudget.retryLimitSource})`,
+  `**Retry mode:** ${retryBudget.retryMode} (automatic limit ${retryBudget.automaticRetryLimit}; retry-ci limit ${retryBudget.labelRetryLimit})`,
   `**Failed jobs:** ${failedJobs.length}`,
   ``,
   `| Job | Category | Job Retryable | Reason |`,
@@ -1155,10 +1162,10 @@ if (unmatchedJobs.length > 0) {
   );
 }
 
-if (atMaxAttempts && isRetryable && hasPR) {
+if (retryBudget.labelRetryLimitReached && isRetryable && hasPR) {
   reportLines.push(
     ``,
-    `> 🛑 **Retry limit reached** — attempt ${retryBudget.attemptNumber} of ${retryBudget.retryLimit}. The failures look retryable, but no more automatic retries will be attempted for this run.`,
+    `> 🛑 **Retry-ci limit reached** — attempt ${retryBudget.attemptNumber} of ${retryBudget.labelRetryLimit}. The failures look retryable, but no further retries will be attempted for this run.`,
   );
 }
 
@@ -1260,8 +1267,12 @@ if (Sentry) {
     'ci.retry.date': new Date().toISOString().slice(0, 10),
     'ci.retry.decision': decision,
     'ci.retry.mode': retryBudget.retryMode,
-    'ci.retry.limit': String(retryBudget.retryLimit),
-    'ci.retry.limitSource': retryBudget.retryLimitSource,
+    'ci.retry.automaticLimit': String(retryBudget.automaticRetryLimit),
+    'ci.retry.automaticLimitReached': String(
+      retryBudget.automaticRetryLimitReached,
+    ),
+    'ci.retry.labelLimit': String(retryBudget.labelRetryLimit),
+    'ci.retry.labelLimitReached': String(retryBudget.labelRetryLimitReached),
     'ci.retry.consumeRetryLabel': String(retryBudget.consumeRetryLabel),
     'ci.retry.runId': MAIN_RUN_ID,
     'ci.retry.attempt': ATTEMPT || 'unknown',
