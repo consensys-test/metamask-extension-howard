@@ -1,0 +1,29 @@
+name: Codeowners Plus Rerun
+
+# Reruns the "Run Codeowners Plus" check whenever a review is submitted or
+# dismissed, so the status updates as approvals come in/go out without
+# waiting for another push. Pattern recommended by the codeowners-plus
+# README.
+
+on:
+  pull_request_review:
+    types:
+      - submitted
+      - dismissed
+
+permissions: {}
+
+jobs:
+  rerun-codeowners-plus:
+    name: Rerun Codeowners Plus
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      pull-requests: write
+      checks: read
+    steps:
+      - name: Rerun the Codeowners Plus check
+        uses: shqear93/rerun-checks@cafa5c1c11c880f9b23e6a73ad8628483fdae798 # v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          check-names: Run Codeowners Plus

@@ -1,0 +1,18 @@
+# This file is the codeowners-plus equivalent of .github/CODEOWNERS, used by
+# the multimediallc/codeowners-plus GitHub Action.
+#
+# Trial setup: this file lives alongside the existing .github/CODEOWNERS for
+# now. Native CODEOWNERS continues to gate merges; codeowners-plus runs as a
+# parallel, non-required check so people can evaluate it without it blocking
+# anything.
+#
+# Syntax differences from CODEOWNERS:
+#   - Rules are relative to this file's directory (repo root here).
+#   - Leading '/' is ignored.
+#   - Trailing '/' auto-expands to '/**'.
+#   - '*' does not cross path separators; use '**/x' for "anywhere in the tree".
+#   - '& path @owner' adds an AND-required reviewer in addition to the file owner.
+#   - '? path @owner' adds an optional (cc'd, non-blocking) reviewer.
+# See https://github.com/multimediallc/codeowners-plus for the full spec.
+
+.editorconfig                                       @consensys-test/release-team @HowardBraham

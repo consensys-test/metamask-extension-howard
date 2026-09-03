@@ -1,0 +1,55 @@
+name: Codeowners Plus
+
+# Trial integration of multimediallc/codeowners-plus alongside the existing
+# .github/CODEOWNERS. Runs as a parallel, informational check; the status
+# check is intentionally NOT marked required in branch protection so that
+# people can evaluate it without it blocking merges.
+#
+# Spec: https://github.com/multimediallc/codeowners-plus
+# Companion rerun workflow: codeowners-plus-rerun.yml
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+      - unlabeled
+
+concurrency:
+  group: codeowners-plus-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  codeowners-plus:
+    name: Run Codeowners Plus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          # codeowners-plus runs `git diff base...head` (symmetric difference),
+          # which needs the merge-base. fetch-depth: 0 gives the full commit
+          # graph; filter: tree:0 makes it a partial clone so blobs/trees are
+          # fetched lazily, dramatically faster than a full clone on this repo.
+          fetch-depth: 0
+          filter: tree:0
+
+      - name: Run Codeowners Plus
+        uses: multimediallc/codeowners-plus@v1.9.1
+        with:
+          # Org-team review requests need a token with org Members:Read.
+          # GITHUB_TOKEN can't resolve cross-team identities; fall back to
+          # GITHUB_TOKEN if the PAT secret isn't configured (e.g. on forks).
+          github-token: ${{ secrets.CODEOWNERS_PLUS_TOKEN || secrets.GITHUB_TOKEN }}
+          pr: ${{ github.event.pull_request.number }}
+          verbose: true
+          # Skip comments and review-requests on draft PRs; still posts status.
+          quiet: ${{ github.event.pull_request.draft }}
