@@ -267,10 +267,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Emit retryable blocker failure
+      - uses: actions/checkout@v6
+
+      - name: Emit configured retryable blocker failure
         run: |
-          echo 'ETIMEDOUT: synthetic dependency download failure'
-          exit 1
+          if [[ "$(jq -r '.retryableBlocker // false' .github/test/e2e-quality-gate-test.json)" == 'true' ]]; then
+            echo 'ETIMEDOUT: synthetic dependency download failure'
+            exit 1
+          fi
 
   test-lint:
     name: Test lint
