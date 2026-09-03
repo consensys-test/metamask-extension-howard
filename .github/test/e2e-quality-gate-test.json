@@ -1,0 +1,10 @@
+{
+  "failThroughAttempt": 1,
+  "failedTestPath": "test/e2e/tests/e2e-quality-gate-test.pw.spec.ts",
+  "failureMode": "test",
+  "logChangedTestList": true,
+  "retryableBlocker": true,
+  "scenario": "retryable-blocker-does-not-bypass-e2e-quality-gate",
+  "skipEverything": true,
+  "skipQualityGate": false
+}

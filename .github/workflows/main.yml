@@ -135,6 +135,143 @@ jobs:
           echo "Unsupported retry-policy failureType: $FAILURE_TYPE" >&2
           exit 2
 
+  e2e-quality-gate-test:
+    name: e2e-quality-gate-test
+    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'e2e-quality-gate-test-') }}
+    needs:
+      - get-requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: write
+    steps:
+      - name: Checkout and setup environment
+        uses: MetaMask/action-checkout-and-setup@v3
+        with:
+          is-high-risk-environment: false
+          skip-allow-scripts: true
+
+      - name: Create failed changed/new E2E test result
+        id: fixture-data
+        run: |
+          CONFIG=.github/test/e2e-quality-gate-test.json
+          FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt // 1' "$CONFIG")
+          FAILED_TEST_PATH=$(jq -r '.failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"' "$CONFIG")
+          FAILURE_MODE=$(jq -r '.failureMode // "test"' "$CONFIG")
+          ORDINARY_FAILURE=$(jq -r '.ordinaryFailure // false' "$CONFIG")
+          NOISE_ANNOTATIONS=$(jq -r '.noiseAnnotations // 0' "$CONFIG")
+          SKIP_QUALITY_GATE=$(jq -r '.skipQualityGate // false' "$CONFIG")
+          LOG_CHANGED_TEST_LIST=$(jq -r '.logChangedTestList // false' "$CONFIG")
+          echo "noise-annotations=$NOISE_ANNOTATIONS" >> "$GITHUB_OUTPUT"
+          echo "ordinary-failure=$ORDINARY_FAILURE" >> "$GITHUB_OUTPUT"
+          if (( GITHUB_RUN_ATTEMPT > FAIL_THROUGH_ATTEMPT )); then
+            echo "E2E quality-gate test passes on attempt $GITHUB_RUN_ATTEMPT."
+            exit 0
+          fi
+
+          mkdir -p changed-files test/test-results/e2e
+          jq -n --arg path "$FAILED_TEST_PATH" \
+            '[{path: $path, changeType: "ADDED"}]' \
+            > changed-files/changed-files.json
+          if [[ "$SKIP_QUALITY_GATE" == 'true' ]]; then
+            printf '%s\n' 'PR labels: {skip-e2e-quality-gate}' 'PR base: {main}' > changed-files/pr-body.txt
+          else
+            printf '%s\n' 'PR labels: {}' 'PR base: {main}' > changed-files/pr-body.txt
+          fi
+          if [[ "$LOG_CHANGED_TEST_LIST" == 'true' ]]; then
+            echo "Changed or new test list: [ '${FAILED_TEST_PATH}' ]"
+          fi
+          if [[ "$FAILURE_MODE" == 'infrastructure' ]]; then
+            echo "Synthetic browser startup failure before any E2E test result."
+            exit 0
+          fi
+          printf '%s\n' \
+            '<testsuites>' \
+            "  <testsuite file=\"${FAILED_TEST_PATH}\" failures=\"1\" errors=\"0\">" \
+            '    <testcase name="quality gate fixture">' \
+            '      <failure message="Synthetic E2E test failure" />' \
+            '    </testcase>' \
+            '  </testsuite>' \
+            '</testsuites>' \
+            > test/test-results/e2e/e2e-quality-gate-test.xml
+
+      - name: Seed paginated fixture annotations
+        if: ${{ fromJson(steps.fixture-data.outputs.noise-annotations) > 0 }}
+        uses: actions/github-script@v8
+        env:
+          CHECK_RUN_ID: ${{ job.check_run_id }}
+          NOISE_ANNOTATIONS: ${{ steps.fixture-data.outputs.noise-annotations }}
+        with:
+          script: |
+            const count = Number(process.env.NOISE_ANNOTATIONS);
+            const annotations = Array.from({ length: count }, (_, index) => ({
+              annotation_level: 'warning',
+              end_column: 1,
+              end_line: 1,
+              message: `Pagination fixture annotation ${index + 1}`,
+              path: '.github/test/e2e-quality-gate-test.json',
+              start_column: 1,
+              start_line: 1,
+              title: 'E2E fixture noise',
+            }));
+
+            for (let index = 0; index < annotations.length; index += 50) {
+              await github.rest.checks.update({
+                check_run_id: Number(process.env.CHECK_RUN_ID),
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                output: {
+                  annotations: annotations.slice(index, index + 50),
+                  summary: 'E2E pagination fixture',
+                  title: 'E2E pagination fixture',
+                },
+              });
+            }
+
+      - name: Annotate changed/new E2E test failures
+        run: yarn tsx .github/scripts/emit-e2e-quality-gate-annotations.mts
+
+      - name: Fail changed/new E2E quality gate
+        run: |
+          FAILURE_MODE=$(jq -r '.failureMode // "test"' .github/test/e2e-quality-gate-test.json)
+          FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt // 1' .github/test/e2e-quality-gate-test.json)
+          if (( GITHUB_RUN_ATTEMPT <= FAIL_THROUGH_ATTEMPT )); then
+            if [[ "$FAILURE_MODE" == 'infrastructure' ]]; then
+              echo 'E2E quality gate failure: test/e2e/tests/e2e-quality-gate-test.spec.ts'
+              echo 'Chrome failed to start: browser startup fixture.'
+            fi
+            exit 1
+          fi
+
+  e2e-quality-gate-ordinary-test:
+    name: e2e-quality-gate-ordinary-test
+    if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'e2e-quality-gate-test-') }}
+    needs:
+      - get-requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Fail ordinary E2E fixture
+        run: |
+          if [[ "$(jq -r '.ordinaryFailure // false' .github/test/e2e-quality-gate-test.json)" == 'true' ]]; then
+            exit 1
+          fi
+
+  e2e-quality-gate-retryable-blocker-test:
+    name: Prepare dependencies
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'e2e-quality-gate-test-annotation' }}
+    needs:
+      - get-requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Emit retryable blocker failure
+        run: |
+          echo 'ETIMEDOUT: synthetic dependency download failure'
+          exit 1
+
   test-lint:
     name: Test lint
     if: ${{ needs.get-requirements.outputs.needs-lint == 'true' }}
@@ -618,6 +755,8 @@ jobs:
       - prep-deps
       - lint-workflows
       - retry-policy-test
+      - e2e-quality-gate-test
+      - e2e-quality-gate-ordinary-test
       - test-lint
       - repository-health-checks
       - test-storybook
