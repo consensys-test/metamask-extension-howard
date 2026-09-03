@@ -97,7 +97,7 @@ jobs:
         github.event_name == 'merge_group'
         || (
           github.event_name == 'pull_request'
-          && startsWith(github.head_ref, 'retry-policy-test-')
+          && github.head_ref == 'e2e-quality-gate-test-annotation'
         )
       }}
     needs:
