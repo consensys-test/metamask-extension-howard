@@ -1,6 +1,6 @@
 {
-  "failThroughAttempt": 0,
-  "failedTestPath": "test/e2e/tests/e2e-quality-gate-test.pw.spec.ts",
+  "failThroughAttempt": 1,
+  "failedTestPaths": ["test/e2e/tests/e2e-quality-gate-test.pw.spec.ts"],
   "failureMode": "test",
   "logChangedTestList": true,
   "retryableBlocker": false,

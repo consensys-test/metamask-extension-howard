@@ -1,5 +1,6 @@
 import {
   E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE,
+  E2E_QUALITY_GATE_FAILURE_ANNOTATION_MESSAGE,
   getE2eQualityGateFailurePaths,
   hasE2eQualityGateFailure,
 } from './e2e-quality-gate.mts';
@@ -35,6 +36,12 @@ describe('E2E quality gate failures', () => {
         [{ title: E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE }],
       ),
     ).toBe(true);
+  });
+
+  it('explains why the test failure is terminal', () => {
+    expect(E2E_QUALITY_GATE_FAILURE_ANNOTATION_MESSAGE).toBe(
+      'This changed or new E2E test failed. CI will not retry it automatically; review the failure output and fix the test before rerunning CI.',
+    );
   });
 
   it('does not match arbitrary annotation text', () => {
