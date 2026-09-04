@@ -57,6 +57,11 @@ jobs:
             let allPassed = true;
             let onlyCancelled = true;
             const errors = [];
+            const directMainE2eFailure =
+              context.payload.pull_request?.base?.ref === 'main'
+              && ['e2e-chrome', 'e2e-firefox'].some(
+                (job) => needs[job]?.result === 'failure',
+              );
 
             for (const [job, { result }] of Object.entries(needs)) {
               if (!result) {
@@ -129,6 +134,17 @@ jobs:
                 .write();
             }
 
+            if (qualityGateFailures.length > 0 || directMainE2eFailure) {
+              // Prefer the changed/new test reason when both policies apply
+              // to the same run because retry-ci cannot override that gate.
+              core.setOutput(
+                'e2eRetryWithheldDescription',
+                qualityGateFailures.length > 0
+                  ? "There's a failure in changed/new E2E tests, so we shouldn't be retrying this"
+                  : 'A PR to main with an E2E failure requires the retry-ci label to retry',
+              );
+            }
+
             // Three-state result: success, cancelled (all failures are cancellations), failure
             const checkResult = allPassed ? 'success' : (onlyCancelled ? 'cancelled' : 'failure');
             core.setOutput('checkResult', checkResult);
@@ -136,22 +152,26 @@ jobs:
             for (const msg of errors) core.error(msg);
             core.setOutput('errors', errors.join('\n'));
 
-      - name: Post E2E quality-gate status
+      - name: Post E2E retry-withheld status
         if: >-
           ${{
-            steps.check.outputs.hasE2eQualityGateFailure == 'true' &&
+            steps.check.outputs.e2eRetryWithheldDescription != '' &&
             (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
           }}
         uses: actions/github-script@v8
+        env:
+          E2E_RETRY_WITHHELD_DESCRIPTION: ${{ steps.check.outputs.e2eRetryWithheldDescription }}
         with:
           script: |
+            // One visible status covers both reasons automatic E2E retry can
+            // be withheld; the description tells reviewers which one applied.
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha: process.env.HEAD_COMMIT_HASH,
               state: 'failure',
-              context: 'E2E quality gate failed',
-              description: 'Automatic retry withheld',
+              context: 'E2E retry withheld',
+              description: process.env.E2E_RETRY_WITHHELD_DESCRIPTION,
             });
 
       # ── Retry gate (merge queue only) ──────────────────────────────
