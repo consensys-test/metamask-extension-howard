@@ -3,5 +3,6 @@
   "failThroughAttempt": 2,
   "failureType": "transient",
   "skipEverything": false,
+  "skipEverythingPullRequest": true,
   "scenario": "merge-group-e2e-matrix-completion"
 }

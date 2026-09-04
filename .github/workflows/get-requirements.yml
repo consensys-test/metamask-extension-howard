@@ -99,7 +99,7 @@ jobs:
             exit 0
           fi
 
-          if [[ "$(jq -r '.skipEverything // false' "$CONFIG")" == 'true' ]]; then
+          if [[ "$(jq -r '.skipEverything // false' "$CONFIG")" == 'true' || ( "$EVENT_NAME" == 'pull_request' && "$(jq -r '.skipEverythingPullRequest // false' "$CONFIG")" == 'true' ) ]]; then
             echo "skip-everything=true" >> "$GITHUB_OUTPUT"
             echo "Retry-policy test override enabled."
           fi
