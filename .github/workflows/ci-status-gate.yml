@@ -59,8 +59,9 @@ jobs:
             const errors = [];
             const directMainE2eFailure =
               context.payload.pull_request?.base?.ref === 'main'
-              && ['e2e-chrome', 'e2e-firefox'].some(
-                (job) => needs[job]?.result === 'failure',
+              && Object.entries(needs).some(
+                ([job, { result }]) =>
+                  job.startsWith('e2e-') && result === 'failure',
               );
 
             for (const [job, { result }] of Object.entries(needs)) {
