@@ -1,6 +1,6 @@
 {
-  "enabled": false,
-  "failThroughAttempt": 2,
+  "enabled": true,
+  "failThroughAttempt": 0,
   "failureType": "transient",
   "skipEverything": false,
   "skipEverythingPullRequest": true,
