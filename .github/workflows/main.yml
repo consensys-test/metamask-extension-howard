@@ -610,6 +610,7 @@ jobs:
       - get-requirements
       - e2e-chrome
       - e2e-firefox
+      - e2e-quality-gate-test
     if: >-
       ${{
         always() &&
