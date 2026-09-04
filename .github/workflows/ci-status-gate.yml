@@ -114,14 +114,16 @@ jobs:
 
             if (qualityGateFailures.length > 0) {
               const failedTests = qualityGateFailures.map(
-                ({ path }) => `Changed or new E2E test failed: ${path}. CI will not retry it automatically.`,
+                ({ path }) => path,
               );
-              errors.push(...failedTests);
+              errors.push(
+                `E2E quality gate failed; automatic retry withheld for: ${failedTests.join(', ')}`,
+              );
               allPassed = false;
               onlyCancelled = false;
               await core.summary
                 .addHeading('E2E quality gate failed')
-                .addRaw('Changed or new E2E tests failed. CI will not retry them automatically.')
+                .addRaw('Automatic retry withheld for:')
                 .addList(failedTests)
                 .write();
             }
