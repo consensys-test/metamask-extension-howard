@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "failThroughAttempt": 1,
+  "failThroughAttempt": 2,
   "failureType": "transient",
   "skipEverything": true,
   "scenario": "direct-main-e2e-without-retry-ci"
