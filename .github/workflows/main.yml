@@ -163,6 +163,11 @@ jobs:
               .failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"
             end
           ' "$CONFIG")
+          CHANGED_TEST_PATHS=$(jq -c '
+            .changedTestPaths // .failedTestPaths // [
+              .failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"
+            ]
+          ' "$CONFIG")
           FAILURE_MODE=$(jq -r '.failureMode // "test"' "$CONFIG")
           ORDINARY_FAILURE=$(jq -r '.ordinaryFailure // false' "$CONFIG")
           NOISE_ANNOTATIONS=$(jq -r '.noiseAnnotations // 0' "$CONFIG")
@@ -176,13 +181,7 @@ jobs:
           fi
 
           mkdir -p changed-files test/test-results/e2e
-          jq -n --argjson paths "$(jq -c '
-            if .failedTestPaths then
-              .failedTestPaths
-            else
-              [.failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"]
-            end
-          ' "$CONFIG")" \
+          jq -n --argjson paths "$CHANGED_TEST_PATHS" \
             '$paths | map({path: ., changeType: "ADDED"})' \
             > changed-files/changed-files.json
           if [[ "$SKIP_QUALITY_GATE" == 'true' ]]; then
