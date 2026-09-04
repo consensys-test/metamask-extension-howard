@@ -1,7 +1,7 @@
 {
-  "enabled": true,
+  "enabled": false,
   "failThroughAttempt": 2,
   "failureType": "transient",
-  "skipEverything": true,
-  "scenario": "direct-main-e2e-without-retry-ci"
+  "skipEverything": false,
+  "scenario": "merge-group-e2e-matrix-completion"
 }
