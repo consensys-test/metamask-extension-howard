@@ -441,15 +441,7 @@ jobs:
 
       - name: Fail job if checks failed
         if: ${{ steps.check.outputs.checkResult == 'failure' || steps.check.outputs.checkResult == 'cancelled' }}
-        env:
-          ERRORS: ${{ steps.check.outputs.errors }}
-        run: |
-          # Re-emit each error from the `check` step so they appear in this
-          # step's annotations (users land here, not on the `check` step).
-          while IFS= read -r line; do
-            [[ -n "$line" ]] && echo "::error::$line"
-          done <<< "$ERRORS"
-          exit 1
+        run: exit 1
 
       # This reporting method has probably been superseded by the Sentry logging, and may be removed later.
       - name: Log merge group failure
