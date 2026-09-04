@@ -156,7 +156,13 @@ jobs:
         run: |
           CONFIG=.github/test/e2e-quality-gate-test.json
           FAIL_THROUGH_ATTEMPT=$(jq -r '.failThroughAttempt // 1' "$CONFIG")
-          FAILED_TEST_PATH=$(jq -r '.failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"' "$CONFIG")
+          FAILED_TEST_PATHS=$(jq -r '
+            if .failedTestPaths then
+              .failedTestPaths[]
+            else
+              .failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"
+            end
+          ' "$CONFIG")
           FAILURE_MODE=$(jq -r '.failureMode // "test"' "$CONFIG")
           ORDINARY_FAILURE=$(jq -r '.ordinaryFailure // false' "$CONFIG")
           NOISE_ANNOTATIONS=$(jq -r '.noiseAnnotations // 0' "$CONFIG")
@@ -170,8 +176,14 @@ jobs:
           fi
 
           mkdir -p changed-files test/test-results/e2e
-          jq -n --arg path "$FAILED_TEST_PATH" \
-            '[{path: $path, changeType: "ADDED"}]' \
+          jq -n --argjson paths "$(jq -c '
+            if .failedTestPaths then
+              .failedTestPaths
+            else
+              [.failedTestPath // "test/e2e/tests/e2e-quality-gate-test.spec.ts"]
+            end
+          ' "$CONFIG")" \
+            '$paths | map({path: ., changeType: "ADDED"})' \
             > changed-files/changed-files.json
           if [[ "$SKIP_QUALITY_GATE" == 'true' ]]; then
             printf '%s\n' 'PR labels: {skip-e2e-quality-gate}' 'PR base: {main}' > changed-files/pr-body.txt
@@ -179,21 +191,24 @@ jobs:
             printf '%s\n' 'PR labels: {}' 'PR base: {main}' > changed-files/pr-body.txt
           fi
           if [[ "$LOG_CHANGED_TEST_LIST" == 'true' ]]; then
-            echo "Changed or new test list: [ '${FAILED_TEST_PATH}' ]"
+            echo "Changed or new test list: $(jq -c .path changed-files/changed-files.json)"
           fi
           if [[ "$FAILURE_MODE" == 'infrastructure' ]]; then
             echo "Synthetic browser startup failure before any E2E test result."
             exit 0
           fi
-          printf '%s\n' \
-            '<testsuites>' \
-            "  <testsuite file=\"${FAILED_TEST_PATH}\" failures=\"1\" errors=\"0\">" \
-            '    <testcase name="quality gate fixture">' \
-            '      <failure message="Synthetic E2E test failure" />' \
-            '    </testcase>' \
-            '  </testsuite>' \
-            '</testsuites>' \
-            > test/test-results/e2e/e2e-quality-gate-test.xml
+          {
+            echo '<testsuites>'
+            while IFS= read -r failed_test_path; do
+              printf '%s\n' \
+                "  <testsuite file=\"${failed_test_path}\" failures=\"1\" errors=\"0\">" \
+                '    <testcase name="quality gate fixture">' \
+                '      <failure message="Synthetic E2E test failure" />' \
+                '    </testcase>' \
+                '  </testsuite>'
+            done <<< "$FAILED_TEST_PATHS"
+            echo '</testsuites>'
+          } > test/test-results/e2e/e2e-quality-gate-test.xml
 
       - name: Seed paginated fixture annotations
         if: ${{ fromJson(steps.fixture-data.outputs.noise-annotations) > 0 }}
