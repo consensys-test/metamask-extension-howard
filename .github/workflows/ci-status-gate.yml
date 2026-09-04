@@ -116,6 +116,7 @@ jobs:
               const failedTests = qualityGateFailures.map(
                 ({ path }) => path,
               );
+              core.setOutput('hasE2eQualityGateFailure', 'true');
               errors.push(
                 `E2E quality gate failed; automatic retry withheld for: ${failedTests.join(', ')}`,
               );
@@ -134,6 +135,24 @@ jobs:
 
             for (const msg of errors) core.error(msg);
             core.setOutput('errors', errors.join('\n'));
+
+      - name: Post E2E quality-gate status
+        if: >-
+          ${{
+            steps.check.outputs.hasE2eQualityGateFailure == 'true' &&
+            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+          }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.HEAD_COMMIT_HASH,
+              state: 'failure',
+              context: 'E2E quality gate failed',
+              description: 'Automatic retry withheld',
+            });
 
       # ── Retry gate (merge queue only) ──────────────────────────────
       #
