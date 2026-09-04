@@ -549,7 +549,6 @@ jobs:
             contents: write
 
       - name: Record bundle size at commit
-        # Skip on fork repos — only record stats on the canonical repository.
         if: ${{ env.BRANCH == 'main' && !github.event.repository.fork }}
         env:
           EXTENSION_BUNDLESIZE_STATS_TOKEN: ${{ steps.token.outputs.token }}
@@ -622,6 +621,7 @@ jobs:
       checks: read
     env:
       HEAD_COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
+
 
     steps:
       - name: Check changed/new E2E test failures
