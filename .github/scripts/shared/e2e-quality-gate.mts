@@ -1,5 +1,8 @@
 export const E2E_QUALITY_GATE_FAILURE_ANNOTATION_TITLE =
-  'E2E quality gate failure';
+  'E2E quality gate failed';
+
+export const E2E_QUALITY_GATE_FAILURE_ANNOTATION_MESSAGE =
+  'This changed or new E2E test failed. CI will not retry it automatically; review the failure output and fix the test before rerunning CI.';
 
 export type CheckAnnotation = {
   title?: string;
