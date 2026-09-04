@@ -79,6 +79,53 @@ jobs:
               onlyCancelled = false;
             }
 
+            const annotationTitle = 'E2E quality gate failed';
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: process.env.RUN_ID,
+                per_page: 100,
+              },
+            );
+            const qualityGateFailures = [];
+
+            for (const job of jobs) {
+              if (job.conclusion !== 'failure') {
+                continue;
+              }
+
+              const annotations = await github.paginate(
+                github.rest.checks.listAnnotations,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: job.id,
+                  per_page: 100,
+                },
+              );
+              for (const annotation of annotations) {
+                if (annotation.title === annotationTitle) {
+                  qualityGateFailures.push(annotation);
+                }
+              }
+            }
+
+            if (qualityGateFailures.length > 0) {
+              const failedTests = qualityGateFailures.map(
+                ({ path }) => `Changed or new E2E test failed: ${path}. CI will not retry it automatically.`,
+              );
+              errors.push(...failedTests);
+              allPassed = false;
+              onlyCancelled = false;
+              await core.summary
+                .addHeading('E2E quality gate failed')
+                .addRaw('Changed or new E2E tests failed. CI will not retry them automatically.')
+                .addList(failedTests)
+                .write();
+            }
+
             // Three-state result: success, cancelled (all failures are cancellations), failure
             const checkResult = allPassed ? 'success' : (onlyCancelled ? 'cancelled' : 'failure');
             core.setOutput('checkResult', checkResult);

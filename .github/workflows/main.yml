@@ -604,81 +604,6 @@ jobs:
     secrets:
       INFURA_PROJECT_ID: ${{ secrets.INFURA_PROJECT_ID }}
 
-  e2e-quality-gate:
-    name: E2E quality gate
-    needs:
-      - get-requirements
-      - e2e-chrome
-      - e2e-firefox
-      - e2e-quality-gate-test
-    if: >-
-      ${{
-        always() &&
-        !cancelled()
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      checks: read
-    env:
-      HEAD_COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
-
-
-    steps:
-      - name: Check changed/new E2E test failures
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const annotationTitle = 'E2E quality gate failed';
-            const checkRuns = await github.paginate(
-              github.rest.checks.listForRef,
-              {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: process.env.HEAD_COMMIT_HASH,
-                per_page: 100,
-              },
-            );
-            const failures = [];
-
-            for (const checkRun of checkRuns) {
-              if (checkRun.conclusion !== 'failure') {
-                continue;
-              }
-
-              const annotations = await github.paginate(
-                github.rest.checks.listAnnotations,
-                {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  check_run_id: checkRun.id,
-                  per_page: 100,
-                },
-              );
-              for (const annotation of annotations) {
-                if (annotation.title === annotationTitle) {
-                  failures.push({ checkRun, annotation });
-                }
-              }
-            }
-
-            if (failures.length === 0) {
-              core.info('No changed or new E2E test failures found.');
-              return;
-            }
-
-            const failedTests = failures.map(
-              ({ annotation }) => `- ${annotation.path}: ${annotation.message}`,
-            );
-            await core.summary
-              .addHeading('E2E quality gate failed')
-              .addRaw('Changed or new E2E tests failed. CI will not retry them automatically.')
-              .addList(failedTests)
-              .write();
-            core.setFailed(
-              `Changed or new E2E test failed: ${failures.map(({ annotation }) => annotation.path).join(', ')}`,
-            );
-
   build-storybook:
     name: Build storybook
     if: ${{ needs.get-requirements.outputs.skip-everything != 'true' && needs.get-requirements.outputs.builds-from-run == github.run_id }}
@@ -815,6 +740,7 @@ jobs:
   ci-status-gate:
     if: ${{ !cancelled() }}
     permissions:
+      actions: read
       pull-requests: read
       statuses: write
       checks: read
@@ -855,7 +781,6 @@ jobs:
       - prep-e2e
       - e2e-chrome
       - e2e-firefox
-      - e2e-quality-gate
       - build-storybook
       - build-ts-migration-dashboard
       - trigger-regression-validation
