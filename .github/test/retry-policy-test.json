@@ -4,5 +4,6 @@
   "failureType": "transient",
   "skipEverything": false,
   "skipEverythingPullRequest": true,
+  "matrixTest": true,
   "scenario": "merge-group-e2e-matrix-completion"
 }

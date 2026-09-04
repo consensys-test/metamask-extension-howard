@@ -76,6 +76,7 @@ jobs:
       needs-releases: ${{ steps.set-needs-releases.outputs.needs-releases || 'false' }}
       needs-benchmarks: ${{ steps.set-needs-benchmarks.outputs.needs-benchmarks || 'false' }}
       needs-e2e: ${{ steps.set-needs-e2e.outputs.needs-e2e || 'false' }}
+      matrix-test: ${{ steps.retry-policy-test.outputs.matrix-test || 'false' }}
     steps:
       - name: Check pull request merge queue status
         id: check-skip-merge-queue
@@ -102,6 +103,10 @@ jobs:
           if [[ "$(jq -r '.skipEverything // false' "$CONFIG")" == 'true' || ( "$EVENT_NAME" == 'pull_request' && "$(jq -r '.skipEverythingPullRequest // false' "$CONFIG")" == 'true' ) ]]; then
             echo "skip-everything=true" >> "$GITHUB_OUTPUT"
             echo "Retry-policy test override enabled."
+          fi
+
+          if [[ "$(jq -r '.matrixTest // false' "$CONFIG")" == 'true' ]]; then
+            echo "matrix-test=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check E2E quality-gate test override
@@ -576,7 +581,10 @@ jobs:
         if: >-
           ${{
             env.IS_RUN_EVERYTHING_BRANCH == 'false' && (
-              steps.check-skip-merge-queue.outputs.up-to-date == 'true' ||
+              (
+                steps.check-skip-merge-queue.outputs.up-to-date == 'true' &&
+                steps.retry-policy-test.outputs.matrix-test != 'true'
+              ) ||
               steps.retry-policy-test.outputs.skip-everything == 'true' ||
               steps.e2e-quality-gate-test.outputs.skip-everything == 'true' ||
               steps.set-needs-locales.outputs.needs-locales == 'true' ||
@@ -707,6 +715,7 @@ jobs:
         id: set-needs-e2e
         if: ${{ steps.set-skip-everything.outputs.skip-everything != 'true' }}
         env:
+          MATRIX_TEST: ${{ steps.retry-policy-test.outputs.matrix-test }}
           SKIP_E2E: ${{ steps.e2e-override.outputs.skip }}
           FORCE_E2E: ${{ steps.e2e-override.outputs.force }}
           BUILDS_FROM_BASE_BRANCH: ${{ steps.find-reusable-builds.outputs.builds-from-base-branch }}
@@ -728,6 +737,12 @@ jobs:
           if [[ "$IS_RUN_EVERYTHING_BRANCH" == "true" ]]; then
             echo "needs-e2e=true" >> "$GITHUB_OUTPUT"
             echo "-> needs-e2e=true (run-everything branch)"
+            exit 0
+          fi
+
+          if [[ "$MATRIX_TEST" == "true" ]]; then
+            echo "needs-e2e=true" >> "$GITHUB_OUTPUT"
+            echo "-> needs-e2e=true (matrix test override)"
             exit 0
           fi
 
