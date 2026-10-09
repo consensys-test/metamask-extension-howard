@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [99.98.3]
+
+### Fixed
+
+- Fixed a predecessor fixture issue (#45844)
+
 ## [13.46.1]
 
 ### Fixed
@@ -3079,7 +3085,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This changelog was split off with 12.22.0
 - All older changes can be found in [docs/CHANGELOG_older.md](https://github.com/MetaMask/metamask-extension/blob/main/docs/CHANGELOG_older.md)
 
-[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v13.46.1...HEAD
+[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v99.98.3...HEAD
+[99.98.3]: https://github.com/MetaMask/metamask-extension/compare/v13.46.1...v99.98.3
 [13.46.1]: https://github.com/MetaMask/metamask-extension/compare/v13.46.0...v13.46.1
 [13.46.0]: https://github.com/MetaMask/metamask-extension/compare/v13.45.1...v13.46.0
 [13.45.1]: https://github.com/MetaMask/metamask-extension/compare/v13.45.0...v13.45.1
