@@ -21,7 +21,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/MetaMask/metamask-extension.git"
+    "url": "https://github.com/consensys-test/metamask-extension-howard.git"
   },
   "scripts": {
     "webpack": "tsx ./development/webpack/launch.ts",
