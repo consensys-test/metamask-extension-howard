@@ -1,6 +1,6 @@
 {
   "name": "metamask-crx",
-  "version": "13.48.0",
+  "version": "99.99.0",
   "private": true,
   "imports": {
     "#ui/*": [
@@ -21,7 +21,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/MetaMask/metamask-extension.git"
+    "url": "https://github.com/consensys-test/metamask-extension-howard.git"
   },
   "scripts": {
     "webpack": "tsx ./development/webpack/launch.ts",
