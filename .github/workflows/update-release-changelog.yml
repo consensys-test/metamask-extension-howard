@@ -22,7 +22,7 @@ jobs:
         env:
           AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
           RELEASE_CHANGELOG_RACE_TEST_PAUSE_MS: '45000'
-          RELEASE_CHANGELOG_RACE_TEST_READY_BRANCH: race-test-ready-105-0-0
+          RELEASE_CHANGELOG_RACE_TEST_READY_BRANCH: race-test-ready-106-0-0
         with:
           release-branch: ${{ github.ref_name }}
           repository-url: ${{ github.server_url }}/${{ github.repository }}
