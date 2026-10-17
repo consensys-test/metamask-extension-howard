@@ -18,7 +18,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Update Release Changelog
-        uses: MetaMask/github-tools/.github/actions/update-release-changelog@5424672a21c0ee167c3ee61b750008a667f6d814
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@a521b9f98a401c1f8059523af06fa098199cbc93
         env:
           AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
         with:
