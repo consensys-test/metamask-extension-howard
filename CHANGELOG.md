@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Updated code owner checks with additional logging (#68)
-- Added merge queue reshuffle companion checks (#79)
-- Updated merge queue retry test coverage for retry guards (#91)
+- Added logging to code owner checks (#68)
+- Updated merge queue reshuffle checks (#79)
+- Updated merge queue retry guard test coverage (#91)
 
 ## [99.98.3]
 
