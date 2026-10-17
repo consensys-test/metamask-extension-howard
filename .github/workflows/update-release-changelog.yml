@@ -18,9 +18,11 @@ jobs:
       pull-requests: write
     steps:
       - name: Update Release Changelog
-        uses: MetaMask/github-tools/.github/actions/update-release-changelog@a521b9f98a401c1f8059523af06fa098199cbc93
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@1e0bfc6d2bf47736731111321b266185a859ca40
         env:
           AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+          RELEASE_CHANGELOG_RACE_TEST_PAUSE_MS: '45000'
+          RELEASE_CHANGELOG_RACE_TEST_READY_BRANCH: race-test-ready-108-0-0
         with:
           release-branch: ${{ github.ref_name }}
           repository-url: ${{ github.server_url }}/${{ github.repository }}
