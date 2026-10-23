@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [99.99.0]
 
+### Added
+
+- Added a test-only Codeowners Plus CI fixture (#67)
+
 ### Changed
 
 - Updated code owner checks with additional logging (#68)
