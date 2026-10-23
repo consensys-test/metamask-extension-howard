@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated code owner checks with additional logging (#68)
 - Added merge queue reshuffle and retry guard coverage (#79, #91)
 
+### Fixed
+
+- Fixed fixture alignment (#71)
+
 ## [99.98.3]
 
 ### Fixed
