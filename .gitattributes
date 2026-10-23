@@ -28,5 +28,3 @@ app/*.html linguist-language=EJS
 # breaking bash with `$'\r': command not found` and `set: invalid option`.
 *.sh text eol=lf
 
-
-CHANGELOG.md -text
