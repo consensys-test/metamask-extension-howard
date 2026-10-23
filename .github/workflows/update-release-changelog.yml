@@ -1,0 +1,30 @@
+name: Update Release Changelog PR
+
+on:
+  push:
+    branches:
+      - 'release/[0-9]+.[0-9]+.[0-9]+-ota'
+
+concurrency:
+  group: update-release-changelog-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh-changelog:
+    name: Update changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Update Release Changelog
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@cbdab5c4e25f904f87baaecdb7c45ba874bbea21
+        env:
+          AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+        with:
+          release-branch: ${{ github.ref_name }}
+          repository-url: ${{ github.server_url }}/${{ github.repository }}
+          platform: extension
+          previous-version-ref: 'null'
+          github-token: ${{ secrets.PR_TOKEN }}
+          auto-changelog-ref: e608bb40cf29cdc28526f2e8547aaf75cd9d840e
