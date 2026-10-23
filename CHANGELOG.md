@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a predecessor fixture issue (#45844)
+- Fixed combined fixture issues (#81, #82)
 
 ## [13.46.1]
 
