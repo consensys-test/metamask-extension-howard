@@ -87,6 +87,16 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Check release retry test override
+        id: release-retry-test
+        if: ${{ startsWith(env.BRANCH, 'release/') }}
+        run: |
+          CONFIG=.github/test/release-retry-test.json
+          if [[ "$(jq -r '.skipEverything // false' "$CONFIG")" == "true" ]]; then
+            echo "skip-everything=true" >> "$GITHUB_OUTPUT"
+            echo "Release retry test override enabled."
+          fi
+
       - name: Fetch HEAD commit for message checks
         if: ${{ steps.check-skip-merge-queue.outputs.up-to-date != 'true' }}
         run: git fetch --depth=1 origin "${HEAD_COMMIT_HASH}"
@@ -550,6 +560,7 @@ jobs:
           ${{
             env.IS_RUN_EVERYTHING_BRANCH == 'false' && (
               steps.check-skip-merge-queue.outputs.up-to-date == 'true' ||
+              steps.release-retry-test.outputs.skip-everything == 'true' ||
               steps.set-needs-locales.outputs.needs-locales == 'true' ||
               steps.set-just-repository-health-checks.outputs.just-repository-health-checks == 'true' ||
               steps.set-just-package-json-version.outputs.just-package-json-version == 'true'
