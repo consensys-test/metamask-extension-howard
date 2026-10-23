@@ -27,4 +27,4 @@ jobs:
           platform: extension
           previous-version-ref: 'null'
           github-token: ${{ secrets.PR_TOKEN }}
-          auto-changelog-ref: 2c6add72405d66b70b2566e719c2ae8f0a64603f
+          auto-changelog-ref: e608bb40cf29cdc28526f2e8547aaf75cd9d840e
