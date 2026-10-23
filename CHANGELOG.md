@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [103.0.0]
+
+### Fixed
+
+- Fixed OTA fixture alignment (#72)
+
 ## [99.99.0]
 
 ### Changed
@@ -3093,7 +3099,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This changelog was split off with 12.22.0
 - All older changes can be found in [docs/CHANGELOG_older.md](https://github.com/MetaMask/metamask-extension/blob/main/docs/CHANGELOG_older.md)
 
-[Unreleased]: https://github.com/consensys-test/metamask-extension-howard/compare/v99.99.0...HEAD
+[Unreleased]: https://github.com/consensys-test/metamask-extension-howard/compare/v103.0.0...HEAD
+[103.0.0]: https://github.com/consensys-test/metamask-extension-howard/compare/v99.99.0...v103.0.0
 [99.99.0]: https://github.com/consensys-test/metamask-extension-howard/compare/v99.98.3...v99.99.0
 [99.98.3]: https://github.com/consensys-test/metamask-extension-howard/compare/v13.46.1...v99.98.3
 [13.46.1]: https://github.com/consensys-test/metamask-extension-howard/compare/v13.46.0...v13.46.1
