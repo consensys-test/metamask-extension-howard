@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [999.999.999]
+
+### Fixed
+
+- Destination fixture entry that must be preserved
+
 ## [13.46.1]
 
 ### Fixed
