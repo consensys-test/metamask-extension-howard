@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.53.1]
+
+### Added
+
+- Added an earn section and banner to eligible stablecoin and aToken details pages (#47056)
+- Added deep links to notification settings and supported preference sections (#46753)
+- Added a Perps outage banner with help-center and support links across trading screens when enabled (#46864)
+- Added token symbols to Crypto and Stocks search result subtitles (#47045)
+- Added an About section to Perps market details so users can read a short description of the underlying asset (#46610)
+- Added feature-flagged Money account calls to action to eligible token rows (#46923)
+- Improved error reporting for lifetime earnings API failures (#47078)
+
+### Changed
+
+- Improved transaction simulation accuracy for verified contracts (#47025)
+- Improved transaction event reporting when smart transaction fee requests failed (#46825)
+- Moved Import NFT from a modal to a full page (#47027)
+- Reordered notification settings so Agentic CLI appears above Marketing (#47023)
+- Made the Money balance summary on the home screen open the Money page and removed its mUSD label (#46901)
+- Simplified the locked hardware wallet error modal to a single unlock instruction (#46936)
+- Improved Money account styling and layout (#47026)
+- Updated the preinstalled Stellar wallet integration (#47080)
+- Updated Perps and Predict deposits to prefill half of the selected token balance (#46892)
+- Updated the Import NFT banner to direct users to Basic Functionality when it controls NFT media (#47044)
+
+### Removed
+
+- Removed Bitcoin account label tags except in the multichain account address list (#47077)
+- Removed duplicate native token rows from Manage Tokens (#47038)
+
+### Fixed
+
+- Fixed Money account balances and earnings remaining visible when privacy mode was enabled (#47139)
+- Fixed missing native token icons for sends in the Activity tab on non-bridge networks (#47145)
+- Fixed transaction nonce reuse when the network transaction count lagged behind a confirmed transaction (#47085)
+- Fixed malicious and suspicious token warnings not appearing in Swaps when destination tokens were opened from deeplinks, the asset page, and other entry points (#47097)
+- Fixed alignment between the Money menu and the main navigation menu when scrollbars are visible (#47071)
+- Refreshed Tron energy, bandwidth, and staking details when opening the TRX token page and after Tron transactions confirmed (#46795)
+- Corrected Tempo's native currency to USD for affected users (#47074)
+- Hid fiat values in the send asset picker and amount field when Basic Functionality is disabled (#47022)
+- Prevented hardware wallet error modals from blocking swap and bridge quote browsing (#46766)
+- Prevented Bitcoin transactions with zero fees when fee estimates are invalid (#47052)
+- Prevented `0x0` placeholder transaction hashes from appearing in Money account details (#47035)
+- Matched the Add Contact network dropdown border to other form fields (#47037)
+- Fixed Stellar contract-token sends showing memo fields (#46973)
+- Fixed the home balance flashing “Fund your wallet” or a zero balance while assets loaded for the first time (#47105)
+- Fixed grammar in the Arc usage notice (#47112)
+- Fixed Tron energy and bandwidth values displaying incorrectly when data was unavailable by showing a warning instead (#47046)
+- Fixed infinite loading when sending with a Keystone hardware wallet (#47067)
+- Fixed a misleading lifetime earnings value when Money data could not be fetched (#47076)
+- Fixed Send Max transactions on Ink by accounting for Layer 1 gas fees (#46880)
+- Fixed swaps from automatically retrying after a transaction was rejected (#47060)
+- Fixed stale reverse-position fee previews during quote refreshes and unavailable estimates for malformed live Perps position values (#47016)
+- Fixed Money deposits confirming a previous Max amount when Add funds was pressed before a typed amount finished updating (#47018)
+- Fixed add-network suggestion lists so they remained open, stayed attached to the field that opened them, and preserved entered details when adding an RPC or block explorer URL (#47001)
+- Fixed native Max sends to reserve the gas estimated by the selected network (#46461)
+- Fixed Robinhood Chain explorer links for existing users (#47019)
+- Fixed a bug that hid the failed-transaction toast when a transaction failed before submission (#46872)
+- Fixed the internal error dialog so it follows the selected theme (#46890)
+- Fixed misleading insufficient network fee alerts on Monad when the 10 MON reserve balance requirement was the actual cause (#46049)
+
 ## [13.53.0]
 
 ### Added
@@ -3479,7 +3540,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This changelog was split off with 12.22.0
 - All older changes can be found in [docs/CHANGELOG_older.md](https://github.com/MetaMask/metamask-extension/blob/main/docs/CHANGELOG_older.md)
 
-[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v13.53.0...HEAD
+[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v13.53.1...HEAD
+[13.53.1]: https://github.com/MetaMask/metamask-extension/compare/v13.53.0...v13.53.1
 [13.53.0]: https://github.com/MetaMask/metamask-extension/compare/v13.52.0...v13.53.0
 [13.52.0]: https://github.com/MetaMask/metamask-extension/compare/v13.51.0...v13.52.0
 [13.51.0]: https://github.com/MetaMask/metamask-extension/compare/v13.50.0...v13.51.0
