@@ -35,12 +35,24 @@ const mockSetNetworkClientIdForDomain = jest.fn(
 const mockAddPermittedChain = jest.fn(
   (_origin: string, _chainId: string) => () => Promise.resolve(),
 );
+const mockShowPermittedNetworkToast = jest.fn();
 const mockUpdateCustomNonce = jest.fn(() => ({ type: 'UPDATE_CUSTOM_NONCE' }));
 const mockSetNextNonce = jest.fn(() => ({ type: 'SET_NEXT_NONCE' }));
 const mockDetectNfts = jest.fn((_) => () => Promise.resolve());
 const mockSetTokenNetworkFilter = jest.fn((_) => ({
   type: 'SET_TOKEN_NETWORK_FILTER',
 }));
+
+jest.mock(
+  '../../../hooks/multichain-accounts/usePermittedNetworkToast',
+  () => ({
+    usePermittedNetworkToast: () => ({
+      showPermittedNetworkToast: (...args: unknown[]) =>
+        mockShowPermittedNetworkToast(...args),
+      dismissPermittedNetworkToast: jest.fn(),
+    }),
+  }),
+);
 
 jest.mock('../../../store/actions', () => ({
   ...jest.requireActual('../../../store/actions'),
@@ -62,8 +74,7 @@ const mockGetOrderedNetworksList = jest.fn();
 const mockGetOriginOfCurrentTab = jest.fn();
 const mockGetPermittedEVMChainsForSelectedTab = jest.fn();
 const mockGetPreferences = jest.fn();
-const mockGetShouldShowTestNetworks = jest.fn();
-const mockGetIsTestnetInUse = jest.fn();
+const mockGetShowTestNetworks = jest.fn();
 const mockGetAllChainsToPoll = jest.fn();
 
 jest.mock('../../../selectors', () => ({
@@ -75,9 +86,7 @@ jest.mock('../../../selectors', () => ({
   getOriginOfCurrentTab: (state: unknown) => mockGetOriginOfCurrentTab(state),
   getPermittedEVMChainsForSelectedTab: (state: unknown, activeTab: unknown) =>
     mockGetPermittedEVMChainsForSelectedTab(state, activeTab),
-  getShouldShowTestNetworks: (state: unknown) =>
-    mockGetShouldShowTestNetworks(state),
-  getIsTestnetInUse: (state: unknown) => mockGetIsTestnetInUse(state),
+  getShowTestNetworks: (state: unknown) => mockGetShowTestNetworks(state),
   getAllChainsToPoll: (state: unknown) => mockGetAllChainsToPoll(state),
 }));
 
@@ -187,9 +196,7 @@ const setupSelectors = ({
   mockGetOriginOfCurrentTab.mockReturnValue(origin);
   mockGetPermittedEVMChainsForSelectedTab.mockReturnValue(permittedChainIds);
   mockGetPreferences.mockReturnValue({ tokenNetworkFilter });
-  const isTestnetInUse = dappActiveChainId === '0xaa36a7';
-  mockGetIsTestnetInUse.mockReturnValue(isTestnetInUse);
-  mockGetShouldShowTestNetworks.mockReturnValue(showTestnets || isTestnetInUse);
+  mockGetShowTestNetworks.mockReturnValue(showTestnets);
   mockGetAllChainsToPoll.mockReturnValue(['0x1', '0x38', '0xaa36a7']);
   mockGetDappActiveNetwork.mockReturnValue(
     dappActiveChainId
@@ -308,6 +315,10 @@ describe('DappBarNetworkSelectorPopover', () => {
       expect(mockAddPermittedChain).not.toHaveBeenCalled();
     });
 
+    it('does not surface the permitted-network toast', () => {
+      expect(mockShowPermittedNetworkToast).not.toHaveBeenCalled();
+    });
+
     it('activates the selected network client', () => {
       expect(mockSetActiveNetwork).toHaveBeenCalledWith(BNB_CLIENT_ID);
     });
@@ -370,6 +381,10 @@ describe('DappBarNetworkSelectorPopover', () => {
       );
     });
 
+    it('surfaces the permitted-network toast', () => {
+      expect(mockShowPermittedNetworkToast).toHaveBeenCalledTimes(1);
+    });
+
     it('persists the per-origin network client', () => {
       expect(mockSetNetworkClientIdForDomain).toHaveBeenCalledWith(
         DAPP_ORIGIN,
@@ -414,6 +429,7 @@ describe('DappBarNetworkSelectorPopover', () => {
     });
     expect(mockSetNetworkClientIdForDomain).not.toHaveBeenCalled();
     expect(mockAddPermittedChain).not.toHaveBeenCalled();
+    expect(mockShowPermittedNetworkToast).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

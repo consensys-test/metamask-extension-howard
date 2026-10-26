@@ -1,24 +1,22 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
 const N_A = 'N/A';
 
 export function useDappSwapComparisonLatencyMetrics() {
-  const [uiInitializedTime] = useState(() => Date.now());
-  const [swapComparisonLatency, setSwapComparisonLatency] = useState<
-    number | undefined
-  >();
+  const uiInitializedTime = useRef<number>(new Date().getTime());
+  const swapComparisonLatency = useRef<number>();
 
   const updateSwapComparisonLatency = useCallback(() => {
-    if (swapComparisonLatency !== undefined) {
-      return swapComparisonLatency.toString();
+    if (swapComparisonLatency.current !== undefined) {
+      return swapComparisonLatency.current.toString();
     }
-    const latency = Date.now() - uiInitializedTime;
-    setSwapComparisonLatency(latency);
-    return latency.toString();
-  }, [swapComparisonLatency, uiInitializedTime]);
+    swapComparisonLatency.current =
+      new Date().getTime() - (uiInitializedTime.current ?? 0);
+    return swapComparisonLatency.current.toString();
+  }, []);
 
   return {
-    swapComparisonLatency: (swapComparisonLatency ?? N_A).toString(),
+    swapComparisonLatency: (swapComparisonLatency.current ?? N_A).toString(),
     updateSwapComparisonLatency,
   };
 }

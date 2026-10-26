@@ -61,8 +61,7 @@ describe('NFTs list', () => {
           '0xaa36a7': true,
         },
       },
-      optedInToMarketing: false,
-      marketingConsentDecisionMade: true,
+      dataCollectionForMarketing: false,
     };
 
     await act(async () => {

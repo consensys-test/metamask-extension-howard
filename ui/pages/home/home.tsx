@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useBottomNavBar } from '#ui/hooks/useBottomNavBar';
 import {
   MetaMetricsContextProp,
   MetaMetricsEventCategory,
@@ -193,7 +192,7 @@ export default function Home() {
     lastVisitedPerpsRoute,
     pendingRedirectRoute,
     envType,
-    navigate,
+    setRedirectAfterDefaultPage: setRedirectAfterDefaultPageAction,
     clearLastVisitedPerpsRoute,
   });
 
@@ -234,9 +233,6 @@ export default function Home() {
     setBasicFunctionalityModalOpen();
   }, [setBasicFunctionalityModalOpen]);
 
-  const showNavbar = useBottomNavBar();
-  const appHeader = showNavbar ? null : <AppHeader />;
-
   if (forgottenPassword) {
     return <Navigate to={RESTORE_VAULT_ROUTE} replace />;
   }
@@ -248,9 +244,9 @@ export default function Home() {
   if (location.pathname === CONNECTED_ROUTE) {
     return (
       <>
-        {appHeader}
+        <AppHeader />
         <div className="flex flex-col flex-1 min-h-0">
-          <ScrollContainer className="main-container main-container--has-shadow min-h-0 flex-1">
+          <ScrollContainer className="main-container main-container--has-shadow">
             <ConnectedSites navigate={navigate} />
           </ScrollContainer>
           <DappConnectionControlBar />
@@ -262,9 +258,9 @@ export default function Home() {
   if (location.pathname === CONNECTED_ACCOUNTS_ROUTE) {
     return (
       <>
-        {appHeader}
+        <AppHeader />
         <div className="flex flex-col flex-1 min-h-0">
-          <ScrollContainer className="main-container main-container--has-shadow min-h-0 flex-1">
+          <ScrollContainer className="main-container main-container--has-shadow">
             <ConnectedAccounts navigate={navigate} />
           </ScrollContainer>
           <DappConnectionControlBar />
@@ -273,58 +269,46 @@ export default function Home() {
     );
   }
 
-  const homeBody = (
-    <>
-      <div className="home__container" data-testid="parent-selector-home">
-        <MetaMetricsConsentContainer />
-        <PasswordOutdatedModalContainer />
-        <MultiRpcEditModalContainer />
-        <UpdateModalContainer />
-        <RecoveryPhraseReminderContainer />
-        <TermsOfUsePopupContainer />
-        <ShieldEntryModalContainer />
-        <RewardsModalContainer />
-        <DeeplinkQrCodeModalContainer />
-        <Pna25ModalContainer />
-        <ConnectedStatusPopoverContainer />
-        <div className="home__main-view">
-          <AccountOverview
-            onSupportLinkClick={onSupportLinkClick}
-            useExternalServices={useExternalServices ?? false}
-            setBasicFunctionalityModalOpen={handleBasicFunctionalityModalOpen}
-          />
-          {(isBeta() || isFlask()) && (
-            <div className="home__support">
-              <BetaAndFlaskHomeFooter />
-            </div>
-          )}
-        </div>
-        <HomeNotificationsContainer />
-        <ImportedTokensNotificationContainer />
-      </div>
-      <HomeDeepLinkActions />
-      <ShieldCohortContainer />
-    </>
-  );
-
   return (
     <>
-      {appHeader}
-      {showNavbar ? (
-        <div className="flex min-h-full flex-col">
-          <div className="grow">{homeBody}</div>
-          <div className="sticky bottom-0 shrink-0 group-has-[.bottom-nav-bar]/shell:bottom-16 z-10">
-            <DappConnectionControlBar />
+      <AppHeader />
+      <div className="flex flex-col flex-1 min-h-0">
+        <ScrollContainer className="main-container main-container--has-shadow">
+          <div className="home__container">
+            <MetaMetricsConsentContainer />
+            <PasswordOutdatedModalContainer />
+            <MultiRpcEditModalContainer />
+            <UpdateModalContainer />
+            <RecoveryPhraseReminderContainer />
+            <TermsOfUsePopupContainer />
+            <ShieldEntryModalContainer />
+            <RewardsModalContainer />
+            <DeeplinkQrCodeModalContainer />
+            <Pna25ModalContainer />
+            <ConnectedStatusPopoverContainer />
+            <div className="home__main-view">
+              <AccountOverview
+                onSupportLinkClick={onSupportLinkClick}
+                useExternalServices={useExternalServices ?? false}
+                setBasicFunctionalityModalOpen={
+                  handleBasicFunctionalityModalOpen
+                }
+              />
+              {(isBeta() || isFlask()) && (
+                <div className="home__support">
+                  <BetaAndFlaskHomeFooter />
+                </div>
+              )}
+            </div>
+            <HomeNotificationsContainer />
+            <ImportedTokensNotificationContainer />
           </div>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <ScrollContainer className="main-container main-container--has-shadow min-h-0 flex-1">
-            {homeBody}
-          </ScrollContainer>
-          <DappConnectionControlBar />
-        </div>
-      )}
+
+          <HomeDeepLinkActions />
+          <ShieldCohortContainer />
+        </ScrollContainer>
+        <DappConnectionControlBar />
+      </div>
     </>
   );
 }

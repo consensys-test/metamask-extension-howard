@@ -271,16 +271,13 @@ export function useMusdConversion(): UseMusdConversionResult {
 
         await ensureMusdTokenPromise;
 
-        navigate(
-          {
-            pathname: `${CONFIRM_TRANSACTION_ROUTE}/${txId}`,
-            search: new URLSearchParams({
-              loader: ConfirmationLoader.CustomAmount,
-              goBackTo: location.pathname + location.search,
-            }).toString(),
-          },
-          { replace: true },
-        );
+        navigate({
+          pathname: `${CONFIRM_TRANSACTION_ROUTE}/${txId}`,
+          search: new URLSearchParams({
+            loader: ConfirmationLoader.CustomAmount,
+            goBackTo: location.pathname + location.search,
+          }).toString(),
+        });
 
         if (preferredToken?.address) {
           await updateTransactionPaymentToken({

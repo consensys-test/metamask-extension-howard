@@ -6,10 +6,7 @@ import {
   MetaMetricsEventName,
 } from '../../shared/constants/metametrics';
 import { resolveABTestAssignment } from '../../shared/lib/ab-testing/resolve-ab-test-assignment';
-import {
-  getRemoteFeatureFlags,
-  getFeatureFlagThresholdGroups,
-} from '../../shared/lib/selectors/remote-feature-flags';
+import { getRemoteFeatureFlags } from '../../shared/lib/selectors/remote-feature-flags';
 import { useAnalytics } from './useAnalytics';
 
 /**
@@ -107,12 +104,10 @@ export function useABTest<TVariants extends ABTestVariants>(
   const trackExposure = options?.trackExposure ?? true;
   const { trackEvent, createEventBuilder } = useAnalytics();
   const flags = useSelector(getRemoteFeatureFlags);
-  const thresholdGroups = useSelector(getFeatureFlagThresholdGroups);
   const { variantName, isActive } = resolveABTestAssignment(
     flags,
     flagKey,
     Object.keys(variants),
-    thresholdGroups,
   );
   const variationDisplayName =
     exposureMetadata?.variationNames?.[

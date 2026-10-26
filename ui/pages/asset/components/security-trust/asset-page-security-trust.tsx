@@ -18,7 +18,7 @@ import {
   getResultTypeConfig,
   type ResultTypeConfig,
 } from '../../utils/security-utils';
-import { SecurityTrustInlineBadge } from '../../../../components/app/security-trust';
+import { SecurityTrustVerifiedBadge } from '../../../../components/app/security-trust';
 import { SecurityBanner } from './security-banner';
 import {
   SecurityTrustEntryCard,
@@ -302,9 +302,8 @@ export const AssetPageSecurityTrustHeaderBadge = () => {
   }
 
   return (
-    <SecurityTrustInlineBadge
+    <SecurityTrustVerifiedBadge
       badge={context.securityConfig.badge}
-      testId="security-badge-verified"
       onClick={context.openInfoSheet}
     />
   );

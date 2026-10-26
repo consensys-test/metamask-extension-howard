@@ -10,11 +10,11 @@ import type {
   AnalyticsEvent,
   AnalyticsEventBuildOptions,
 } from '../../../../shared/lib/analytics/create-event-builder';
-import type { OnboardingControllerGetStateAction } from '../../controllers/onboarding';
 import type {
-  SentryTracingServiceBufferedEndTraceAction,
-  SentryTracingServiceBufferedTraceAction,
-} from '../sentry/sentry-tracing-service-method-action-types';
+  TraceRequest,
+  EndTraceRequest,
+} from '../../../../shared/lib/trace';
+import type { OnboardingControllerGetStateAction } from '../../controllers/onboarding';
 import ExtensionPlatform from '../../platforms/extension';
 import { AuthConnection } from '../../../../shared/constants/onboarding';
 import { OAuthServiceMethodActions } from './oauth-service-method-action-types';
@@ -40,9 +40,7 @@ export type OAuthServiceAction =
   | SeedlessOnboardingControllerGetStateAction
   | SeedlessOnboardingControllerGetAccessTokenAction
   | OnboardingControllerGetStateAction
-  | GeolocationControllerGetGeolocationAction
-  | SentryTracingServiceBufferedTraceAction
-  | SentryTracingServiceBufferedEndTraceAction;
+  | GeolocationControllerGetGeolocationAction;
 
 /**
  * All possible events that the OAuthService can emit.
@@ -153,6 +151,15 @@ export type OAuthServiceOptions = {
    * The extension platform abstraction for browser tab lifecycle handling.
    */
   platform: ExtensionPlatform;
+
+  /**
+   * Buffered trace methods that handle consent checking
+   */
+  bufferedTrace: (
+    request: TraceRequest,
+    fn?: (context?: unknown) => unknown,
+  ) => void;
+  bufferedEndTrace: (request: EndTraceRequest) => void;
 
   /**
    * Track an analytics event built with createEventBuilder.

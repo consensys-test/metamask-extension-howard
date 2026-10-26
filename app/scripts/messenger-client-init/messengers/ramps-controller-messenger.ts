@@ -4,7 +4,6 @@ import {
   type MessengerEvents,
 } from '@metamask/messenger';
 import {
-  RAMPS_CONTROLLER_REQUIRED_CONTROLLER_ACTIONS,
   RAMPS_CONTROLLER_REQUIRED_SERVICE_ACTIONS,
   type RampsControllerMessenger,
 } from '@metamask/ramps-controller';
@@ -19,8 +18,8 @@ import {
 import { RootMessenger } from '../../lib/messenger';
 
 /**
- * Get the messenger for the RampsController. Delegates the RampsService,
- * TransakService, and controller actions required by the controller.
+ * Get the messenger for the RampsController. Delegates the RampsService and
+ * TransakService actions required by the controller.
  *
  * @param messenger - The root messenger.
  * @returns The RampsControllerMessenger.
@@ -38,10 +37,7 @@ export function getRampsControllerMessenger(
 
   messenger.delegate({
     messenger: controllerMessenger,
-    actions: [
-      ...RAMPS_CONTROLLER_REQUIRED_SERVICE_ACTIONS,
-      ...RAMPS_CONTROLLER_REQUIRED_CONTROLLER_ACTIONS,
-    ],
+    actions: [...RAMPS_CONTROLLER_REQUIRED_SERVICE_ACTIONS],
     events: [],
   });
 

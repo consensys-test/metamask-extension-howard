@@ -4,17 +4,19 @@ import {
   Button,
   ButtonVariant,
   ButtonSize,
-  ModalContent,
-  Modal,
-  ModalOverlay,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
 } from '@metamask/design-system-react';
 import { getEnvironmentType } from '../../../shared/lib/environment-type';
 import { ENVIRONMENT_TYPE_POPUP } from '../../../shared/constants/app';
 import { useI18nContext } from '../../hooks/useI18nContext';
 import { setConnectedStatusPopoverHasBeenShown } from '../../store/actions';
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from '../../components/component-library';
 import ZENDESK_URLS from '../../helpers/constants/zendesk-url';
 import type { MetaMaskReduxState } from '../../store/store';
 import { useDispatch } from '../../store/hooks';
@@ -45,12 +47,7 @@ export function ConnectedStatusPopoverContainer() {
     >
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader
-          onClose={onDismiss}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
-          {t('whatsThis')}
-        </ModalHeader>
+        <ModalHeader onClose={onDismiss}>{t('whatsThis')}</ModalHeader>
         <ModalBody>
           <div className="home__connect-status-text">
             <div>{t('metaMaskConnectStatusParagraphOne')}</div>

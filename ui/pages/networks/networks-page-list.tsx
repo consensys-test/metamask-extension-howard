@@ -35,15 +35,15 @@ import { useI18nContext } from '../../hooks/useI18nContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useIsNetworkGasSponsored } from '../../hooks/useIsNetworkGasSponsored';
 import { selectAdditionalNetworksBlacklistFeatureFlag } from '../../selectors/network-blacklist/network-blacklist';
+import { getSelectedMultichainNetworkChainId } from '../../selectors/multichain/networks';
 import {
-  getIsTestnetInUse,
   getOrderedNetworksList,
-  getShouldShowTestNetworks,
-} from '../../selectors';
+  getShowTestNetworks,
+} from '../../selectors/selectors';
 import {
   addNetwork,
   setEditedNetwork,
-  setShowTestNetworksPreference,
+  setShowTestNetworks,
 } from '../../store/actions';
 import {
   CHAIN_ID_TO_NETWORK_IMAGE_URL_MAP,
@@ -176,7 +176,10 @@ export const NetworksPageList = ({
   const { trackEvent, createEventBuilder } = useAnalytics();
 
   const orderedNetworksList = useSelector(getOrderedNetworksList);
-  const showTestnets = useSelector(getShouldShowTestNetworks);
+  const showTestnets = useSelector(getShowTestNetworks);
+  const currentMultichainChainId = useSelector(
+    getSelectedMultichainNetworkChainId,
+  );
   const evmNetworks = useSelector(getNetworkConfigurationsByChainId);
   const blacklistedChainIds = useSelector(
     selectAdditionalNetworksBlacklistFeatureFlag,
@@ -233,7 +236,13 @@ export const NetworksPageList = ({
     [testNetworks, searchQuery],
   );
 
-  const currentlyOnTestnet = useSelector(getIsTestnetInUse);
+  const currentlyOnTestnet = useMemo(
+    () =>
+      Object.values(testNetworks).some(
+        (network) => network.chainId === currentMultichainChainId,
+      ),
+    [currentMultichainChainId, testNetworks],
+  );
   const showNoSearchResults =
     searchQuery.trim().length > 0 &&
     defaultNetworks.length === 0 &&
@@ -286,7 +295,7 @@ export const NetworksPageList = ({
       }
 
       const newValue = !value;
-      dispatch(setShowTestNetworksPreference(newValue));
+      dispatch(setShowTestNetworks(newValue));
       trackEvent(
         createEventBuilder(MetaMetricsEventName.TestNetworksDisplayed)
           .addCategory(MetaMetricsEventCategory.Network)
@@ -357,7 +366,7 @@ export const NetworksPageList = ({
               </Text>
               <ToggleButton
                 dataTestId="networks-page-show-test-networks"
-                value={showTestnets}
+                value={showTestnets || currentlyOnTestnet}
                 disabled={currentlyOnTestnet}
                 onToggle={handleToggleTestNetworks}
               />
@@ -365,7 +374,7 @@ export const NetworksPageList = ({
           </>
         ) : null}
 
-        {showTestnets ? (
+        {showTestnets || currentlyOnTestnet ? (
           <Box className="pb-2">
             {sortedTestNetworks.map(renderNetworkListItem)}
           </Box>

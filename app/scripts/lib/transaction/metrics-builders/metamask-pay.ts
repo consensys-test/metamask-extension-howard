@@ -24,11 +24,6 @@ type TransactionData = TransactionPayControllerState['transactionData'][string];
 const PAY_TYPES = [
   TransactionType.perpsDeposit,
   TransactionType.perpsWithdraw,
-  TransactionType.predictDeposit,
-  TransactionType.predictDepositAndOrder,
-  TransactionType.predictWithdraw,
-  TransactionType.moneyAccountDeposit,
-  TransactionType.moneyAccountWithdraw,
   TransactionType.musdConversion,
   TransactionType.musdClaim,
 ];
@@ -36,11 +31,6 @@ const PAY_TYPES = [
 const USE_CASE_MAP: [TransactionType[], string][] = [
   [[TransactionType.perpsDeposit], 'perps_deposit'],
   [[TransactionType.perpsWithdraw], 'perps_withdraw'],
-  [[TransactionType.predictDeposit], 'predict_deposit'],
-  [[TransactionType.predictDepositAndOrder], 'predict_deposit_and_order'],
-  [[TransactionType.predictWithdraw], 'predict_withdraw'],
-  [[TransactionType.moneyAccountDeposit], 'money_account_deposit'],
-  [[TransactionType.moneyAccountWithdraw], 'money_account_withdraw'],
   [[TransactionType.musdConversion], 'musd_conversion'],
   [[TransactionType.musdClaim], 'musd_claim'],
 ];
@@ -186,10 +176,6 @@ function addPayTypeProperties(
       transactionId,
     )?.properties;
 
-  if (fragmentProperties?.mm_pay_entry_point !== undefined) {
-    properties.mm_pay_entry_point = fragmentProperties.mm_pay_entry_point;
-  }
-
   const prefilledAmount = fragmentProperties?.mm_pay_prefilled_amount;
 
   if (prefilledAmount !== undefined) {
@@ -245,18 +231,6 @@ function addPayTypeProperties(
   }
 
   if (!txPayData) {
-    const persistedSendingValue = transaction.assetsFiatValues?.sending;
-    const persistedReceivingValue =
-      metamaskPay.targetFiat ?? transaction.assetsFiatValues?.receiving;
-
-    if (persistedSendingValue !== undefined) {
-      properties.mm_pay_sending_value_usd = Number(persistedSendingValue);
-    }
-
-    if (persistedReceivingValue !== undefined) {
-      properties.mm_pay_receiving_value_usd = Number(persistedReceivingValue);
-    }
-
     return;
   }
 

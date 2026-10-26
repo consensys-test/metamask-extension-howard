@@ -31,10 +31,7 @@ export function getProviderBuyLimit(
 type TranslateFn = ReturnType<typeof useI18nContext>;
 
 /**
- * Formats a provider buy limit for payment method list display.
- *
- * Shows "{max} limit" when a maximum is published, or a minimum-only
- * label when only a min is available.
+ * Formats a provider min/max buy limit for payment method list display.
  *
  * @param limit - Structured buy limit, when available.
  * @param formatFiat - Fiat amount formatter.
@@ -53,12 +50,19 @@ export function formatPaymentMethodLimits(
   const hasMin = Number.isFinite(limit.minAmount);
   const hasMax = Number.isFinite(limit.maxAmount);
 
-  if (hasMax) {
-    return t('rampsPaymentMethodLimits', [formatFiat(limit.maxAmount)]);
+  if (hasMin && hasMax) {
+    return t('rampsPaymentMethodLimits', [
+      formatFiat(limit.minAmount),
+      formatFiat(limit.maxAmount),
+    ]);
   }
 
   if (hasMin) {
     return t('rampsPaymentMethodMinLimit', [formatFiat(limit.minAmount)]);
+  }
+
+  if (hasMax) {
+    return t('rampsPaymentMethodMaxLimit', [formatFiat(limit.maxAmount)]);
   }
 
   return null;

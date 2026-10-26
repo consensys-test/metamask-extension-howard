@@ -11,10 +11,6 @@ import {
   isDefiControllerV2Enabled,
   type DefiControllerV2FeatureFlag,
 } from '../../../../shared/lib/defi-controller-v2/remote-feature-flag';
-import {
-  getBackendApiUrlsOption,
-  isBackendAuthDisabled,
-} from '../../../../shared/lib/core-backend-api-urls';
 
 /**
  * Cached API client instance shared across init calls (matches AssetsController).
@@ -30,9 +26,6 @@ let apiClient: ApiPlatformClient | null = null;
 async function safeGetBearerToken(
   initMessenger: DeFiPositionsControllerV2InitMessenger,
 ): Promise<string | undefined> {
-  if (isBackendAuthDisabled()) {
-    return undefined;
-  }
   try {
     return await initMessenger.call('AuthenticationController:getBearerToken');
   } catch {
@@ -54,7 +47,6 @@ function getApiClient(
       clientProduct: 'metamask-extension',
       clientVersion: process.env.METAMASK_VERSION,
       getBearerToken: () => safeGetBearerToken(initMessenger),
-      ...getBackendApiUrlsOption(),
     });
   }
   return apiClient;

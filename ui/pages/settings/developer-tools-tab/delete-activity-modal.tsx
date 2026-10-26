@@ -10,13 +10,19 @@ import {
   TextVariant,
   TextColor,
   FontWeight,
+} from '@metamask/design-system-react';
+import {
   Modal,
+  ModalContent,
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  ModalContent,
-} from '@metamask/design-system-react';
-import { toast } from '../../../components/ui/toast/toast';
+} from '../../../components/component-library';
+import {
+  AlignItems,
+  Display,
+  FlexDirection,
+} from '../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { resetAccount } from '../../../store/actions';
 import { useDispatch } from '../../../store/hooks';
@@ -34,7 +40,6 @@ export default function DeleteActivityModal({
   const deleteActivityData = async () => {
     await dispatch(resetAccount());
     onClose();
-    toast.success(t('activityAndNonceDataDeleted'));
   };
 
   return (
@@ -45,15 +50,13 @@ export default function DeleteActivityModal({
     >
       <ModalOverlay />
       <ModalContent
-        className="items-center"
+        alignItems={AlignItems.center}
         modalDialogProps={{
-          flexDirection: BoxFlexDirection.Column,
+          display: Display.Flex,
+          flexDirection: FlexDirection.Column,
         }}
       >
-        <ModalHeader
-          onClose={onClose}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
+        <ModalHeader onClose={onClose}>
           <Box
             flexDirection={BoxFlexDirection.Column}
             alignItems={BoxAlignItems.Center}

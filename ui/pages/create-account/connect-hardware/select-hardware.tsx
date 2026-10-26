@@ -232,10 +232,7 @@ const SelectHardware = ({
 
   if (!browserSupported) {
     return (
-      <Page
-        className="select-hardware"
-        data-testid="parent-selector-connect-hardware-wallet-page"
-      >
+      <Page className="select-hardware">
         <Header
           textProps={{
             variant: LegacyTextVariant.headingSm,
@@ -267,10 +264,7 @@ const SelectHardware = ({
   }
 
   return (
-    <Page
-      className="select-hardware"
-      data-testid="parent-selector-connect-hardware-wallet-page"
-    >
+    <Page className="select-hardware">
       <Header
         textProps={{
           variant: LegacyTextVariant.headingSm,

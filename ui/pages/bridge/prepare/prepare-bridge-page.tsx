@@ -14,11 +14,13 @@ import {
   formatAddressToCaipReference,
 } from '@metamask/bridge-controller';
 import { Box, BoxBackgroundColor } from '@metamask/design-system-react';
+import { BRIDGE_ONLY_CHAINS } from '../../../../shared/constants/bridge';
 import { endTrace, TraceName } from '../../../../shared/lib/trace';
 import {
   setFromToken,
   setFromTokenInputValue,
   setSelectedQuote,
+  setToToken,
   updateQuoteRequestParams,
   trackUnifiedSwapBridgeEvent,
   setIsSrcAssetPickerOpen,
@@ -35,6 +37,7 @@ import {
   getSlippage,
   getIsSlippageUserOverride,
   getToChain,
+  getToChains,
   getToToken,
   getWasTxDeclined,
   getFromAmountInCurrency,
@@ -44,9 +47,9 @@ import {
   getFromAccount,
   getIsStxEnabled,
   getValidatedFromValue,
+  getIsSrcAssetPickerOpen,
+  getIsDestAssetPickerOpen,
   getQuoteRequestInsufficientBal,
-  getFromTokenBalance,
-  getQuoteStreamComplete,
 } from '../../../ducks/bridge/selectors';
 import {
   AvatarFavicon,
@@ -82,13 +85,13 @@ import {
 import { useDestinationAccount } from '../hooks/useDestinationAccount';
 import { useBridgeAlerts } from '../hooks/useBridgeAlerts';
 import { useSecurityAlerts } from '../hooks/useSecurityAlerts';
+import { useEnsureNetworkEnabled } from '../hooks/useEnsureNetworkEnabled';
 import { useGasIncludedSupport } from '../hooks/useGasIncludedSupport';
 import { getTokenSecurityAssetKey } from '../utils/token-security';
 import { useDispatch } from '../../../store/hooks';
 import { getCurrentCurrency } from '../../../ducks/metamask/metamask';
 import { getCurrencySymbol } from '../../../helpers/utils/common.util';
 import { useSourceInputAmount } from '../../../hooks/bridge/useSourceInputAmount';
-import { swapQuoteFetchTrace } from '../utils/swap-quote-fetch-trace';
 import { BridgeInputGroup } from './bridge-input-group';
 import { PrepareBridgePageFooter } from './prepare-bridge-page-footer';
 import { DestinationAccountPickerModal } from './components/destination-account-picker-modal';
@@ -97,13 +100,8 @@ import { BridgeAlertBannerList } from './components/bridge-alert-banner-list';
 
 const PrepareBridgePage = ({
   onOpenSettings,
-  swapViewTrace = { id: '', prefilledAmount: false },
 }: {
   onOpenSettings: () => void;
-  swapViewTrace?: {
-    id: string;
-    prefilledAmount: boolean;
-  };
 }) => {
   const dispatch = useDispatch();
 
@@ -120,6 +118,7 @@ const PrepareBridgePage = ({
   );
 
   const fromChains = useSelector(getFromChains);
+  const toChains = useSelector(getToChains);
   const toChain = useSelector(getToChain);
 
   const fromAmount = useSelector(getFromAmount);
@@ -140,15 +139,14 @@ const PrepareBridgePage = ({
   const quoteRequest = useSelector(getQuoteRequest);
   const {
     isLoading,
-    quoteFetchError,
     // This quote may be older than the refresh rate, but we keep it for display purposes
     activeQuote: unvalidatedQuote,
   } = useSelector(getBridgeQuotes);
-  const fromTokenBalance = useSelector(getFromTokenBalance);
-  const quoteStreamComplete = useSelector(getQuoteStreamComplete);
   const { dest } = unvalidatedQuote?.quote ?? {};
 
   const wasTxDeclined = useSelector(getWasTxDeclined);
+  const isSrcAssetPickerOpen = useSelector(getIsSrcAssetPickerOpen);
+  const isDestAssetPickerOpen = useSelector(getIsDestAssetPickerOpen);
 
   const isQuoteRequestInsufficientBal = useSelector(
     getQuoteRequestInsufficientBal,
@@ -239,6 +237,8 @@ const PrepareBridgePage = ({
 
   useLatestBalance();
 
+  const ensureNetworkEnabled = useEnsureNetworkEnabled();
+
   const [rotateSwitchTokens, setRotateSwitchTokens] = useState(false);
 
   // Background updates are debounced when the switch button is clicked
@@ -246,15 +246,8 @@ const PrepareBridgePage = ({
   // from switching tokens within the debounce period
   const [isSwitchingTemporarilyDisabled, setIsSwitchingTemporarilyDisabled] =
     useState(false);
-  const isFirstRotateEffectRef = useRef(true);
   useEffect(() => {
-    if (isFirstRotateEffectRef.current) {
-      isFirstRotateEffectRef.current = false;
-      return undefined;
-    }
-    queueMicrotask(() => {
-      setIsSwitchingTemporarilyDisabled(true);
-    });
+    setIsSwitchingTemporarilyDisabled(true);
     const switchButtonTimer = setTimeout(() => {
       setIsSwitchingTemporarilyDisabled(false);
     }, SECOND);
@@ -278,51 +271,44 @@ const PrepareBridgePage = ({
   }, [isLoading]);
 
   const isToOrFromNonEvm = useSelector(getIsToOrFromNonEvm);
-  const fromTokenAssetId = fromToken?.assetId;
-  const toTokenAssetId = toToken?.assetId;
-  const fromTokenChainId = fromToken?.chainId;
-  const toTokenChainId = toToken?.chainId;
-  const selectedAccountAddress = selectedAccount?.address;
-  const selectedDestinationAccountAddress = selectedDestinationAccount?.address;
-  const providerConfigRpcUrl = providerConfig?.rpcUrl;
   const quoteParams:
     | Parameters<BridgeController['updateBridgeQuoteRequestParams']>[0]
     | undefined = useMemo(() => {
-    if (!selectedAccountAddress) {
+    if (!selectedAccount?.address) {
       return undefined;
     }
     return {
-      srcTokenAddress: fromTokenAssetId
-        ? formatAddressToCaipReference(fromTokenAssetId)
+      srcTokenAddress: fromToken?.assetId
+        ? formatAddressToCaipReference(fromToken.assetId)
         : undefined,
-      destTokenAddress: toTokenAssetId
-        ? formatAddressToCaipReference(toTokenAssetId)
+      destTokenAddress: toToken?.assetId
+        ? formatAddressToCaipReference(toToken.assetId)
         : undefined,
       srcTokenAmount: validatedFromValue,
-      srcChainId: fromTokenChainId,
-      destChainId: toTokenChainId,
+      srcChainId: fromToken?.chainId,
+      destChainId: toToken?.chainId,
       // This override allows quotes to be returned when the rpcUrl is a forked network
       // Otherwise quotes get filtered out by the bridge-api when the wallet's real
       // balance is less than the tenderly balance
-      insufficientBal: providerConfigRpcUrl?.includes('localhost')
+      insufficientBal: providerConfig?.rpcUrl?.includes('localhost')
         ? true
         : isQuoteRequestInsufficientBal,
       ...(slippage === undefined ? {} : { slippage }),
-      walletAddress: selectedAccountAddress,
-      destWalletAddress: selectedDestinationAccountAddress,
+      walletAddress: selectedAccount.address,
+      destWalletAddress: selectedDestinationAccount?.address,
       gasIncluded,
       gasIncluded7702,
     };
   }, [
-    fromTokenAssetId,
-    toTokenAssetId,
+    fromToken?.assetId,
+    toToken?.assetId,
     validatedFromValue,
-    fromTokenChainId,
-    toTokenChainId,
+    fromToken?.chainId,
+    toToken?.chainId,
     slippage,
-    selectedAccountAddress,
-    selectedDestinationAccountAddress,
-    providerConfigRpcUrl,
+    selectedAccount?.address,
+    selectedDestinationAccount?.address,
+    providerConfig?.rpcUrl,
     gasIncluded,
     gasIncluded7702,
     isQuoteRequestInsufficientBal,
@@ -333,25 +319,9 @@ const PrepareBridgePage = ({
   // The function contains reactive dependencies, but they are `dispatch` and an action,
   // making it safe not to worry about recreating this function on dependency updates.
   const debouncedUpdateQuoteRequestInController = useRef(
-    debounce(
-      (
-        params: Parameters<typeof updateQuoteRequestParams>[0],
-        eventProperties: Parameters<typeof updateQuoteRequestParams>[1],
-        isRefresh = false,
-      ) => {
-        if (isValidQuoteRequest(params)) {
-          swapQuoteFetchTrace.start({
-            srcChainId: params.srcChainId,
-            destChainId: params.destChainId,
-            isRefresh,
-          });
-        } else {
-          swapQuoteFetchTrace.finish('cancelled');
-        }
-        dispatch(updateQuoteRequestParams(params, eventProperties));
-      },
-      300,
-    ),
+    debounce((...args: Parameters<typeof updateQuoteRequestParams>) => {
+      dispatch(updateQuoteRequestParams(...args));
+    }, 300),
   );
   const previousSlippageRef = useRef(slippage);
 
@@ -360,7 +330,6 @@ const PrepareBridgePage = ({
     previousSlippageRef.current = slippage;
 
     if (!quoteParams) {
-      swapQuoteFetchTrace.finish('cancelled');
       return;
     }
 
@@ -394,59 +363,26 @@ const PrepareBridgePage = ({
       // eslint-disable-next-line @typescript-eslint/naming-convention
       usd_amount_source: fromAmountInCurrency.usd.toNumber(),
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      custom_slippage: isSlippageUserOverride,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       feature_id: FeatureId.UNIFIED_SWAP_BRIDGE,
     };
     debouncedUpdateQuoteRequestInController.current(
       quoteParams,
       eventProperties,
     );
-  }, [dispatch, isSlippageUserOverride, quoteParams, slippage]);
+  }, [quoteParams, isSlippageUserOverride, slippage]);
 
-  const isQuoteSurfaceReady = Boolean(
-    quoteFetchError || (quoteStreamComplete && !isLoading),
-  );
-  const isPageLoadReady = Boolean(
-    fromToken &&
-    toToken &&
-    fromTokenBalance !== null &&
-    (!swapViewTrace.prefilledAmount || isQuoteSurfaceReady),
-  );
-  const hasCompletedPageLoadTraceRef = useRef(false);
-
+  // Trace swap/bridge view loaded
   useEffect(() => {
-    if (
-      !isPageLoadReady ||
-      !fromToken ||
-      !toToken ||
-      hasCompletedPageLoadTraceRef.current
-    ) {
-      return;
-    }
-
     endTrace({
       name: TraceName.SwapViewLoaded,
-      id: swapViewTrace.id,
       timestamp: Date.now(),
-      data: {
-        result: 'success',
-        /* eslint-disable @typescript-eslint/naming-convention -- Sentry trace attributes use snake_case */
-        src_chain_id: formatChainIdToCaip(fromToken.chainId),
-        dest_chain_id: formatChainIdToCaip(toToken.chainId),
-        /* eslint-enable @typescript-eslint/naming-convention */
-      },
     });
-    hasCompletedPageLoadTraceRef.current = true;
-  }, [fromToken, fromTokenBalance, isPageLoadReady, swapViewTrace.id, toToken]);
 
-  useEffect(
-    () => () => {
+    return () => {
       // This `ref` is safe from unintended mutations, because it points to a function reference, not any reactive node or element.
       debouncedUpdateQuoteRequestInController.current.cancel();
-    },
-    [],
-  );
+    };
+  }, []);
 
   const [showBlockExplorerToast, setShowBlockExplorerToast] = useState(false);
   const [blockExplorerToken, setBlockExplorerToken] =
@@ -484,22 +420,26 @@ const PrepareBridgePage = ({
         onClose={() => setIsMarketClosedModalOpen(false)}
       />
 
-      <Column
-        className="prepare-bridge-page flex-1"
-        gap={4}
-        data-testid="parent-selector-bridge-quote"
-      >
+      <Column className="prepare-bridge-page" gap={4}>
         <BridgeInputGroup
+          isAssetPickerOpen={isSrcAssetPickerOpen}
           setIsAssetPickerOpen={(isOpen) =>
             dispatch(setIsSrcAssetPickerOpen(isOpen))
           }
+          header={t('swapSelectToken')}
           token={fromToken}
           tokenSecurityData={
             selectedTokenSecurityData[
               getTokenSecurityAssetKey(fromToken.assetId)
             ]
           }
+          accountAddress={selectedAccount?.address}
           onAmountChange={sourceInputAmount.handleAmountChange}
+          onAssetChange={async (token) => {
+            await ensureNetworkEnabled(token.chainId);
+            dispatch(setFromToken(token));
+          }}
+          networks={fromChains}
           onMaxButtonClick={
             shouldShowMaxButton
               ? (value: string) => {
@@ -633,6 +573,7 @@ const PrepareBridgePage = ({
                       formatTokenAmount(locale, previousDestAmount),
                     ),
                   );
+                dispatch(setToToken(fromToken));
               }}
             />
           </Box>
@@ -646,8 +587,13 @@ const PrepareBridgePage = ({
           />
 
           <BridgeInputGroup
+            isAssetPickerOpen={isDestAssetPickerOpen}
             setIsAssetPickerOpen={(isOpen) =>
               dispatch(setIsDestAssetPickerOpen(isOpen))
+            }
+            header={t('swapSelectToken')}
+            accountAddress={
+              selectedDestinationAccount?.address ?? selectedAccount.address
             }
             token={toToken}
             tokenSecurityData={
@@ -655,6 +601,18 @@ const PrepareBridgePage = ({
                 getTokenSecurityAssetKey(toToken.assetId)
               ]
             }
+            // If the fromChain is a bridge-only chain, disable it in the toChain picker
+            disabledChainId={
+              fromChain?.chainId &&
+              BRIDGE_ONLY_CHAINS.includes(fromChain.chainId)
+                ? fromChain.chainId
+                : undefined
+            }
+            onAssetChange={async (newToToken) => {
+              await ensureNetworkEnabled(newToToken.chainId);
+              dispatch(setToToken(newToToken));
+            }}
+            networks={toChains}
             secondaryDisplay={destinationSecondaryDisplay}
             amountInputPrefix={
               isDestinationFiatPrimary ? getCurrencySymbol(currency) : undefined
@@ -710,14 +668,15 @@ const PrepareBridgePage = ({
 
         {!isInitialQuoteLoading && (
           <Column
-            className="sticky bottom-0 z-10 flex-1 shrink-0 group-has-[.bottom-nav-bar]/shell:bottom-16"
             justifyContent={JustifyContent.flexEnd}
             width={BlockSize.Full}
+            height={BlockSize.Full}
             gap={3}
             paddingInline={4}
             paddingTop={4}
             paddingBottom={4}
             backgroundColor={BackgroundColor.backgroundDefault}
+            style={{ position: 'sticky', bottom: 0 }}
           >
             <PrepareBridgePageFooter
               onFetchNewQuotes={() => {
@@ -728,33 +687,29 @@ const PrepareBridgePage = ({
                   return;
                 }
                 setAlertModalProps({});
-                debouncedUpdateQuoteRequestInController.current(
-                  quoteParams,
-                  {
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    stx_enabled: smartTransactionsEnabled,
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    token_symbol_source: fromToken?.symbol ?? '',
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    token_symbol_destination: toToken?.symbol ?? '',
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    token_security_type_destination:
-                      toToken?.securityData?.type ?? null,
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    security_warnings: securityWarnings,
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    usd_amount_source: fromAmountInCurrency.usd.toNumber(),
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    feature_id: FeatureId.UNIFIED_SWAP_BRIDGE,
-                  },
-                  true,
-                );
+                debouncedUpdateQuoteRequestInController.current(quoteParams, {
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  stx_enabled: smartTransactionsEnabled,
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  token_symbol_source: fromToken?.symbol ?? '',
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  token_symbol_destination: toToken?.symbol ?? '',
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  token_security_type_destination:
+                    toToken?.securityData?.type ?? null,
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  security_warnings: securityWarnings,
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  usd_amount_source: fromAmountInCurrency.usd.toNumber(),
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  feature_id: FeatureId.UNIFIED_SWAP_BRIDGE,
+                });
               }}
               needsDestinationAddress={
                 isToOrFromNonEvm && !selectedDestinationAccount

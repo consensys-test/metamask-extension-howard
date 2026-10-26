@@ -3,7 +3,6 @@ import { fireEvent, waitFor } from '@testing-library/react';
 import configureMockStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
 import { renderWithProvider } from '../../../test/lib/render-helpers-navigate';
-import { enLocale as messages } from '../../../test/lib/i18n-helpers';
 import { CreatePasswordForm } from '.';
 
 const mockTrackEvent = jest.fn();
@@ -71,22 +70,6 @@ describe('CreatePasswordForm', () => {
     );
 
     expect(getByRole('checkbox')).not.toBeChecked();
-  });
-
-  it('renders an error message when error is true', () => {
-    const { getByTestId } = renderWithProvider(
-      <CreatePasswordForm
-        isSocialLoginFlow={false}
-        onSubmit={jest.fn()}
-        onBack={jest.fn()}
-        error
-      />,
-      createMockStore(),
-    );
-
-    expect(getByTestId('create-password-error')).toHaveTextContent(
-      messages.notificationsSettingsBoxError.message,
-    );
   });
 
   it('onsubmit called with correct passwords and terms checked', async () => {

@@ -17,10 +17,8 @@ import {
   ButtonSize,
   ButtonVariant,
   FontWeight,
-  Icon,
-  IconColor,
-  IconName,
-  IconSize,
+  IconColor as DsIconColor,
+  IconName as DsIconName,
   ModalHeader,
   Text,
   TextColor,
@@ -38,6 +36,9 @@ import {
 } from '../../../../../../shared/lib/network.utils';
 import { isEvmChainId } from '../../../../../../shared/lib/asset-utils';
 import {
+  Icon,
+  IconName,
+  IconSize,
   Modal,
   ModalContent,
   ModalContentSize,
@@ -57,7 +58,7 @@ import {
 } from '../../../../../selectors/multichain/networks';
 import {
   getOrderedNetworksList,
-  getShouldShowTestNetworks,
+  getShowTestNetworks,
   getUseExternalServices,
 } from '../../../../../selectors';
 import {
@@ -76,12 +77,11 @@ import { useDispatch } from '../../../../../store/hooks';
 type HomeNetworkFilterModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onPendingChange?: (isPending: boolean) => void;
 };
 
 type NetworkRowProps = {
   name: string;
-  iconSrc?: string;
+  iconSrc?: string | IconName;
   chainId?: string;
   selected?: boolean;
   disabled?: boolean;
@@ -94,8 +94,7 @@ type NetworkRowProps = {
 export type NetworkSelectionItem = {
   key: string;
   name: string;
-  iconName?: IconName;
-  iconSrc?: string;
+  iconSrc?: string | IconName;
   chainId?: string;
   selected?: boolean;
   disabled?: boolean;
@@ -128,6 +127,9 @@ type NetworkSelectionModalProps = {
 
 const getSelectableChainId = (network: MultichainNetworkConfiguration) =>
   network.isEvm ? convertCaipToHexChainId(network.chainId) : network.chainId;
+
+const isIconName = (iconSrc?: string | IconName): iconSrc is IconName =>
+  Object.values(IconName).includes(iconSrc as IconName);
 
 const SectionHeader = ({
   children,
@@ -183,7 +185,7 @@ const HomeNetworkFilterRow = ({
     <Box data-testid={testId}>
       <NetworkListItem
         name={name}
-        iconSrc={iconSrc}
+        iconSrc={isIconName(iconSrc) ? (iconSrc as string) : iconSrc}
         chainId={chainId}
         selected={selected}
         disabled={disabled}
@@ -196,22 +198,25 @@ const HomeNetworkFilterRow = ({
   );
 };
 
+const getDsIconName = (iconName: IconName): DsIconName =>
+  Object.keys(IconName).find(
+    (key) => IconName[key as keyof typeof IconName] === iconName,
+  ) as DsIconName;
+
 const NetworkSelectionItemIcon = ({
   name,
-  iconName,
   iconSrc,
 }: {
   name: string;
-  iconName?: IconName;
   iconSrc?: string;
 }) => {
-  if (iconName) {
+  if (isIconName(iconSrc)) {
     return (
       <AvatarIcon
-        iconName={iconName}
+        iconName={getDsIconName(iconSrc)}
         size={AvatarIconSize.Md}
         severity={AvatarIconSeverity.Neutral}
-        iconProps={{ color: IconColor.IconDefault }}
+        iconProps={{ color: DsIconColor.IconDefault }}
       />
     );
   }
@@ -270,7 +275,6 @@ export const NetworkSelectionModal = ({
                 <Box className="flex min-w-0 items-center gap-3">
                   <NetworkSelectionItemIcon
                     name={topItem.name}
-                    iconName={topItem.iconName}
                     iconSrc={topItem.iconSrc}
                   />
                   <Text
@@ -316,7 +320,7 @@ export const NetworkSelectionModal = ({
             <Box className="px-4 pt-4">
               <Button
                 data-testid={footerButton.testId}
-                className="h-12 w-full border-0 bg-muted hover:bg-muted-hover active:bg-muted-pressed"
+                className="h-12 w-full rounded-xl border-0 bg-muted hover:bg-muted-hover active:bg-muted-pressed"
                 size={ButtonSize.Md}
                 variant={ButtonVariant.Secondary}
                 onClick={footerButton.onClick}
@@ -338,10 +342,8 @@ export const NetworkSelectionModal = ({
 
 const HomeNetworkFilterModalContent = ({
   onClose,
-  onPendingChange,
 }: {
   onClose: () => void;
-  onPendingChange?: (isPending: boolean) => void;
 }) => {
   const t = useI18nContext();
   const dispatch = useDispatch();
@@ -356,7 +358,7 @@ const HomeNetworkFilterModalContent = ({
   );
   const enabledNetworks = useSelector(getAllEnabledNetworksForAllNamespaces);
   const useExternalServices = useSelector(getUseExternalServices);
-  const showTestnets = useSelector(getShouldShowTestNetworks);
+  const showTestnets = useSelector(getShowTestNetworks);
   const blacklistedChainIds = useSelector(
     selectAdditionalNetworksBlacklistFeatureFlag,
   );
@@ -383,15 +385,7 @@ const HomeNetworkFilterModalContent = ({
       );
     },
   );
-  const { handleNetworkChange, isPending } = useNetworkChangeHandlers();
-
-  const handleClose = useCallback(() => {
-    if (isPending) {
-      return;
-    }
-    onClose();
-  }, [isPending, onClose]);
-
+  const { handleNetworkChange } = useNetworkChangeHandlers();
   const {
     nonTestNetworks: allDefaultNetworkMap,
     isNetworkInDefaultNetworkTab,
@@ -492,38 +486,24 @@ const HomeNetworkFilterModalContent = ({
   }, [blacklistedChainIds, evmNetworks, useExternalServices]);
 
   const handleSelectAllDefaultNetworks = useCallback(() => {
-    if (isPending) {
-      return;
-    }
     dispatch(setEnabledAllPopularNetworks());
     onClose();
-  }, [dispatch, isPending, onClose]);
+  }, [dispatch, onClose]);
 
   const handleSelectNetwork = useCallback(
     async (chainId: CaipChainId) => {
-      if (isPending) {
-        return;
-      }
-      onPendingChange?.(true);
+      await handleNetworkChange(chainId);
       onClose();
-      try {
-        await handleNetworkChange(chainId);
-      } finally {
-        onPendingChange?.(false);
-      }
     },
-    [handleNetworkChange, isPending, onClose, onPendingChange],
+    [handleNetworkChange, onClose],
   );
 
   const handleAddNetwork = useCallback(
     async (network: AddNetworkFields) => {
-      if (isPending) {
-        return;
-      }
       await dispatch(addNetwork(network));
       onClose();
     },
-    [dispatch, isPending, onClose],
+    [dispatch, onClose],
   );
 
   const handleManageNetworks = useCallback(() => {
@@ -539,7 +519,7 @@ const HomeNetworkFilterModalContent = ({
         key: 'default-networks',
         title: hasOnlyDefaultNetworks ? undefined : t('defaultNetworks'),
         items: defaultNetworks.map((network) => ({
-          disabled: isPending || isNetworkDisabled(network),
+          disabled: isNetworkDisabled(network),
           key: network.chainId,
           name: network.name,
           iconSrc: getNetworkIcon(network),
@@ -557,7 +537,7 @@ const HomeNetworkFilterModalContent = ({
         key: 'custom-networks',
         title: t('customNetworks'),
         items: customNetworks.map((network) => ({
-          disabled: isPending || isNetworkDisabled(network),
+          disabled: isNetworkDisabled(network),
           key: network.chainId,
           name: network.name,
           iconSrc: getNetworkIcon(network),
@@ -575,7 +555,7 @@ const HomeNetworkFilterModalContent = ({
         key: 'test-networks',
         title: t('testnets'),
         items: testNetworks.map((network) => ({
-          disabled: isPending || isNetworkDisabled(network),
+          disabled: isNetworkDisabled(network),
           key: network.chainId,
           name: network.name,
           iconSrc: getNetworkIcon(network),
@@ -594,9 +574,8 @@ const HomeNetworkFilterModalContent = ({
         title: t('additionalNetworks'),
         items: additionalNetworks.map((network) => {
           const disabled =
-            isPending ||
-            (!isEvmChainId(network.chainId as CaipChainId) &&
-              isEvmOnlySelectedAccountGroup);
+            !isEvmChainId(network.chainId as CaipChainId) &&
+            isEvmOnlySelectedAccountGroup;
 
           return {
             key: network.chainId,
@@ -628,7 +607,6 @@ const HomeNetworkFilterModalContent = ({
     isEvmOnlySelectedAccountGroup,
     isNetworkDisabled,
     isNetworkSelected,
-    isPending,
     showTestnets,
     t,
     testNetworks,
@@ -637,15 +615,14 @@ const HomeNetworkFilterModalContent = ({
   return (
     <NetworkSelectionModal
       isOpen
-      onClose={handleClose}
-      data-testid="home-network-filter-modal"
+      onClose={onClose}
       title={t('bridgeSelectNetwork')}
       topItem={{
         key: 'all-default-networks',
         name: hasOnlyDefaultNetworks
           ? t('allNetworks')
           : t('allDefaultNetworks'),
-        iconName: IconName.Global,
+        iconSrc: IconName.Global,
         selected: isAllDefaultSelected,
         onClick: handleSelectAllDefaultNetworks,
         testId: 'home-network-filter-all-default',
@@ -664,12 +641,6 @@ const HomeNetworkFilterModalContent = ({
 export const HomeNetworkFilterModal = ({
   isOpen,
   onClose,
-  onPendingChange,
 }: HomeNetworkFilterModalProps) => {
-  return isOpen ? (
-    <HomeNetworkFilterModalContent
-      onClose={onClose}
-      onPendingChange={onPendingChange}
-    />
-  ) : null;
+  return isOpen ? <HomeNetworkFilterModalContent onClose={onClose} /> : null;
 };

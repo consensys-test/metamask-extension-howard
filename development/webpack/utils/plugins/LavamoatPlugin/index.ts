@@ -83,13 +83,6 @@ const getScuttleGlobalThisExceptions = (args: Args) => [
   'opr',
   // for @popperjs/core and snap simple keyring site
   'devicePixelRatio',
-  // for @floating-ui/dom (via @metamask/design-system-react Popover), which
-  // reads these off the real window returned by `ownerDocument.defaultView`
-  'parent',
-  'frameElement',
-  'scrollX',
-  'scrollY',
-  'Node',
   // for @tanstack/react-virtual
   'ResizeObserver',
   'setTimeout',
@@ -101,29 +94,7 @@ const getScuttleGlobalThisExceptions = (args: Args) => [
   ...(args.test ? ['ret_nodes', 'browser', 'chrome', 'indexedDB'] : []),
 ];
 
-type IsolatedHtmlEntries = {
-  isIsolatedHtmlEntry: (name?: string | null) => boolean;
-  getIsolatedHtmlEntryNames: () => string[];
-};
-
-const lockdownBase = [
-  String.raw`runtime\.[0-9a-h]{20}\.js`,
-  String.raw`scripts\/contentscript\.js`,
-  String.raw`service-worker\.js`,
-];
-
-function lockdownPattern(isolatedHtmlNames: string[]) {
-  const isolated = isolatedHtmlNames.map(
-    (name) =>
-      `${name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?:\\.[0-9a-h]{20})?\\.js`,
-  );
-  return new RegExp(`^(?:${[...lockdownBase, ...isolated].join('|')})$`, 'u');
-}
-
-export const lavamoatPlugin = (
-  args: Args,
-  isolatedHtml?: IsolatedHtmlEntries,
-) =>
+export const lavamoatPlugin = (args: Args) =>
   new LavaMoatPlugin({
     rootDir,
     policyLocation: join(
@@ -136,15 +107,9 @@ export const lavamoatPlugin = (
     generatePolicyOnly: args.generatePolicy,
     runChecks: true, // Candidate to disable later for performance. useful in debugging invalid JS errors, but unless the audit proves me wrong this is probably not improving security.
     readableResourceIds: true,
-    // Apply lockdown to shared runtimes and self-contained extension entrypoints.
-    // LavaMoat copies options at construct time, before WAR HTML entries exist,
-    // so this must resolve names when `.test` runs during emit.
-    inlineLockdown: {
-      test: (file: string) =>
-        lockdownPattern(isolatedHtml?.getIsolatedHtmlEntryNames() ?? []).test(
-          file,
-        ),
-    } as RegExp,
+    // we apply lockdown to 'runtime.<hash>.js', 'scripts/contentscript.js', and 'service-worker.js'.
+    inlineLockdown:
+      /^(?:runtime\.[0-9a-h]{20}\.js|scripts\/contentscript\.js|service-worker\.js)$/u,
     debugRuntime: args.lavamoatDebug,
     lockdown: {
       consoleTaming: 'unsafe',
@@ -188,20 +153,6 @@ export const lavamoatPlugin = (
             },
           },
         };
-      } else if (isolatedHtml?.isIsolatedHtmlEntry(chunk.name)) {
-        return {
-          mode: 'safe',
-          embeddedOptions: {
-            scuttleGlobalThis: {
-              enabled: true,
-              exceptions: [
-                ...getScuttleGlobalThisExceptions(args),
-                'browser',
-                'chrome',
-              ],
-            },
-          },
-        };
       } else if (chunk.name === 'runtime') {
         return {
           mode: 'safe',
@@ -227,7 +178,7 @@ export const lavamoatPlugin = (
 // Matches the app's `background` root module, which the service worker imports.
 // This is the boundary at which the 'unsafe' layer must stop, so that `background`
 // and its entire dependency graph run inside LavaMoat.
-const backgroundEntryRe = /[\\/]app[\\/]scripts[\\/]background\.(?:js|ts)$/u;
+const backgroundEntryRe = /[\\/]app[\\/]scripts[\\/]background\.js$/u;
 
 // Unsafe layer that runs code without LavaMoat. `background` is excluded here
 // because, although it is imported from the unsafe service worker, it must

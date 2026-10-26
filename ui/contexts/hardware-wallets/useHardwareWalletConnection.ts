@@ -1,6 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import { ErrorCode, HardwareWalletError } from '@metamask/hw-wallet-sdk';
-import { createHardwareWalletError } from './errors';
+import {
+  getConnectionStateFromError,
+  createHardwareWalletError,
+} from './errors';
 import { ConnectionState } from './connectionState';
 import { createAdapterForHardwareWalletType } from './adapters/factory';
 import {
@@ -153,7 +156,7 @@ export const useHardwareWalletConnection = ({
     }) => {
       if (!abortSignal.aborted) {
         if (isHardwareWalletError(error)) {
-          updateConnectionState(ConnectionState.error(error));
+          updateConnectionState(getConnectionStateFromError(error));
         } else {
           const fallbackError = createHardwareWalletError(
             ErrorCode.ConnectionClosed,
@@ -391,7 +394,7 @@ export const useHardwareWalletConnection = ({
               return false;
             }
             if (isHardwareWalletError(error)) {
-              updateConnectionState(ConnectionState.error(error));
+              updateConnectionState(getConnectionStateFromError(error));
             } else {
               const fallbackError = toHardwareWalletError(
                 error,

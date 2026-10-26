@@ -11,10 +11,10 @@ import {
 } from '../../../ui/pages/confirmations/context/confirm';
 import { DappSwapContextProvider } from '../../../ui/pages/confirmations/context/dapp-swap';
 import {
-  createProviderWrapper,
   I18nProvider,
   en,
   renderHookWithProvider,
+  renderWithProvider,
 } from '../render-helpers-navigate';
 import { DEFAULT_ROUTE } from '../../../ui/helpers/constants/routes';
 import { GasFeeModalContextProvider } from '../../../ui/pages/confirmations/context/gas-fee-modal';
@@ -26,43 +26,20 @@ export function renderWithConfirmContextProvider(
   pathname = DEFAULT_ROUTE,
   confirmationId?: string,
   getMockTrackEvent?: () => jest.Mock,
-  initialIsAmountPending = false,
 ) {
-  const ConfirmContextContainer = ({
-    children,
-  }: {
-    children: React.ReactNode;
-  }) => (
+  return renderWithProvider(
     <HardwareWalletErrorProvider>
-      <ConfirmContextProvider
-        confirmationId={confirmationId}
-        initialIsAmountPending={initialIsAmountPending}
-      >
+      <ConfirmContextProvider confirmationId={confirmationId}>
         <DappSwapContextProvider>
-          <GasFeeModalContextProvider>{children}</GasFeeModalContextProvider>
+          <GasFeeModalContextProvider>{component}</GasFeeModalContextProvider>
         </DappSwapContextProvider>
       </ConfirmContextProvider>
-    </HardwareWalletErrorProvider>
-  );
-
-  const ProviderWrapper = createProviderWrapper(
+    </HardwareWalletErrorProvider>,
     store,
     pathname,
-    getMockTrackEvent ?? (() => jest.fn().mockResolvedValue(undefined)),
+    render,
+    getMockTrackEvent,
   );
-
-  const wrapper = ({ children }: { children: React.ReactNode }) => {
-    const confirmContext = (
-      <ConfirmContextContainer>{children}</ConfirmContextContainer>
-    );
-
-    return (
-      // @ts-expect-error: React 18 ReactElement.key is Key|null, incompatible with @types/prop-types ReactNodeLike
-      <ProviderWrapper>{confirmContext}</ProviderWrapper>
-    );
-  };
-
-  return render(component, { wrapper });
 }
 
 function renderWithContext(
@@ -107,9 +84,6 @@ export function renderWithConfirmContext(
     isScrollToBottomCompleted: true,
     setIsScrollToBottomCompleted: () => undefined,
     goBackTo: undefined,
-    suppressAutoExit: () => undefined,
-    isAmountPending: false,
-    setIsAmountPending: () => undefined,
   });
 }
 

@@ -2,8 +2,7 @@ import type { Provider, QuotesResponse } from '@metamask/ramps-controller';
 import {
   buildProviderListItems,
   findProviderQuote,
-  getProviderTags,
-  type ProviderTag,
+  getProviderTag,
 } from './build-provider-list-items';
 
 const transak = {
@@ -27,22 +26,24 @@ const unsupported = {
 const t = (key: string) => key;
 
 describe('buildProviderListItems', () => {
-  it('keeps provider order while quotes are unavailable', () => {
+  it('separates unsupported assets when quotes are not displayed', () => {
     const items = buildProviderListItems({
       providers: [transak, unsupported, moonpay],
       quotes: null,
       quotesLoading: false,
       displayQuotes: false,
+      selectedTokenAssetId: 'eip155:1/slip44:60',
     });
 
     expect(items).toEqual([
       { type: 'provider', provider: transak },
-      { type: 'provider', provider: unsupported },
       { type: 'provider', provider: moonpay },
+      { type: 'separator' },
+      { type: 'provider', provider: unsupported },
     ]);
   });
 
-  it('sorts providers with quotes and hides providers without quotes', () => {
+  it('sorts providers with quotes first using reliability order', () => {
     const quotes: QuotesResponse = {
       success: [
         {
@@ -64,31 +65,15 @@ describe('buildProviderListItems', () => {
       quotes,
       quotesLoading: false,
       displayQuotes: true,
+      selectedTokenAssetId: 'eip155:1/slip44:60',
     });
 
     expect(items).toEqual([
       { type: 'provider', provider: transak },
       { type: 'provider', provider: moonpay },
+      { type: 'separator' },
+      { type: 'provider', provider: unsupported },
     ]);
-  });
-
-  it('returns no providers when no quotes succeed', () => {
-    const items = buildProviderListItems({
-      providers: [transak, moonpay],
-      quotes: {
-        success: [],
-        sorted: [],
-        error: [
-          { provider: transak.id, error: 'Quote unavailable' },
-          { provider: moonpay.id, error: 'Quote unavailable' },
-        ],
-        customActions: [],
-      },
-      quotesLoading: false,
-      displayQuotes: true,
-    });
-
-    expect(items).toEqual([]);
   });
 });
 
@@ -123,89 +108,40 @@ describe('findProviderQuote', () => {
         ?.amountOut,
     ).toBe('0.05');
   });
-
-  it('derives tags only from the matched quote, not other provider quotes', () => {
-    const quotes: QuotesResponse = {
-      success: [
-        {
-          provider: transak.id,
-          quote: {
-            amountIn: 100,
-            amountOut: '0.04',
-            paymentMethod: 'bank-transfer',
-          },
-          metadata: { tags: { isMostReliable: true } },
-        },
-        {
-          provider: transak.id,
-          quote: {
-            amountIn: 100,
-            amountOut: '0.05',
-            paymentMethod: 'debit-credit-card',
-          },
-        },
-      ],
-      sorted: [],
-      error: [],
-      customActions: [],
-    };
-
-    const matchedQuote = findProviderQuote(
-      quotes,
-      transak.id,
-      'debit-credit-card',
-    );
-    expect(matchedQuote?.quote?.amountOut).toBe('0.05');
-    expect(getProviderTags(transak.id, matchedQuote, [], t)).toStrictEqual([]);
-  });
 });
 
-describe('getProviderTags', () => {
-  it('returns previously used first, before quote tags', () => {
-    const tags: ProviderTag[] = getProviderTags(
-      transak.id,
-      {
-        provider: transak.id,
-        quote: {
-          amountIn: 1,
-          amountOut: '1',
-          paymentMethod: 'card',
-        },
-        metadata: {
-          tags: { isBestRate: true, isMostReliable: true },
-        },
-      },
-      [transak.id],
-      t,
-    );
-    expect(tags[0]).toStrictEqual({
-      label: 'rampsPreviouslyUsed',
-      severity: 'info',
-    });
-    expect(tags).toHaveLength(3);
-  });
-
-  it('returns both most reliable and best rate, each with its own severity', () => {
+describe('getProviderTag', () => {
+  it('returns previously used before quote tags', () => {
     expect(
-      getProviderTags(
+      getProviderTag(
         transak.id,
         {
           provider: transak.id,
           quote: { amountIn: 1, amountOut: '1', paymentMethod: 'card' },
-          metadata: { tags: { isMostReliable: true, isBestRate: true } },
+          metadata: { tags: { isBestRate: true, isMostReliable: true } },
+        },
+        [transak.id],
+        t,
+      ),
+    ).toBe('rampsPreviouslyUsed');
+  });
+
+  it('returns most reliable then best rate', () => {
+    expect(
+      getProviderTag(
+        transak.id,
+        {
+          provider: transak.id,
+          quote: { amountIn: 1, amountOut: '1', paymentMethod: 'card' },
+          metadata: { tags: { isMostReliable: true } },
         },
         [],
         t,
       ),
-    ).toStrictEqual([
-      { label: 'rampsMostReliable', severity: 'info' },
-      { label: 'rampsBestRate', severity: 'success' },
-    ]);
-  });
+    ).toBe('rampsMostReliable');
 
-  it('returns only best rate when the quote is not most reliable', () => {
     expect(
-      getProviderTags(
+      getProviderTag(
         transak.id,
         {
           provider: transak.id,
@@ -215,25 +151,6 @@ describe('getProviderTags', () => {
         [],
         t,
       ),
-    ).toStrictEqual([{ label: 'rampsBestRate', severity: 'success' }]);
-  });
-
-  it('returns an empty array when the matched quote has no tags', () => {
-    expect(
-      getProviderTags(
-        transak.id,
-        {
-          provider: transak.id,
-          quote: { amountIn: 1, amountOut: '1', paymentMethod: 'card' },
-          metadata: { tags: {} },
-        },
-        [],
-        t,
-      ),
-    ).toStrictEqual([]);
-  });
-
-  it('returns an empty array when there is no matched quote', () => {
-    expect(getProviderTags(transak.id, null, [], t)).toStrictEqual([]);
+    ).toBe('rampsBestRate');
   });
 });

@@ -1,5 +1,4 @@
 import { Mockttp, RequestRuleBuilder } from 'mockttp';
-import type { NotificationPreferences } from '@metamask/authenticated-user-storage';
 import {
   getMockFeatureAnnouncementResponse,
   getMockListNotificationsResponse,
@@ -32,7 +31,6 @@ import {
   type NormalisedAPINotification,
 } from '@metamask/notification-services-controller/notification-services';
 import { MockttpNotificationTriggerServer } from '../../helpers/notifications/mock-notification-trigger-server';
-import { DEFAULT_FIXTURE_ACCOUNT } from '../../constants';
 
 type MockResponse = {
   url: string | RegExp;
@@ -64,37 +62,6 @@ export const notificationsMockAccounts: UserStorageAccount[] = [
     nlu: 1738590287,
   },
 ];
-
-export function getMockNotificationPreferences(): NotificationPreferences {
-  return {
-    walletActivity: {
-      pushNotificationsEnabled: true,
-      inAppNotificationsEnabled: true,
-      accounts: [],
-    },
-    marketing: {
-      pushNotificationsEnabled: true,
-      inAppNotificationsEnabled: true,
-    },
-    perps: {
-      pushNotificationsEnabled: true,
-      inAppNotificationsEnabled: true,
-    },
-    socialAI: {
-      pushNotificationsEnabled: true,
-      inAppNotificationsEnabled: true,
-      mutedTraderProfileIds: [],
-    },
-    agenticCli: {
-      pushNotificationsEnabled: true,
-      inAppNotificationsEnabled: true,
-    },
-    priceAlerts: {
-      pushNotificationsEnabled: true,
-      inAppNotificationsEnabled: true,
-    },
-  };
-}
 
 const mockNotifications: NormalisedAPINotification[] = [
   createMockNotificationEthSent(),
@@ -170,15 +137,7 @@ export async function mockNotificationServices(
   server: Mockttp,
   triggerServer: MockttpNotificationTriggerServer = new MockttpNotificationTriggerServer(),
 ) {
-  // Wallet-activity addresses come from the keyring and the per-address
-  // enabled bit from the Trigger API, so the fixture account must be reported
-  // as subscribed for wallet notifications to be fetched. Don't overwrite a
-  // config a persisted server already recorded.
-  if (
-    triggerServer.getNotificationConfig(DEFAULT_FIXTURE_ACCOUNT) === undefined
-  ) {
-    triggerServer.setNotificationConfig(DEFAULT_FIXTURE_ACCOUNT, true);
-  }
+  // Trigger Server
   triggerServer.setupServer(server);
 
   // Notification Server

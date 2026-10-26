@@ -43,6 +43,7 @@ import { SecurityAlertResponse } from '../lib/ppom/types';
 import {
   AccountOverviewTabKey,
   CarouselSlide,
+  NetworkConnectionBanner,
   StorageWriteErrorType,
 } from '../../../shared/constants/app-state';
 import type {
@@ -116,14 +117,15 @@ export type AppStateControllerState = {
   // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
   // eslint-disable-next-line @typescript-eslint/naming-convention
   hadAdvancedGasFeesSetPriorToMigration92_3: boolean;
+  canTrackWalletFundsObtained: boolean;
   pendingExtensionVersion: string | null;
   lastInteractedConfirmationInfo?: LastInteractedConfirmationInfo;
   lastUpdatedAt: number | null;
   lastUpdatedFromVersion: string | null;
   lastViewedUserSurvey: number | null;
+  networkConnectionBanner: NetworkConnectionBanner;
   newPrivacyPolicyToastClickedOrClosed: boolean | null;
   newPrivacyPolicyToastShownDate: number | null;
-  arcUsageNoticeShown: boolean;
   pna25Acknowledged: boolean;
   nftsDropdownState: Json;
   notificationGasPollTokens: string[];
@@ -193,16 +195,6 @@ export type AppStateControllerState = {
    * Used to avoid immediately re-prompting biometrics after the user manually locks the wallet.
    */
   passkeyAutoUnlockSuppressed: boolean;
-  /**
-   * Timestamp when the legacy passkey PRF migration reminder was last shown.
-   */
-  lastShownPrfMigrationReminderAt: number | null;
-
-  /**
-   * The entry point that initiated the last Perps deposit flow (e.g.
-   * 'hyperliquid_deposit_prompt'). Currently used to show custom toast UI.
-   */
-  lastPerpsDepositEntryPoint: string | null;
 };
 
 const controllerName = 'AppStateController';
@@ -279,6 +271,7 @@ type AppStateControllerInitState = Partial<
     | 'signatureSecurityAlertResponses'
     | 'addressSecurityAlertResponses'
     | 'currentExtensionPopupId'
+    | 'networkConnectionBanner'
   >
 >;
 
@@ -299,13 +292,13 @@ const getDefaultAppStateControllerState = (): AppStateControllerState => ({
   // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
   // eslint-disable-next-line @typescript-eslint/naming-convention
   hadAdvancedGasFeesSetPriorToMigration92_3: false,
+  canTrackWalletFundsObtained: true,
   pendingExtensionVersion: null,
   lastUpdatedAt: null,
   lastUpdatedFromVersion: null,
   lastViewedUserSurvey: null,
   newPrivacyPolicyToastClickedOrClosed: null,
   newPrivacyPolicyToastShownDate: null,
-  arcUsageNoticeShown: false,
   pna25Acknowledged: false,
   notificationGasPollTokens: [],
   onboardingDate: null,
@@ -337,8 +330,6 @@ const getDefaultAppStateControllerState = (): AppStateControllerState => ({
   dappSwapComparisonData: {},
   storageWriteErrorType: null,
   passkeyAutoUnlockSuppressed: false,
-  lastShownPrfMigrationReminderAt: null,
-  lastPerpsDepositEntryPoint: null,
   ...getInitialStateOverrides(),
 });
 
@@ -355,6 +346,9 @@ function getInitialStateOverrides() {
     currentExtensionPopupId: 0,
     nftsDropdownState: {},
     signatureSecurityAlertResponses: {},
+    networkConnectionBanner: {
+      status: 'unknown' as const,
+    },
   };
 }
 
@@ -427,6 +421,12 @@ const controllerMetadata: StateMetadata<AppStateControllerState> = {
     includeInDebugSnapshot: true,
     usedInUi: false,
   },
+  canTrackWalletFundsObtained: {
+    includeInStateLogs: true,
+    persist: true,
+    includeInDebugSnapshot: true,
+    usedInUi: false,
+  },
   pendingExtensionVersion: {
     includeInStateLogs: true,
     persist: false,
@@ -457,6 +457,12 @@ const controllerMetadata: StateMetadata<AppStateControllerState> = {
     includeInDebugSnapshot: true,
     usedInUi: true,
   },
+  networkConnectionBanner: {
+    includeInStateLogs: false,
+    persist: false,
+    includeInDebugSnapshot: false,
+    usedInUi: true,
+  },
   newPrivacyPolicyToastClickedOrClosed: {
     includeInStateLogs: true,
     persist: true,
@@ -464,12 +470,6 @@ const controllerMetadata: StateMetadata<AppStateControllerState> = {
     usedInUi: true,
   },
   newPrivacyPolicyToastShownDate: {
-    includeInStateLogs: true,
-    persist: true,
-    includeInDebugSnapshot: true,
-    usedInUi: true,
-  },
-  arcUsageNoticeShown: {
     includeInStateLogs: true,
     persist: true,
     includeInDebugSnapshot: true,
@@ -703,22 +703,10 @@ const controllerMetadata: StateMetadata<AppStateControllerState> = {
     includeInDebugSnapshot: true,
     usedInUi: true,
   },
-  lastShownPrfMigrationReminderAt: {
-    includeInStateLogs: true,
-    persist: true,
-    includeInDebugSnapshot: true,
-    usedInUi: true,
-  },
   deferredDeepLink: {
     includeInStateLogs: false,
     persist: true,
     includeInDebugSnapshot: false,
-    usedInUi: true,
-  },
-  lastPerpsDepositEntryPoint: {
-    includeInStateLogs: true,
-    persist: false,
-    includeInDebugSnapshot: true,
     usedInUi: true,
   },
 };
@@ -746,8 +734,8 @@ const MESSENGER_EXPOSED_METHODS = [
   'removeSlide',
   'requestQrCodeScan',
   'setAppActiveTab',
-  'setArcUsageNoticeShown',
   'setBrowserEnvironment',
+  'setCanTrackWalletFundsObtained',
   'setConnectedStatusPopoverHasBeenShown',
   'setCurrentExtensionPopupId',
   'setCurrentPopupId',
@@ -759,7 +747,6 @@ const MESSENGER_EXPOSED_METHODS = [
   'setIsWalletResetInProgress',
   'setLastActiveTime',
   'setLastInteractedConfirmationInfo',
-  'setLastPerpsDepositEntryPoint',
   'setLastUpdatedAt',
   'setLastUpdatedFromVersion',
   'setLastViewedUserSurvey',
@@ -770,7 +757,6 @@ const MESSENGER_EXPOSED_METHODS = [
   'setOnboardingDate',
   'setOutdatedBrowserWarningLastShown',
   'setPasskeyAutoUnlockSuppressed',
-  'setLastShownPrfMigrationReminderAt',
   'setPendingExtensionVersion',
   'setPendingRedirectRoute',
   'setPendingShieldCohort',
@@ -789,6 +775,7 @@ const MESSENGER_EXPOSED_METHODS = [
   'setTermsOfUseLastAgreed',
   'setTrezorModel',
   'setUpdateModalLastDismissedAt',
+  'updateNetworkConnectionBanner',
   'updateNftDropDownState',
   'updateSlides',
   'updateThrottledOriginState',
@@ -975,17 +962,6 @@ export class AppStateController extends BaseController<
     });
   }
 
-  /**
-   * Records when the legacy passkey PRF migration reminder was last shown.
-   *
-   * @param lastShown - Timestamp when the reminder was shown.
-   */
-  setLastShownPrfMigrationReminderAt(lastShown: number): void {
-    this.update((state) => {
-      state.lastShownPrfMigrationReminderAt = lastShown;
-    });
-  }
-
   setNewPrivacyPolicyToastClickedOrClosed(): void {
     this.update((state) => {
       state.newPrivacyPolicyToastClickedOrClosed = true;
@@ -995,12 +971,6 @@ export class AppStateController extends BaseController<
   setNewPrivacyPolicyToastShownDate(time: number): void {
     this.update((state) => {
       state.newPrivacyPolicyToastShownDate = time;
-    });
-  }
-
-  setArcUsageNoticeShown(): void {
-    this.update((state) => {
-      state.arcUsageNoticeShown = true;
     });
   }
 
@@ -1411,6 +1381,19 @@ export class AppStateController extends BaseController<
   }
 
   /**
+   * Updates the network connection banner state
+   *
+   * @param networkConnectionBanner - The new banner state
+   */
+  updateNetworkConnectionBanner(
+    networkConnectionBanner: AppStateControllerState['networkConnectionBanner'],
+  ): void {
+    this.update((state) => {
+      state.networkConnectionBanner = networkConnectionBanner;
+    });
+  }
+
+  /**
    * Sets a unique ID for the current extension popup
    *
    * @param currentExtensionPopupId
@@ -1500,12 +1483,11 @@ export class AppStateController extends BaseController<
   };
 
   /**
-   * A setter for the currentPopupId which indicates the id of popup window that's currently active.
-   * Pass `undefined` to clear when the popup is closed.
+   * A setter for the currentPopupId which indicates the id of popup window that's currently active
    *
    * @param currentPopupId
    */
-  setCurrentPopupId(currentPopupId: number | undefined): void {
+  setCurrentPopupId(currentPopupId: number): void {
     this.update((state) => {
       state.currentPopupId = currentPopupId;
     });
@@ -1530,17 +1512,6 @@ export class AppStateController extends BaseController<
   ): void {
     this.update((state) => {
       state.lastInteractedConfirmationInfo = lastInteractedConfirmationInfo;
-    });
-  }
-
-  /**
-   * Sets the entry point that initiated the last Perps deposit flow.
-   *
-   * @param entryPoint - The entry point identifier, or undefined to clear.
-   */
-  setLastPerpsDepositEntryPoint(entryPoint: string | null): void {
-    this.update((state) => {
-      state.lastPerpsDepositEntryPoint = entryPoint;
     });
   }
 
@@ -1752,6 +1723,12 @@ export class AppStateController extends BaseController<
       if (txType !== undefined) {
         state.pendingShieldCohortTxType = txType;
       }
+    });
+  }
+
+  setCanTrackWalletFundsObtained(enabled: boolean): void {
+    this.update((state) => {
+      state.canTrackWalletFundsObtained = enabled;
     });
   }
 

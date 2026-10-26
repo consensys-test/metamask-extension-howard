@@ -1,4 +1,4 @@
-import { MockedEndpoint, Mockttp } from 'mockttp';
+import { Mockttp } from 'mockttp';
 import { regularDelayMs, withFixtures } from '../../helpers';
 import { Driver } from '../../webdriver/driver';
 import { login } from '../../page-objects/flows/login.flow';
@@ -59,8 +59,6 @@ export async function withBtcWalletStandardSnap(
     title,
     dappOptions,
     numberOfAccounts = 1,
-    additionalMocks,
-    fixtureCustomizer,
   }: {
     title?: string;
     dappOptions?: {
@@ -68,8 +66,6 @@ export async function withBtcWalletStandardSnap(
       customDappPaths?: string[];
     };
     numberOfAccounts?: number;
-    additionalMocks?: (mockServer: Mockttp) => Promise<MockedEndpoint[]>;
-    fixtureCustomizer?: (builder: FixtureBuilder) => FixtureBuilder;
   },
   test: (
     driver: Driver,
@@ -77,24 +73,20 @@ export async function withBtcWalletStandardSnap(
     extensionId?: string,
   ) => Promise<void>,
 ) {
-  let builder = new FixtureBuilder().withEnabledNetworks({
-    eip155: {
-      '0x539': true,
-    },
-    bip122: {
-      [MultichainNetworks.BITCOIN]: true,
-      [MultichainNetworks.BITCOIN_TESTNET]: true,
-      [MultichainNetworks.BITCOIN_SIGNET]: true,
-    },
-  });
-
-  if (fixtureCustomizer) {
-    builder = fixtureCustomizer(builder);
-  }
-
   await withFixtures(
     {
-      fixtures: builder.build(),
+      fixtures: new FixtureBuilder()
+        .withEnabledNetworks({
+          eip155: {
+            '0x539': true,
+          },
+          bip122: {
+            [MultichainNetworks.BITCOIN]: true,
+            [MultichainNetworks.BITCOIN_TESTNET]: true,
+            [MultichainNetworks.BITCOIN_SIGNET]: true,
+          },
+        })
+        .build(),
       title,
       dapp: true,
       dappOptions: dappOptions ?? {
@@ -105,6 +97,7 @@ export async function withBtcWalletStandardSnap(
       testSpecificMock: async (mockServer: Mockttp) => [
         await mockInitialFullScan(mockServer),
         await mockExchangeRates(mockServer),
+
         await mockGetUtxos(mockServer),
         await mockGetBlocks(mockServer),
         await mockFeeEstimates(mockServer),
@@ -117,17 +110,20 @@ export async function withBtcWalletStandardSnap(
         await mockGetTxHex(mockServer),
         await mockGetTxHexMainnet(mockServer),
         await mockScripthashTxs2(mockServer),
+
         await mockRampsDynamicFeatureFlag(mockServer, 'api'),
         await mockRampsDynamicFeatureFlag(mockServer, 'uat-api'),
         await mockPriceMulti(mockServer),
         await mockPriceMultiBtcAndSol(mockServer),
-        ...(additionalMocks ? await additionalMocks(mockServer) : []),
       ],
     },
     async ({ driver, mockServer }: { driver: Driver; mockServer: Mockttp }) => {
       await login(driver);
+
       await driver.delay(regularDelayMs); // workaround to avoid flakiness
+
       await addMultipleAccounts({ driver, numberOfAccounts });
+
       await test(driver, mockServer);
     },
   );

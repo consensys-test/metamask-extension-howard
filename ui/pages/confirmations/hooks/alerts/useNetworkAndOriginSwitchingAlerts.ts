@@ -3,7 +3,6 @@ import { useSelector } from 'react-redux';
 
 import { TransactionMeta } from '@metamask/transaction-controller';
 import { LastInteractedConfirmationInfo } from '../../../../../shared/types/confirm';
-import { hasTransactionType } from '../../../../../shared/lib/transactions.utils';
 import { Alert } from '../../../../ducks/confirm-alerts/confirm-alerts';
 import { RowAlertKey } from '../../../../components/app/confirm/info/row/constants';
 import { Severity } from '../../../../helpers/constants/design-system';
@@ -17,7 +16,6 @@ import {
 } from '../../../../../shared/lib/selectors/networks';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import { useConfirmContext } from '../../context/confirm';
-import { PAY_TRANSACTION_TYPES } from '../../constants/pay';
 import { SignatureRequestType } from '../../types/confirm';
 
 const CHANGE_THRESHOLD_MS = 60 * 1000; // 1 Minute
@@ -37,13 +35,6 @@ export const useNetworkAndOriginSwitchingAlerts = (): Alert[] => {
   );
   const [lastInteractedConfirmationInfo, updateLastInteractedConfirmationInfo] =
     useState<LastInteractedConfirmationInfo>();
-
-  // Network/origin switching warnings are not relevant for wallet-initiated
-  // MM Pay confirmations.
-  const isPayTransaction = hasTransactionType(
-    currentConfirmation as TransactionMeta,
-    PAY_TRANSACTION_TYPES,
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -80,11 +71,7 @@ export const useNetworkAndOriginSwitchingAlerts = (): Alert[] => {
   ]);
 
   const networkAndOriginSwitchingAlerts = useMemo<Alert[]>((): Alert[] => {
-    if (
-      !currentConfirmationId ||
-      !lastInteractedConfirmationInfo ||
-      isPayTransaction
-    ) {
+    if (!currentConfirmationId || !lastInteractedConfirmationInfo) {
       return [];
     }
 
@@ -126,7 +113,6 @@ export const useNetworkAndOriginSwitchingAlerts = (): Alert[] => {
     return alerts;
   }, [
     currentConfirmationId,
-    isPayTransaction,
     lastInteractedConfirmationInfo,
     newNetwork?.name,
     newChainId,

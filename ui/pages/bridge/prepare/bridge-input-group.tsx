@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { BigNumber } from 'bignumber.js';
 import { useSelector, shallowEqual } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   FeatureId,
   formatChainIdToCaip,
@@ -38,43 +39,23 @@ import {
 import { shortenString } from '../../../helpers/utils/util';
 import { useCopyToClipboard } from '../../../hooks/useCopyToClipboard';
 import { getIntlLocale } from '../../../ducks/locale/locale';
+import { getIsNetworkManagementEnabled } from '../../../selectors/multichain/feature-flags';
+import { SWAP_ASSETS_PATH } from '../../../helpers/constants/routes';
 import { MULTICHAIN_NETWORK_BLOCK_EXPLORER_FORMAT_URLS_MAP } from '../../../../shared/constants/multichain/networks';
 import { formatBlockExplorerAddressUrl } from '../../../../shared/lib/multichain/networks';
 import { CAIP_CHAINID_DEFAULT_BLOCK_EXPLORER_URL_MAP } from '../../../../shared/constants/common';
-import type { BridgeToken } from '../../../ducks/bridge/types';
+import type { BridgeNetwork, BridgeToken } from '../../../ducks/bridge/types';
 import { trackUnifiedSwapBridgeEvent } from '../../../ducks/bridge/actions';
 import { useDispatch } from '../../../store/hooks';
-import { useBridgeNavigation } from '../../../hooks/bridge/useBridgeNavigation';
-import { SelectedAssetButton } from '../asset-picker/selected-asset-button';
-
-const getBlockExplorerUrl = (
-  chainId: BridgeToken['chainId'],
-  assetReference: string,
-): string | null => {
-  const caipChainId = formatChainIdToCaip(chainId);
-
-  if (isNonEvmChainId(chainId)) {
-    const blockExplorerUrls =
-      MULTICHAIN_NETWORK_BLOCK_EXPLORER_FORMAT_URLS_MAP[caipChainId];
-    return blockExplorerUrls
-      ? formatBlockExplorerAddressUrl(blockExplorerUrls, assetReference)
-      : null;
-  }
-
-  const explorerUrl = CAIP_CHAINID_DEFAULT_BLOCK_EXPLORER_URL_MAP[caipChainId];
-  return explorerUrl
-    ? getAccountLink(
-        assetReference,
-        formatChainIdToHex(chainId),
-        { blockExplorerUrl: explorerUrl },
-        undefined,
-      )
-    : null;
-};
+import { SelectedAssetButton } from './components/bridge-asset-picker/selected-asset-button';
+import { BridgeAssetPicker } from './components/bridge-asset-picker';
 
 export const BridgeInputGroup = ({
+  header,
   token,
+  onAssetChange,
   onAmountChange,
+  networks,
   amountFieldProps,
   secondaryDisplay,
   amountInputPrefix,
@@ -82,12 +63,16 @@ export const BridgeInputGroup = ({
   onMaxButtonClick,
   onBlockExplorerClick,
   buttonProps,
+  accountAddress,
+  disabledChainId,
   containerProps = {},
   isDestination,
   showAmountSkeleton = false,
+  isAssetPickerOpen,
   setIsAssetPickerOpen,
   tokenSecurityData,
 }: {
+  isAssetPickerOpen: boolean;
   setIsAssetPickerOpen: (isOpen: boolean) => void;
   secondaryDisplay?: string;
   amountInputPrefix?: React.ReactNode;
@@ -101,14 +86,22 @@ export const BridgeInputGroup = ({
   >;
   onMaxButtonClick?: (value: string) => void;
   onBlockExplorerClick?: (token: BridgeToken) => void;
+  networks: BridgeNetwork[];
   containerProps?: React.ComponentProps<typeof Column>;
   showAmountSkeleton?: boolean;
   tokenSecurityData?: Pick<BridgeToken, 'isVerified' | 'securityData'>;
-  isDestination: boolean;
-}) => {
+} & Pick<
+  React.ComponentProps<typeof BridgeAssetPicker>,
+  | 'header'
+  | 'onAssetChange'
+  | 'accountAddress'
+  | 'disabledChainId'
+  | 'isDestination'
+>) => {
   const t = useI18nContext();
   const dispatch = useDispatch();
-  const { navigateToBridgeAssetPickerPage } = useBridgeNavigation();
+  const navigate = useNavigate();
+  const isNetworkManagementEnabled = useSelector(getIsNetworkManagementEnabled);
 
   const { isInsufficientBalance, isEstimatedReturnLow } = useSelector(
     getValidationErrors,
@@ -130,12 +123,10 @@ export const BridgeInputGroup = ({
   );
 
   // useCopyToClipboard analysis: Copies a public address
-  const [, handleCopy] = useCopyToClipboard();
+  const [, handleCopy] = useCopyToClipboard({ clearDelayMs: null });
 
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const assetReference = token
-    ? parseCaipAssetType(token.assetId).assetReference
-    : undefined;
+  const { assetReference } = token ? parseCaipAssetType(token.assetId) : {};
   const balanceAmount = useSelector(getFromTokenBalance);
 
   const isAmountReadOnly =
@@ -202,17 +193,40 @@ export const BridgeInputGroup = ({
   }, []);
 
   const handleAddressClick = () => {
-    if (!token || !selectedChainId || !assetReference) {
-      return;
-    }
+    if (token && selectedChainId && assetReference) {
+      const caipChainId = formatChainIdToCaip(selectedChainId);
 
-    const blockExplorerUrl = getBlockExplorerUrl(
-      selectedChainId,
-      assetReference,
-    );
-    if (blockExplorerUrl) {
-      handleCopy(blockExplorerUrl);
-      onBlockExplorerClick?.(token);
+      let blockExplorerUrl = '';
+      if (isNonEvmChainId(selectedChainId)) {
+        const blockExplorerUrls =
+          MULTICHAIN_NETWORK_BLOCK_EXPLORER_FORMAT_URLS_MAP[caipChainId];
+        if (blockExplorerUrls) {
+          blockExplorerUrl = formatBlockExplorerAddressUrl(
+            blockExplorerUrls,
+            assetReference,
+          );
+        }
+      } else {
+        const explorerUrl =
+          CAIP_CHAINID_DEFAULT_BLOCK_EXPLORER_URL_MAP[
+            formatChainIdToCaip(token.chainId)
+          ];
+        if (explorerUrl) {
+          blockExplorerUrl = getAccountLink(
+            assetReference,
+            formatChainIdToHex(selectedChainId),
+            {
+              blockExplorerUrl: explorerUrl,
+            },
+            undefined,
+          );
+        }
+      }
+
+      if (blockExplorerUrl) {
+        handleCopy(blockExplorerUrl);
+        onBlockExplorerClick?.(token);
+      }
     }
   };
 
@@ -292,6 +306,27 @@ export const BridgeInputGroup = ({
             {...amountFieldProps}
           />
         )}
+        {/*
+         * When the network management feature flag is enabled, token selection
+         * happens on a dedicated page (`BridgeAssetPickerPage`) instead of this
+         * modal. The button below records which picker is open and navigates to
+         * that page.
+         */}
+        {!isNetworkManagementEnabled && (
+          <BridgeAssetPicker
+            disabledChainId={disabledChainId}
+            selectedAsset={token}
+            header={header}
+            isOpen={isAssetPickerOpen}
+            onClose={() => setIsAssetPickerOpen(false)}
+            onAssetChange={(asset) => {
+              onAssetChange?.(asset);
+            }}
+            chains={networks}
+            accountAddress={accountAddress}
+            isDestination={isDestination}
+          />
+        )}
         <SelectedAssetButton
           onClick={() => {
             dispatch(
@@ -308,7 +343,9 @@ export const BridgeInputGroup = ({
               ),
             );
             setIsAssetPickerOpen(true);
-            navigateToBridgeAssetPickerPage(isDestination ? 'dest' : 'src');
+            if (isNetworkManagementEnabled) {
+              navigate(SWAP_ASSETS_PATH);
+            }
           }}
           asset={selectedButtonAsset}
           data-testid={buttonProps.testId}

@@ -19,10 +19,7 @@ import {
 import { useAnalytics } from '../../../../hooks/useAnalytics';
 import { useBalanceChanges } from '../../../../pages/confirmations/components/simulation-details/useBalanceChanges';
 import { useTransactionMetadataRequest } from '../../../../pages/confirmations/hooks/transactions/useTransactionMetadataRequest';
-import {
-  Q1_OPTIONS,
-  ScamQuestionnaireTrigger,
-} from './scam-questionnaire.constants';
+import { Q1_OPTIONS } from './scam-questionnaire.constants';
 import { useScamQuestionnaireMetrics } from './useScamQuestionnaireMetrics';
 
 jest.mock('../../../../hooks/useAnalytics');
@@ -70,9 +67,7 @@ function setup(balanceChanges: BalanceChange[] = []) {
   });
   useTransactionMetadataRequestMock.mockReturnValue(TRANSACTION_META);
 
-  const { result } = renderHook(() =>
-    useScamQuestionnaireMetrics(ScamQuestionnaireTrigger.SecurityAlert),
-  );
+  const { result } = renderHook(() => useScamQuestionnaireMetrics());
   return { metrics: result.current, trackEvent };
 }
 
@@ -102,7 +97,7 @@ describe('useScamQuestionnaireMetrics', () => {
       metrics.trackContactSupport(ANSWERS);
 
       expect(firedEvent(trackEvent)).toMatchObject({
-        name: MetaMetricsEventName.ScamQuestionnaireSupportContacted as string,
+        name: MetaMetricsEventName.ScamQuestionnaireContactSupport as string,
         properties: {
           category: MetaMetricsEventCategory.Confirmations,
           q1_answer: 'q1_yes',

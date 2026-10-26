@@ -11,7 +11,6 @@ import {
   KeyringControllerLockEvent,
   KeyringControllerUnlockEvent,
 } from '@metamask/keyring-controller';
-import { inMilliseconds, Duration } from '@metamask/utils';
 import { MessengerClientInitRequest } from '../types';
 import { buildControllerInitRequestMock } from '../test/utils';
 import {
@@ -58,7 +57,6 @@ describe('SnapControllerInit', () => {
     const controllerMock = jest.mocked(SnapController);
     expect(controllerMock).toHaveBeenCalledWith({
       messenger: expect.any(Object),
-      maxIdleTime: inMilliseconds(2, Duration.Minute),
       state: undefined,
       encryptor: expect.any(Object),
       environmentEndowmentPermissions: expect.any(Array),

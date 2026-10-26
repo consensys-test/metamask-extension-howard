@@ -46,14 +46,12 @@ export type TrackingStrategy = {
    * When the generation bumps, previously seen batches/txs are marked stale.
    *
    * @param retryGenerationRef - External ref that gets bumped on retry.
-   * @param lastSeenGeneration - The last-seen generation value to compare against.
-   * @returns The new last-seen generation when a retry-generation bump was
-   * applied, otherwise `null`; the caller owns persisting the returned value.
+   * @param lastSeenGenerationRef - Internal ref tracking the last-seen generation.
    */
   checkRetryGeneration(
     retryGenerationRef: React.RefObject<number | undefined> | undefined,
-    lastSeenGeneration: number,
-  ): number | null;
+    lastSeenGenerationRef: React.MutableRefObject<number>,
+  ): void;
 
   /**
    * Process a transactionStatusUpdated event.
@@ -78,12 +76,6 @@ export type TrackingStrategy = {
 
   /** Get all currently tracked transaction IDs (for abort). */
   getTrackedTxIds(): Set<string>;
-
-  /**
-   * True when every tracked tx has finished signing.
-   * Cancel uses this to skip waiting for abort confirmations.
-   */
-  hasSettledSigning(): boolean;
 
   /** Reset all tracking state (called on cancel, subscription teardown, enable toggle). */
   reset(): void;

@@ -13,7 +13,7 @@ jest.mock('@metamask/bridge-controller', () => ({
   formatChainIdToCaip: jest.fn(),
 }));
 
-const mockCopyCallback = jest.fn().mockResolvedValue(true);
+const mockCopyCallback = jest.fn();
 const mockQrCallback = jest.fn();
 
 const mockFormatChainIdToCaip = formatChainIdToCaip as jest.Mock;
@@ -138,18 +138,6 @@ describe('MultichainAddressRow', () => {
     renderComponent({ className: 'custom-class' });
     const addressRow = screen.getByTestId('multichain-address-row');
     expect(addressRow).toHaveClass('custom-class');
-  });
-
-  it('does not show copy feedback when copying fails', async () => {
-    mockCopyCallback.mockResolvedValueOnce(false);
-    renderComponent();
-
-    fireEvent.click(screen.getByTestId('multichain-address-row-copy-button'));
-
-    await Promise.resolve();
-    expect(
-      screen.getByTestId('multichain-address-row-address'),
-    ).toHaveTextContent('0x12345...67890');
   });
 
   it('converts decimal chainId to CAIP format in QR callback', () => {

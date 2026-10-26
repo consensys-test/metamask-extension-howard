@@ -1,30 +1,9 @@
 import { Driver } from '../../../webdriver/driver';
 
-/**
- * Dapp connect / account permission confirmation (multichain connect page).
- *
- * Screen: `#/connect/:id` (connect flow, not `#/confirmation`).
- * Owns: connect title/origin, account list presence, edit-accounts entry,
- * and confirm/cancel connect actions.
- * Boundaries: reviewing or editing permitted networks after connect is
- * `ReviewPermissionsConfirmation`. Snap install/update connect routes are
- * outside this object.
- * Related: `ReviewPermissionsConfirmation`.
- *
- * @see ui/pages/multichain-accounts/multichain-accounts-connect-page/multichain-accounts-connect-page.tsx
- */
 class ConnectAccountConfirmation {
   private readonly accountListItem = (accountName: string) => ({
     testId: `multichain-account-cell-name-${accountName}`,
   });
-
-  private readonly accountsCount = (count: number) => ({
-    testId: `accounts-count-${count}`,
-  });
-
-  private readonly accountSection = {
-    testId: 'account-selection-section',
-  };
 
   private readonly cancelConnectButton = {
     testId: 'cancel-btn',
@@ -34,6 +13,11 @@ class ConnectAccountConfirmation {
     testId: 'confirm-btn',
   };
 
+  private readonly connectAccountConfirmationButton = {
+    text: 'Connect',
+    tag: 'button',
+  };
+
   private readonly connectAccountConfirmationTitle = {
     text: 'Connect this website with MetaMask',
     tag: 'p',
@@ -41,13 +25,16 @@ class ConnectAccountConfirmation {
 
   driver: Driver;
 
-  private readonly originHeader = (origin: string) => ({
-    tag: 'h3',
-    text: origin,
-  });
+  private readonly editAccountButton = {
+    text: 'Edit accounts',
+    tag: 'button',
+  };
 
-  private readonly parentSelector = {
-    testId: 'parent-selector-connect-page',
+  private readonly originHeader = (origin: string) => {
+    return {
+      tag: 'h2',
+      text: origin,
+    };
   };
 
   constructor(driver: Driver) {
@@ -62,12 +49,8 @@ class ConnectAccountConfirmation {
   }
 
   async checkForAccountsInPermissionList(accounts: string[]): Promise<void> {
-    if (accounts.length === 1) {
-      // Single account: look for the account cell with the name
-      await this.driver.waitForSelector(this.accountListItem(accounts[0]));
-    } else {
-      // Multiple accounts: look for the accounts count indicator
-      await this.driver.waitForSelector(this.accountsCount(accounts.length));
+    for (const account of accounts) {
+      await this.driver.waitForSelector(this.accountListItem(account));
     }
   }
 
@@ -75,9 +58,8 @@ class ConnectAccountConfirmation {
     origin = '127.0.0.1',
   }: { origin?: string } = {}): Promise<void> {
     await this.driver.waitForMultipleSelectors([
-      this.parentSelector,
       this.connectAccountConfirmationTitle,
-      this.confirmConnectButton,
+      this.connectAccountConfirmationButton,
       this.originHeader(origin),
     ]);
     console.log(`Connect Account confirmation page is loaded`);
@@ -86,7 +68,7 @@ class ConnectAccountConfirmation {
   async confirmConnect(): Promise<void> {
     console.log('Confirm connection on Connect Account confirmation page');
     await this.driver.clickElementAndWaitForWindowToClose(
-      this.confirmConnectButton,
+      this.connectAccountConfirmationButton,
     );
   }
 
@@ -105,11 +87,7 @@ class ConnectAccountConfirmation {
 
   async openEditAccountsModal(): Promise<void> {
     console.log('Open edit accounts modal');
-    await this.driver.clickElement(this.accountSection);
-  }
-
-  async waitForCancelButton(): Promise<void> {
-    await this.driver.findClickableElements(this.cancelConnectButton);
+    await this.driver.clickElement(this.editAccountButton);
   }
 }
 

@@ -71,9 +71,9 @@ describe('PPOM Blockaid Alert - Multiple Networks Support', function () {
       },
 
       async ({ driver }) => {
-        const expectedTitle = 'Risk signals detected';
+        const expectedTitle = 'This is a deceptive request';
         const expectedDescription =
-          'Security partners found risk signals in this request. Review before continuing.';
+          'If you approve this request, you might lose your assets.';
 
         await login(driver, { expectedBalance: '1.37T ETH' });
         await driver.openNewPage(DAPP_URL_LOCALHOST);

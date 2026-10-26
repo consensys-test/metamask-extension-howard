@@ -23,7 +23,7 @@ const mockChunk = (name: string | undefined): Chunk =>
 
 describe('LavamoatPlugin', () => {
   describe('lavamoatUnsafeLayerRule', () => {
-    it('excludes background entry from the unsafe LavaMoat exclude-loader', () => {
+    it('excludes background.js from the unsafe LavaMoat exclude-loader', () => {
       const { exclude } = lavamoatUnsafeLayerRule;
       assert.ok(exclude instanceof RegExp, 'exclude should be a RegExp');
 
@@ -33,16 +33,8 @@ describe('LavamoatPlugin', () => {
         'should exclude Unix-style background.js path',
       );
       assert.ok(
-        exclude.test('/project/app/scripts/background.ts'),
-        'should exclude Unix-style background.ts path',
-      );
-      assert.ok(
         exclude.test('C:\\project\\app\\scripts\\background.js'),
         'should exclude Windows-style background.js path',
-      );
-      assert.ok(
-        exclude.test('C:\\project\\app\\scripts\\background.ts'),
-        'should exclude Windows-style background.ts path',
       );
     });
 
@@ -79,7 +71,7 @@ describe('LavamoatPlugin', () => {
       );
     });
 
-    it('matches only the background entry module', () => {
+    it('matches only background.js', () => {
       const { test } = lavamoatBackgroundLayerRule;
       assert.ok(test instanceof RegExp, 'test should be a RegExp');
 
@@ -88,16 +80,8 @@ describe('LavamoatPlugin', () => {
         'should match Unix-style background.js path',
       );
       assert.ok(
-        test.test('/project/app/scripts/background.ts'),
-        'should match Unix-style background.ts path',
-      );
-      assert.ok(
         test.test('C:\\project\\app\\scripts\\background.js'),
         'should match Windows-style background.js path',
-      );
-      assert.ok(
-        test.test('C:\\project\\app\\scripts\\background.ts'),
-        'should match Windows-style background.ts path',
       );
       assert.ok(
         !test.test('/project/app/scripts/ui.js'),

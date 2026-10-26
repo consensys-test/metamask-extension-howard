@@ -1,7 +1,6 @@
-import type {
-  AvatarAccountVariant,
-  AvatarTokenSize,
-} from '@metamask/design-system-react';
+import type { AvatarAccountVariant } from '@metamask/design-system-react';
+import { BorderColor } from '../../../helpers/constants/design-system';
+import { AvatarTokenSize } from '../../component-library/avatar-token/avatar-token.types';
 import type { StyleUtilityProps } from '../../component-library/box';
 
 export type AvatarGroupProps = StyleUtilityProps & {
@@ -20,6 +19,8 @@ export type AvatarGroupProps = StyleUtilityProps & {
   }[];
   /** * Size of Avatar Tokens. For AvatarGroup we are considering AvatarTokenSize.Xs, AvatarTokenSize.Sm, AvatarTokenSize.Md  */
   size?: AvatarTokenSize;
+  /** * Border Color of Avatar Tokens */
+  borderColor?: BorderColor;
   /** * Whether the tag should be displayed as separate text or within an overlay avatar */
   isTagOverlay?: boolean;
   /** * Variant of AvatarAccount */

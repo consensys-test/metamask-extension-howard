@@ -135,7 +135,7 @@ describe('Request Queuing Dapp 1, Switch Tx -> Dapp 2 Send Tx', function () {
 
         // The Review Alert appears while the balance is not yet loaded
         await transactionConfirmation.waitForReviewAlertToDisappear();
-        await transactionConfirmation.clickFooterButton({ button: 'confirm' });
+        await transactionConfirmation.clickFooterConfirmButton();
 
         await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
 
@@ -148,7 +148,7 @@ describe('Request Queuing Dapp 1, Switch Tx -> Dapp 2 Send Tx', function () {
           'Localhost 8546',
         );
 
-        await signTypedDataConfirmation.clickFooterButton({ button: 'cancel' });
+        await signTypedDataConfirmation.clickFooterCancelButton();
       },
     );
   });

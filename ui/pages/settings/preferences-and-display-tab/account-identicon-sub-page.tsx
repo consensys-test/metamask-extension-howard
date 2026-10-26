@@ -18,6 +18,7 @@ import {
   AvatarAccountSize,
 } from '@metamask/design-system-react';
 import { setAvatarType } from '../../../store/actions';
+import { PREFERENCES_AND_DISPLAY_ROUTE } from '../../../helpers/constants/routes';
 import { getPreferences } from '../../../../shared/lib/selectors/preferences';
 import { getSelectedInternalAccount } from '../../../../shared/lib/selectors/accounts';
 import { useI18nContext } from '../../../hooks/useI18nContext';
@@ -37,7 +38,7 @@ const AccountIdenticonSubPage = () => {
 
   const handleSelect = (value: AvatarAccountVariant) => {
     dispatch(setAvatarType(value));
-    transitionBack(() => navigate(-1));
+    transitionBack(() => navigate(PREFERENCES_AND_DISPLAY_ROUTE));
   };
 
   return (

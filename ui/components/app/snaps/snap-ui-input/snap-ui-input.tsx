@@ -4,7 +4,6 @@ import React, {
   FunctionComponent,
   memo,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -59,7 +58,7 @@ export const SnapUIInput: FunctionComponent<
     const {
       handleInputChange,
       getValue,
-      getFocusedInput,
+      focusedInput,
       setCurrentFocusedInput,
     } = useSnapInterfaceContext();
 
@@ -79,11 +78,11 @@ export const SnapUIInput: FunctionComponent<
      * Focus input if the last focused input was this input
      * This avoids losing the focus when the UI is re-rendered
      */
-    useLayoutEffect(() => {
-      if (inputRef.current && name === getFocusedInput()) {
+    useEffect(() => {
+      if (inputRef.current && name === focusedInput) {
         (inputRef.current.querySelector('input') as HTMLInputElement).focus();
       }
-    }, [getFocusedInput, name]);
+    }, [inputRef]);
 
     /**
      * Get the input value, replacing commas with dots for number inputs.

@@ -21,18 +21,6 @@ import {
   mergeCustomTokenMetadataForImport,
 } from './custom-token-import';
 
-/**
- * This suite seeds AssetsController fields (`customAssets`, `assetsInfo`,
- * `assetPreferences`). Override the global jest setup mock so migration
- * selectors resolve those fields instead of legacy TokensController slices.
- */
-jest.mock('../../../shared/lib/assets-unify-state/remote-feature-flag', () => ({
-  ...jest.requireActual(
-    '../../../shared/lib/assets-unify-state/remote-feature-flag',
-  ),
-  isAssetsUnifyStateFeatureEnabled: () => true,
-}));
-
 const METRICS_PROPERTIES = {
   addedToken: 'added_token',
   assetType: 'asset_type',
@@ -62,7 +50,6 @@ const backgroundConnectionMock = new Proxy(
 );
 
 const mockNavigate = jest.fn();
-const mockToastSuccess = jest.fn();
 
 jest.mock('react-router-dom', () => {
   const actual = jest.requireActual('react-router-dom');
@@ -72,18 +59,11 @@ jest.mock('react-router-dom', () => {
   };
 });
 
-jest.mock('../../components/ui/toast/toast', () => ({
-  toast: {
-    success: (...args: unknown[]) => mockToastSuccess(...args),
-  },
-  ToastContent: ({
-    title,
-    dataTestId,
-  }: {
-    title: string;
-    dataTestId?: string;
-  }) => <div data-testid={dataTestId}>{title}</div>,
-}));
+jest.mock('../../../shared/lib/assets-unify-state/remote-feature-flag', () =>
+  jest.requireActual(
+    '../../../shared/lib/assets-unify-state/remote-feature-flag',
+  ),
+);
 
 // The page kicks off real on-chain probes through `getTokenStandardAndDetailsByChain`.
 // Replace it with a deterministic stub so the unit test never reaches the background script.
@@ -108,6 +88,13 @@ const getMockedActions = () =>
     importCustomAssetsBatch: jest.Mock;
     getTokenStandardAndDetailsByChain: jest.Mock;
   };
+
+const ASSETS_UNIFY_STATE_FLAG_ON = {
+  assetsUnifyState: {
+    enabled: true,
+    featureVersion: '1',
+  },
+};
 
 describe('mergeCustomTokenMetadataForImport', () => {
   it('prefers RPC when the token list returns empty strings and placeholder decimals', () => {
@@ -169,7 +156,6 @@ describe('CustomTokenImportPage', () => {
     trackAnalyticsEventMock.mockClear();
     setBackgroundConnection(backgroundConnectionMock as never);
     mockNavigate.mockClear();
-    mockToastSuccess.mockClear();
     const actions = getMockedActions();
     actions.addImportedTokens.mockClear();
     actions.importCustomAssetsBatch.mockClear();
@@ -353,7 +339,7 @@ describe('CustomTokenImportPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a success toast and returns to token management after submitting a custom token', async () => {
+  it('returns to token management with success toast state after submitting a custom token', async () => {
     const actions = getMockedActions();
     await submitCustomToken();
 
@@ -371,17 +357,14 @@ describe('CustomTokenImportPage', () => {
       ),
     );
     await waitFor(() =>
-      expect(mockToastSuccess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          props: expect.objectContaining({
-            dataTestId: 'token-management-custom-token-success-toast',
-            title: expect.stringContaining('APE'),
-          }),
-        }),
-      ),
-    );
-    await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith(TOKEN_MANAGEMENT_ROUTE),
+      expect(mockNavigate).toHaveBeenCalledWith(TOKEN_MANAGEMENT_ROUTE, {
+        state: {
+          tokenManagementToast: {
+            type: 'customTokenAdded',
+            symbol: 'APE',
+          },
+        },
+      }),
     );
     await waitFor(() =>
       expect(trackAnalyticsEventMock).toHaveBeenCalledWith(
@@ -406,11 +389,13 @@ describe('CustomTokenImportPage', () => {
     );
   });
 
-  describe('when the unified assets state is included in the build', () => {
+  describe('when the assets-unify-state remote feature flag is enabled', () => {
     it('seeds AssetsController via importCustomAssetsBatch so the token appears in the manage-tokens list', async () => {
       const actions = getMockedActions();
 
-      await submitCustomToken();
+      await submitCustomToken({
+        remoteFeatureFlags: ASSETS_UNIFY_STATE_FLAG_ON,
+      });
 
       const expectedAssetId =
         'eip155:1/erc20:0x1111111111111111111111111111111111111111';
@@ -443,7 +428,9 @@ describe('CustomTokenImportPage', () => {
     it('passes the full token name (not the symbol) as the name field in metadata', async () => {
       const actions = getMockedActions();
 
-      await submitCustomToken();
+      await submitCustomToken({
+        remoteFeatureFlags: ASSETS_UNIFY_STATE_FLAG_ON,
+      });
 
       const expectedAssetId =
         'eip155:1/erc20:0x1111111111111111111111111111111111111111';
@@ -466,6 +453,7 @@ describe('CustomTokenImportPage', () => {
         'eip155:1/erc20:0x1111111111111111111111111111111111111111';
 
       await submitCustomToken({
+        remoteFeatureFlags: ASSETS_UNIFY_STATE_FLAG_ON,
         assetPreferences: {
           [assetId]: { hidden: true },
         },
@@ -492,10 +480,11 @@ describe('CustomTokenImportPage', () => {
       const accountId = 'cf8dace4-9439-4bd4-b3a8-88c821c8fcb3';
 
       renderPage({
+        remoteFeatureFlags: ASSETS_UNIFY_STATE_FLAG_ON,
         // Simulate state after the user hid the token from the manage tokens
-        // list: the token remains in `customAssets` (so the unified
-        // `getAllTokens` selector still returns it) and
-        // `assetPreferences[assetId].hidden` is `true`.
+        // list when assets-unify-state is on: the token remains in
+        // `customAssets` (so the unified `getAllTokens` selector still
+        // returns it) and `assetPreferences[assetId].hidden` is `true`.
         customAssets: { [accountId]: [assetId] },
         assetsInfo: {
           [assetId]: {
@@ -543,12 +532,13 @@ describe('CustomTokenImportPage', () => {
     });
   });
 
-  it('shows "tokenAlreadyAdded" for a visible (non-hidden) token', async () => {
+  it('still shows "tokenAlreadyAdded" for a visible (non-hidden) token even when assets-unify-state is enabled', async () => {
     const tokenAddress = '0x1111111111111111111111111111111111111111';
     const assetId = `eip155:1/erc20:${tokenAddress}`;
     const accountId = 'cf8dace4-9439-4bd4-b3a8-88c821c8fcb3';
 
     renderPage({
+      remoteFeatureFlags: ASSETS_UNIFY_STATE_FLAG_ON,
       // Token is present in `customAssets` but NOT hidden: the unified
       // selector should still return it, so the "already added" guard
       // must trigger.

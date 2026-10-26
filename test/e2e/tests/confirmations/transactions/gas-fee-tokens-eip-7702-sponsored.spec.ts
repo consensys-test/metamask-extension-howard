@@ -79,10 +79,7 @@ describe('Gas Fee Tokens - EIP-7702 - Sponsored', function (this: Suite) {
         await transactionConfirmation.clickAdvancedDetailsButton();
 
         await transactionConfirmation.checkPaidByMetaMask();
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
 
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
@@ -147,10 +144,7 @@ describe('Gas Fee Tokens - EIP-7702 - Sponsored', function (this: Suite) {
 
         const transactionConfirmation = new TransactionConfirmation(driver);
 
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
 
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
@@ -221,7 +215,6 @@ async function mockTransactionRelayNetworks(mockServer: MockttpServer) {
             network: 'ethereum-mainnet',
             confirmations: true,
             relayTransactions: true,
-            cubistSigners: ['0x1111111111111111111111111111111111111111'],
             sendBundle: true,
           },
         },

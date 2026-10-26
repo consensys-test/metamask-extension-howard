@@ -4,7 +4,6 @@ import FixtureBuilderV2 from '../../fixtures/fixture-builder-v2';
 import { login } from '../../page-objects/flows/login.flow';
 import { SMART_CONTRACTS } from '../../seeder/smart-contracts';
 import TokensTab from '../../page-objects/pages/home/tokens-tab';
-import AssetDetailsPage from '../../page-objects/pages/asset/asset-details';
 import { CHAIN_IDS } from '../../../../shared/constants/network';
 import { Mockttp } from '../../mock-e2e';
 import { switchToNetworkFromNetworkSelect } from '../../page-objects/flows/network.flow';
@@ -251,8 +250,7 @@ describe('Multichain Asset List', function (this: Suite) {
         // Ethereum filter: native ETH + zero-balance mUSD (always shown on mainnet).
         await tokensTab.checkTokenItemNumber(2);
         await tokensTab.clickOnAsset('Ether');
-        const assetDetails = new AssetDetailsPage(driver);
-        await assetDetails.checkNativeBuyIsAvailable();
+        await tokensTab.checkBuySellButtonIsPresent();
         await tokensTab.checkMultichainTokenListButtonIsPresent();
       },
     );

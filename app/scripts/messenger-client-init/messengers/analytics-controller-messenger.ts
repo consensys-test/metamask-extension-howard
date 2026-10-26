@@ -5,21 +5,10 @@ import {
 } from '@metamask/messenger';
 import type {
   AnalyticsControllerMessenger,
-  AnalyticsControllerCreateEventFragmentAction,
-  AnalyticsControllerFinalizeEventFragmentAction,
-  AnalyticsControllerGetEventFragmentByIdAction,
   AnalyticsControllerGetStateAction,
   AnalyticsControllerIdentifyAction,
-  AnalyticsControllerOptInAction,
-  AnalyticsControllerOptInToMarketingAction,
-  AnalyticsControllerOptOutAction,
-  AnalyticsControllerOptOutOfMarketingAction,
-  AnalyticsControllerResetConsentDecisionAction,
-  AnalyticsControllerSetMarketingCampaignCookieIdAction,
   AnalyticsControllerTrackEventAction,
   AnalyticsControllerTrackViewAction,
-  AnalyticsControllerUpdateEventFragmentAction,
-  AnalyticsControllerUpsertEventFragmentAction,
 } from '@metamask/analytics-controller';
 import type { MultichainNetworkControllerGetStateAction } from '@metamask/multichain-network-controller';
 import type {
@@ -27,11 +16,8 @@ import type {
   NetworkControllerGetStateAction,
 } from '@metamask/network-controller';
 import type { RemoteFeatureFlagControllerGetStateAction } from '@metamask/remote-feature-flag-controller';
+import type { MetaMetricsControllerGetStateAction } from '../../controllers/metametrics-controller';
 import type { PreferencesControllerGetStateAction } from '../../controllers/preferences-controller';
-import type {
-  SentryTracingServiceClearTracesAfterMetricsOptInAction,
-  SentryTracingServiceTrackTracesAfterMetricsOptInAction,
-} from '../../services/sentry/sentry-tracing-service-method-action-types';
 import type { RootMessenger } from '../../lib/messenger';
 
 type InitActions =
@@ -40,23 +26,11 @@ type InitActions =
   | NetworkControllerGetStateAction
   | NetworkControllerGetNetworkClientByIdAction
   | RemoteFeatureFlagControllerGetStateAction
-  | AnalyticsControllerSetMarketingCampaignCookieIdAction
+  | MetaMetricsControllerGetStateAction
   | AnalyticsControllerGetStateAction
   | AnalyticsControllerTrackEventAction
   | AnalyticsControllerIdentifyAction
-  | AnalyticsControllerTrackViewAction
-  | AnalyticsControllerOptInAction
-  | AnalyticsControllerOptInToMarketingAction
-  | AnalyticsControllerOptOutAction
-  | AnalyticsControllerOptOutOfMarketingAction
-  | AnalyticsControllerResetConsentDecisionAction
-  | AnalyticsControllerCreateEventFragmentAction
-  | AnalyticsControllerUpsertEventFragmentAction
-  | AnalyticsControllerUpdateEventFragmentAction
-  | AnalyticsControllerGetEventFragmentByIdAction
-  | AnalyticsControllerFinalizeEventFragmentAction
-  | SentryTracingServiceTrackTracesAfterMetricsOptInAction
-  | SentryTracingServiceClearTracesAfterMetricsOptInAction;
+  | AnalyticsControllerTrackViewAction;
 
 type InitEvents = never;
 
@@ -117,23 +91,11 @@ export function getAnalyticsControllerInitMessenger(
       'NetworkController:getState',
       'NetworkController:getNetworkClientById',
       'RemoteFeatureFlagController:getState',
+      'MetaMetricsController:getState',
       'AnalyticsController:getState',
       'AnalyticsController:trackEvent',
       'AnalyticsController:identify',
       'AnalyticsController:trackView',
-      'AnalyticsController:optIn',
-      'AnalyticsController:optInToMarketing',
-      'AnalyticsController:optOut',
-      'AnalyticsController:optOutOfMarketing',
-      'AnalyticsController:resetConsentDecision',
-      'AnalyticsController:setMarketingCampaignCookieId',
-      'AnalyticsController:createEventFragment',
-      'AnalyticsController:upsertEventFragment',
-      'AnalyticsController:updateEventFragment',
-      'AnalyticsController:getEventFragmentById',
-      'AnalyticsController:finalizeEventFragment',
-      'SentryTracingService:trackTracesAfterMetricsOptIn',
-      'SentryTracingService:clearTracesAfterMetricsOptIn',
     ],
     events: [],
   });

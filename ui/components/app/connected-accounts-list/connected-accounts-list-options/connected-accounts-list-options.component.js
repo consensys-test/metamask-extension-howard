@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import React, { useCallback, useState } from 'react';
+import React, { useRef } from 'react';
 import { Menu } from '../../../ui/menu';
 import { IconName, ButtonIcon } from '../../../component-library';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
@@ -10,14 +10,11 @@ const ConnectedAccountsListOptions = ({
   onHideOptions,
   show,
 }) => {
-  const [anchorElement, setAnchorElement] = useState(null);
-  const setAnchorRef = useCallback((node) => {
-    setAnchorElement(node);
-  }, []);
+  const ref = useRef(false);
   const t = useI18nContext();
 
   return (
-    <div ref={setAnchorRef}>
+    <div ref={ref}>
       <ButtonIcon
         iconName={IconName.MoreVertical}
         className="connected-accounts-options__button"
@@ -26,7 +23,7 @@ const ConnectedAccountsListOptions = ({
       />
       {show ? (
         <Menu
-          anchorElement={anchorElement}
+          anchorElement={ref.current}
           onHide={onHideOptions}
           popperOptions={{
             modifiers: [

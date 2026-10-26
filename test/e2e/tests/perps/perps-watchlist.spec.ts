@@ -2,9 +2,8 @@
  * Perps Watchlist E2E tests.
  *
  * Covers adding a market to the watchlist from the market detail page and
- * verifying it appears in the Perps home watchlist section. Unfavorite and
- * multi-market cases are omitted: 16.2 persist-and-revert against the AUS
- * schema (still requires `myx`) fails the second toggle.
+ * verifying it appears in the Perps home watchlist section with a filled
+ * star icon, then removing it and verifying it disappears.
  *
  * PREREQUISITE: All tests require PERPS_ENABLED=true in the extension build.
  * Set PERPS_ENABLED=true in .metamaskrc (see .metamaskrc.dist) before running locally.
@@ -53,7 +52,7 @@ describe('Perps Watchlist', function (this: Suite) {
     );
   });
 
-  it('opens the market list filtered to the watchlist from the section header', async function () {
+  it('removes a market from the watchlist and verifies it disappears', async function () {
     await withFixtures(
       {
         ...getPerpsConfigEligible(this.test?.fullTitle()),
@@ -69,18 +68,64 @@ describe('Perps Watchlist', function (this: Suite) {
         const marketListPage = new PerpsMarketListPage(driver);
         const marketDetailPage = new PerpsMarketDetailPage(driver);
 
+        // Add ETH to the watchlist first so the section is never fully empty
         await marketListPage.navigateToMarketList();
-        await marketDetailPage.navigateToMarket('BTC');
+        await marketDetailPage.navigateToMarket('ETH');
         await marketDetailPage.clickFavoriteButton();
         await marketDetailPage.clickBack();
         await marketListPage.clickBack();
-        await perpsTab.waitForWatchlistMarket('BTC');
+        await perpsTab.waitForWatchlistMarket('ETH');
 
-        await perpsTab.clickWatchlistHeader();
+        // Remove ETH from the watchlist
+        await marketListPage.navigateToMarketList();
 
-        await marketListPage.checkPageIsLoaded();
-        await marketListPage.waitForFilterLabel('Watchlist');
-        await marketListPage.waitForMarketRow('BTC');
+        await marketDetailPage.navigateToMarket('ETH');
+        await marketDetailPage.clickFavoriteButton();
+
+        // Wait for the button to reflect the unfavorited state before leaving
+        await marketDetailPage.waitForFavoriteButton('unfavorited');
+
+        // Navigate back to Perps home and verify the watchlist section is gone
+        await marketDetailPage.clickBack();
+        await marketListPage.clickBack();
+        await perpsTab.checkWatchlistSectionGone();
+      },
+    );
+  });
+
+  it('adds multiple markets to the watchlist', async function () {
+    await withFixtures(
+      {
+        ...getPerpsConfigEligible(this.test?.fullTitle()),
+        ignoredConsoleErrors: ['Value is null'],
+      },
+      async ({ driver }: { driver: Driver }) => {
+        await login(driver);
+
+        const perpsTab = new PerpsTab(driver);
+        await perpsTab.navigateToPerpsHome();
+        await perpsTab.waitForBalanceSection();
+
+        const marketListPage = new PerpsMarketListPage(driver);
+        const marketDetailPage = new PerpsMarketDetailPage(driver);
+
+        // Add ETH to watchlist
+        await marketListPage.navigateToMarketList();
+        await marketDetailPage.navigateToMarket('ETH');
+        await marketDetailPage.clickFavoriteButton();
+        await marketDetailPage.clickBack();
+        await marketListPage.clickBack();
+        await perpsTab.waitForWatchlistMarket('ETH'); // layout settled
+
+        // Add AVAX to watchlist
+        await marketListPage.navigateToMarketList();
+        await marketDetailPage.navigateToMarket('AVAX');
+        await marketDetailPage.clickFavoriteButton();
+        await marketDetailPage.clickBack();
+        await marketListPage.clickBack();
+
+        await perpsTab.waitForWatchlistMarket('ETH');
+        await perpsTab.waitForWatchlistMarket('AVAX');
       },
     );
   });

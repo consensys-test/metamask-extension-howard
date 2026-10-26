@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useRef } from 'react';
 import { shallowEqual, useSelector } from 'react-redux';
 import isEqual from 'lodash/isEqual';
 
@@ -30,19 +30,15 @@ export function useHwSwapQuoteData() {
   const toToken = useSelector(getToToken, isEqual);
   const hardwareWalletType = useSelector(getHardwareWalletType);
 
-  const [lockedQuote, setLockedQuote] = useState(activeQuote);
-
-  useEffect(() => {
-    if (activeQuote && !lockedQuote) {
-      queueMicrotask(() => {
-        setLockedQuote(activeQuote);
-      });
-    }
-  }, [activeQuote, lockedQuote]);
+  const lockedQuoteRef = useRef(activeQuote);
+  if (activeQuote && !lockedQuoteRef.current) {
+    lockedQuoteRef.current = activeQuote;
+  }
+  const lockedQuote = lockedQuoteRef.current;
 
   return {
     activeQuote,
-    lockedQuote: lockedQuote ?? activeQuote,
+    lockedQuote,
     fromToken,
     toToken,
     hardwareWalletType,

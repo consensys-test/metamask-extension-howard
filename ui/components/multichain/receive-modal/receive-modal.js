@@ -1,13 +1,13 @@
-import {
-  ModalContent,
-  Modal,
-  ModalOverlay,
-  ModalHeader,
-} from '@metamask/design-system-react';
 import React, { useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
-import { Box } from '../../component-library';
+import {
+  Box,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+} from '../../component-library';
 import QrCodeView from '../../ui/qr-code-view';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { getInternalAccountByAddress } from '../../../selectors';
@@ -33,11 +33,7 @@ export const ReceiveModal = ({ address, onClose }) => {
     <Modal isOpen onClose={onClose}>
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader
-          className="mb-4"
-          closeButtonProps={{ ariaLabel: t('close') }}
-          onClose={onClose}
-        >
+        <ModalHeader marginBottom={4} onClose={onClose}>
           {t('receive')}
         </ModalHeader>
         <Box

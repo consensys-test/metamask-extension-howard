@@ -24,12 +24,12 @@ describe('getRetryBudget', () => {
       }),
     ).toStrictEqual({
       attemptNumber: 1,
-      automaticRetryLimit: 2,
-      automaticRetryLimitReached: false,
+      atRetryLimit: false,
       consumeRetryLabel: false,
-      labelRetryLimit: 4,
-      labelRetryLimitReached: false,
+      retryLimit: 2,
+      retryLimitSource: 'default',
       retryMode: 'automatic',
+      usedRetryCiBudget: false,
       willRetry: true,
     });
   });
@@ -47,44 +47,6 @@ describe('getRetryBudget', () => {
     expect(decision.willRetry).toBe(true);
   });
 
-  it('requires retry-ci before retrying a main-targeting PR E2E failure', () => {
-    // A limit of one means attempt one has no automatic rerun available; the
-    // same retry can proceed only through the ordinary retry-ci budget.
-    const withoutLabel = getRetryBudget({
-      attempt: 1,
-      context: 'pr',
-      hasRetryLabel: false,
-      isRetryable: true,
-      automaticRetryLimit: 1,
-    });
-    const withLabel = getRetryBudget({
-      attempt: 1,
-      context: 'pr',
-      hasRetryLabel: true,
-      isRetryable: true,
-      automaticRetryLimit: 1,
-    });
-
-    expect(withoutLabel.willRetry).toBe(false);
-    expect(withoutLabel.retryMode).toBe('none');
-    expect(withLabel.willRetry).toBe(true);
-    expect(withLabel.retryMode).toBe('label');
-    expect(withLabel.consumeRetryLabel).toBe(true);
-  });
-
-  it('keeps the automatic retry for non-E2E failures on a main-targeting PR', () => {
-    const decision = getRetryBudget({
-      attempt: 1,
-      context: 'pr',
-      hasRetryLabel: false,
-      isRetryable: true,
-    });
-
-    expect(decision.willRetry).toBe(true);
-    expect(decision.retryMode).toBe('automatic');
-    expect(decision.consumeRetryLabel).toBe(false);
-  });
-
   it('stops at attempt 2 without retry-ci', () => {
     const decision = getRetryBudget({
       attempt: 2,
@@ -93,8 +55,8 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(true);
-    expect(decision.labelRetryLimitReached).toBe(false);
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(2);
     expect(decision.retryMode).toBe('none');
     expect(decision.willRetry).toBe(false);
   });
@@ -109,7 +71,8 @@ describe('getRetryBudget', () => {
       });
 
       expect(decision.consumeRetryLabel).toBe(true);
-      expect(decision.labelRetryLimit).toBe(4);
+      expect(decision.retryLimit).toBe(4);
+      expect(decision.retryLimitSource).toBe('retry-ci');
       expect(decision.retryMode).toBe('label');
       expect(decision.willRetry).toBe(true);
     }
@@ -123,15 +86,14 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(true);
-    expect(decision.labelRetryLimitReached).toBe(true);
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(4);
     expect(decision.retryMode).toBe('none');
+    expect(decision.usedRetryCiBudget).toBe(true);
     expect(decision.willRetry).toBe(false);
   });
 
   it('preserves the retry-ci ceiling after the label-funded retry consumes the label', () => {
-    // Removing retry-ci authorizes no further retries, but must not erase the
-    // fixed attempt-four ceiling used for terminal reporting.
     const decision = getRetryBudget({
       attempt: 3,
       context: 'pr',
@@ -139,9 +101,11 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(true);
-    expect(decision.labelRetryLimitReached).toBe(false);
+    expect(decision.atRetryLimit).toBe(false);
+    expect(decision.retryLimit).toBe(4);
+    expect(decision.retryLimitSource).toBe('retry-ci');
     expect(decision.retryMode).toBe('none');
+    expect(decision.usedRetryCiBudget).toBe(true);
     expect(decision.willRetry).toBe(false);
   });
 
@@ -153,9 +117,11 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(true);
-    expect(decision.labelRetryLimitReached).toBe(true);
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(4);
+    expect(decision.retryLimitSource).toBe('retry-ci');
     expect(decision.retryMode).toBe('none');
+    expect(decision.usedRetryCiBudget).toBe(true);
     expect(decision.willRetry).toBe(false);
   });
 
@@ -167,7 +133,7 @@ describe('getRetryBudget', () => {
       isRetryable: false,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(false);
+    expect(decision.atRetryLimit).toBe(false);
     expect(decision.retryMode).toBe('none');
     expect(decision.willRetry).toBe(false);
   });
@@ -180,7 +146,7 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(false);
+    expect(decision.atRetryLimit).toBe(false);
     expect(decision.retryMode).toBe('none');
     expect(decision.willRetry).toBe(false);
   });
@@ -193,9 +159,10 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(false);
+    expect(decision.atRetryLimit).toBe(false);
     expect(decision.consumeRetryLabel).toBe(false);
-    expect(decision.automaticRetryLimit).toBe(2);
+    expect(decision.retryLimit).toBe(2);
+    expect(decision.retryLimitSource).toBe('default');
     expect(decision.retryMode).toBe('automatic');
     expect(decision.willRetry).toBe(true);
   });
@@ -208,8 +175,8 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(true);
-    expect(decision.labelRetryLimitReached).toBe(false);
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(2);
     expect(decision.retryMode).toBe('none');
     expect(decision.willRetry).toBe(false);
   });
@@ -222,7 +189,10 @@ describe('getRetryBudget', () => {
       isRetryable: true,
     });
 
-    expect(decision.automaticRetryLimitReached).toBe(true);
+    expect(decision.atRetryLimit).toBe(true);
+    expect(decision.retryLimit).toBe(2);
+    expect(decision.retryLimitSource).toBe('default');
+    expect(decision.usedRetryCiBudget).toBe(false);
     expect(decision.willRetry).toBe(false);
   });
 });

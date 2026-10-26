@@ -74,5 +74,5 @@ export const setTokenPermissions = async (
   }
 
   await setApprovalForAllConfirmation.clickScrollToBottomButton();
-  await setApprovalForAllConfirmation.clickFooterButton({ button: 'confirm' });
+  await setApprovalForAllConfirmation.clickFooterConfirmButton();
 };

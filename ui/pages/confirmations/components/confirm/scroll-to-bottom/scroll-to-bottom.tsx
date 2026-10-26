@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import {
   Box,
@@ -16,6 +16,7 @@ import {
   FlexDirection,
   IconColor,
 } from '../../../../../helpers/constants/design-system';
+import { usePrevious } from '../../../../../hooks/usePrevious';
 import { useScrollRequired } from '../../../../../hooks/useScrollRequired';
 import { useConfirmContext } from '../../../context/confirm';
 import { selectConfirmationAdvancedDetailsOpen } from '../../../selectors/preferences';
@@ -32,7 +33,7 @@ const ScrollToBottom = ({ children }: ContentProps) => {
   const t = useContext(I18nContext);
   const { currentConfirmation, setIsScrollToBottomCompleted } =
     useConfirmContext();
-  const previousConfirmationIdRef = useRef<string | undefined>(undefined);
+  const previousId = usePrevious(currentConfirmation?.id);
   const showAdvancedDetails = useSelector(
     selectConfirmationAdvancedDetailsOpen,
   );
@@ -43,7 +44,6 @@ const ScrollToBottom = ({ children }: ContentProps) => {
     isScrolledToBottom,
     onScroll,
     scrollToBottom,
-    scrollElement,
     setHasScrolledToBottom,
     ref,
   } = useScrollRequired([currentConfirmation?.id, showAdvancedDetails], {
@@ -62,23 +62,21 @@ const ScrollToBottom = ({ children }: ContentProps) => {
    * when we navigate through different confirmations. Also, resets hasScrolledToBottom
    */
   useEffect(() => {
-    const confirmationId = currentConfirmation?.id;
-    if (previousConfirmationIdRef.current === confirmationId) {
+    if (previousId === currentConfirmation?.id) {
       return;
     }
 
-    const scrollEl = scrollElement as HTMLDivElement | null;
-    if (!scrollEl) {
+    const currentRef = ref?.current as null | HTMLDivElement;
+    if (!currentRef) {
       return;
     }
 
-    if (typeof scrollEl.scrollTo === 'function') {
-      scrollEl.scrollTo(0, 0);
+    if (typeof currentRef.scrollTo === 'function') {
+      currentRef.scrollTo(0, 0);
     }
 
     setHasScrolledToBottom(false);
-    previousConfirmationIdRef.current = confirmationId;
-  }, [currentConfirmation?.id, scrollElement, setHasScrolledToBottom]);
+  }, [currentConfirmation?.id, previousId, ref?.current]);
 
   useEffect(() => {
     if (isTransactionRedesign) {
@@ -87,12 +85,7 @@ const ScrollToBottom = ({ children }: ContentProps) => {
     }
 
     setIsScrollToBottomCompleted(!isScrollable || hasScrolledToBottom);
-  }, [
-    isScrollable,
-    hasScrolledToBottom,
-    isTransactionRedesign,
-    setIsScrollToBottomCompleted,
-  ]);
+  }, [isScrollable, hasScrolledToBottom, isTransactionRedesign]);
 
   return (
     <Box
@@ -118,7 +111,7 @@ const ScrollToBottom = ({ children }: ContentProps) => {
         height={BlockSize.Full}
         paddingLeft={4}
         paddingRight={4}
-        onScroll={onScroll ?? undefined}
+        onScroll={onScroll}
         ref={ref}
         style={{ overflow: 'auto' }}
       >

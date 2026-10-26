@@ -16,15 +16,7 @@ import {
 import { TextVariant as LegacyTextVariant } from '../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { ImportAccount } from '../../../components/multichain/import-account/import-account';
-import { toast, ToastContent } from '../../../components/ui/toast/toast';
-import {
-  DEFAULT_ROUTE,
-  PREVIOUS_ROUTE,
-} from '../../../helpers/constants/routes';
-import { SECOND } from '../../../../shared/constants/time';
-
-const toastId = 'account-imported-toast';
-const autoHideToastDelay = 5 * SECOND;
+import { PREVIOUS_ROUTE } from '../../../helpers/constants/routes';
 
 /**
  *
@@ -37,25 +29,13 @@ export const AddWalletPage = () => {
 
   const onActionComplete = useCallback(
     async (confirmed?: boolean) => {
-      if (confirmed === true) {
-        toast.success(
-          <ToastContent dataTestId={toastId} title={t('accountImported')} />,
-          {
-            id: toastId,
-            duration: autoHideToastDelay,
-          },
-        );
-        navigate(DEFAULT_ROUTE);
-        return;
-      }
-
-      // Navigate back if the user cancelled (undefined). Stay on the page if
-      // import failed (false) so they can retry.
+      // Navigate back if import succeeded (true) or user cancelled (undefined)
+      // Stay on page if import failed (false) to allow retry
       if (confirmed !== false) {
         navigate(PREVIOUS_ROUTE);
       }
     },
-    [navigate, t],
+    [navigate],
   );
 
   return (

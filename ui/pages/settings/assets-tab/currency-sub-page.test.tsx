@@ -5,6 +5,7 @@ import thunk from 'redux-thunk';
 import mockState from '../../../../test/data/mock-state.json';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { setBackgroundConnection } from '../../../store/background-connection';
+import { PREFERENCES_AND_DISPLAY_ROUTE } from '../../../helpers/constants/routes';
 import CurrencySubPage from './currency-sub-page';
 
 const mockNavigate = jest.fn();
@@ -50,7 +51,7 @@ describe('CurrencySubPage', () => {
     fireEvent.click(audOption);
 
     expect(mockSetCurrentCurrency).toHaveBeenCalledWith('aud');
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(mockNavigate).toHaveBeenCalledWith(PREFERENCES_AND_DISPLAY_ROUTE);
   });
 
   it('selects a different currency when clicked', () => {
@@ -67,6 +68,6 @@ describe('CurrencySubPage', () => {
     fireEvent.click(option);
 
     expect(mockSetCurrentCurrency).toHaveBeenCalledWith('inr');
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(mockNavigate).toHaveBeenCalledWith(PREFERENCES_AND_DISPLAY_ROUTE);
   });
 });

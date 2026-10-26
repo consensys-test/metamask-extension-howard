@@ -1,11 +1,7 @@
 import { useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { createSelector } from 'reselect';
-import {
-  FALLBACK_VARIATION,
-  NameEntry,
-  NameType,
-} from '@metamask/name-controller';
+import { toUnicode } from 'punycode/punycode.js';
 import type { AddressBookEntry } from '@metamask/address-book-controller';
 import type { TokenListMap } from '@metamask/assets-controllers';
 import {
@@ -13,7 +9,8 @@ import {
   toChecksumHexAddress,
 } from '../../shared/lib/hexstring-utils';
 import { shortenAddress } from '../helpers/utils/util';
-import { getCompleteAddressBook, getNames, getTokenList } from '../selectors';
+import { getCompleteAddressBook, getTokenList } from '../selectors';
+import { EMPTY_OBJECT as emptyObject } from '../selectors/shared';
 import { getAccountGroupWithInternalAccounts } from '../selectors/multichain-accounts/account-tree';
 import type { AccountGroupWithInternalAccounts } from '../selectors/multichain-accounts/account-tree.types';
 
@@ -48,20 +45,11 @@ const selectContactNameByAddress = createSelector(
   },
 );
 
-const selectPetnameByAddress = createSelector(getNames, (names) => {
-  const addressEntries = (names[NameType.ETHEREUM_ADDRESS] ?? {}) as Record<
-    string,
-    Record<string, NameEntry>
-  >;
-  const map = new Map<string, string>();
-  for (const [address, variationEntries] of Object.entries(addressEntries)) {
-    const entry = variationEntries[FALLBACK_VARIATION];
-    if (entry?.name) {
-      map.set(address, entry.name);
-    }
-  }
-  return map;
-});
+const selectEnsResolutions = (state: {
+  metamask?: { ensResolutionsByAddress?: Record<string, string> };
+}) =>
+  state.metamask?.ensResolutionsByAddress ??
+  (emptyObject as Record<string, string>);
 
 /**
  * Returns a callback that resolves an address to a display name.
@@ -69,7 +57,7 @@ const selectPetnameByAddress = createSelector(getNames, (names) => {
 export function useGetDisplayName() {
   const accountNames = useSelector(selectAccountNameByAddress);
   const contactNames = useSelector(selectContactNameByAddress);
-  const petNames = useSelector(selectPetnameByAddress);
+  const ensResolutions = useSelector(selectEnsResolutions);
   const tokenList = useSelector(getTokenList) as TokenListMap;
 
   return useCallback(
@@ -80,18 +68,18 @@ export function useGetDisplayName() {
 
       // Non-EVM addresses must not go through hex helpers
       const key = address.toLowerCase();
-      const petName = petNames.get(address) || petNames.get(key);
+      const ensResolution = ensResolutions[address] || ensResolutions[key];
 
       return (
         accountNames.get(key) ||
         contactNames.get(key) ||
         tokenList[key]?.name ||
-        petName ||
+        (ensResolution ? toUnicode(ensResolution) : undefined) ||
         shortenAddress(
           isValidHexAddress(address) ? toChecksumHexAddress(address) : address,
         )
       );
     },
-    [accountNames, contactNames, tokenList, petNames],
+    [accountNames, contactNames, tokenList, ensResolutions],
   );
 }

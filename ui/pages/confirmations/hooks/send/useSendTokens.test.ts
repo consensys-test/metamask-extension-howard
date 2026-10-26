@@ -9,14 +9,13 @@ import {
   getAssetsBySelectedAccountGroup,
   getAssetsBySelectedAccountGroupIncludingHidden,
 } from '../../../../selectors/assets';
+import { getAccountGroupsByAddress } from '../../../../selectors/multichain-accounts/account-tree';
 import { getIsTokenManagementFilterEnabled } from '../../../../selectors/multichain/feature-flags';
 import * as useFiatFormatterModule from '../../../../hooks/useFiatFormatter';
 import { AssetStandard, type Asset } from '../../types/send';
 import * as useChainNetworkNameAndImageModule from '../useChainNetworkNameAndImage';
 import * as assetUtils from '../../../../../shared/lib/asset-utils';
 import { useTransactionAccountOverride } from '../transactions/useTransactionAccountOverride';
-import { useAccountOverrideGroupId } from './useAccountOverrideGroupId';
-import { useEnsureAccountGroupAssets } from './useEnsureAccountGroupAssets';
 import { useSendTokens } from './useSendTokens';
 
 jest.mock('react-redux', () => ({
@@ -27,15 +26,15 @@ jest.mock('react-redux', () => ({
 jest.mock('../useChainNetworkNameAndImage');
 jest.mock('../../../../hooks/useFiatFormatter');
 jest.mock('../transactions/useTransactionAccountOverride');
-jest.mock('./useAccountOverrideGroupId', () => ({
-  useAccountOverrideGroupId: jest.fn(),
-}));
-jest.mock('./useEnsureAccountGroupAssets', () => ({
-  useEnsureAccountGroupAssets: jest.fn(),
-}));
 jest.mock('../../../../selectors/assets', () => ({
   ...jest.requireActual('../../../../selectors/assets'),
   getAssetsByAccountGroupId: jest.fn(),
+}));
+jest.mock('../../../../selectors/multichain-accounts/account-tree', () => ({
+  ...jest.requireActual(
+    '../../../../selectors/multichain-accounts/account-tree',
+  ),
+  getAccountGroupsByAddress: jest.fn(),
 }));
 jest.mock('../../../../../shared/lib/asset-utils', () => ({
   ...jest.requireActual('../../../../../shared/lib/asset-utils'),
@@ -55,10 +54,7 @@ const mockFetchAssetMetadataForAssetIds = jest.mocked(
 const mockUseTransactionAccountOverride = jest.mocked(
   useTransactionAccountOverride,
 );
-const mockUseAccountOverrideGroupId = jest.mocked(useAccountOverrideGroupId);
-const mockUseEnsureAccountGroupAssets = jest.mocked(
-  useEnsureAccountGroupAssets,
-);
+const mockGetAccountGroupsByAddress = jest.mocked(getAccountGroupsByAddress);
 const mockGetAssetsByAccountGroupId = jest.mocked(getAssetsByAccountGroupId);
 
 /**
@@ -144,8 +140,7 @@ describe('useSendTokens', () => {
     jest.clearAllMocks();
 
     mockUseTransactionAccountOverride.mockReturnValue(undefined);
-    mockUseAccountOverrideGroupId.mockReturnValue(undefined);
-    mockUseEnsureAccountGroupAssets.mockReturnValue(false);
+    mockGetAccountGroupsByAddress.mockReturnValue([]);
     mockGetAssetsByAccountGroupId.mockReturnValue({});
 
     mockUseSelector.mockImplementation((selector) => {
@@ -501,7 +496,9 @@ describe('useSendTokens', () => {
     };
 
     mockUseTransactionAccountOverride.mockReturnValue(overrideAddress);
-    mockUseAccountOverrideGroupId.mockReturnValue('entropy:wallet/1' as never);
+    mockGetAccountGroupsByAddress.mockReturnValue([
+      { id: 'entropy:wallet/1' },
+    ] as never);
     mockGetAssetsByAccountGroupId.mockReturnValue(overrideAssets as never);
     mockUseSelector.mockImplementation((selector) => {
       if (selector === getIsTokenManagementFilterEnabled) {
@@ -531,7 +528,9 @@ describe('useSendTokens', () => {
     mockUseTransactionAccountOverride.mockReturnValue(
       '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Hex,
     );
-    mockUseAccountOverrideGroupId.mockReturnValue('entropy:wallet/1' as never);
+    mockGetAccountGroupsByAddress.mockReturnValue([
+      { id: 'entropy:wallet/1' },
+    ] as never);
     mockGetAssetsByAccountGroupId.mockReturnValue({});
     mockUseSelector.mockImplementation((selector) => {
       if (selector === getIsTokenManagementFilterEnabled) {
@@ -555,7 +554,9 @@ describe('useSendTokens', () => {
     mockUseTransactionAccountOverride.mockReturnValue(
       '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Hex,
     );
-    mockUseAccountOverrideGroupId.mockReturnValue('entropy:wallet/1' as never);
+    mockGetAccountGroupsByAddress.mockReturnValue([
+      { id: 'entropy:wallet/1' },
+    ] as never);
     mockGetAssetsByAccountGroupId.mockReturnValue({
       '0x1': [mockAssetsData[1]],
     } as never);
@@ -586,7 +587,7 @@ describe('useSendTokens', () => {
     mockUseTransactionAccountOverride.mockReturnValue(
       '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' as Hex,
     );
-    mockUseAccountOverrideGroupId.mockReturnValue(undefined);
+    mockGetAccountGroupsByAddress.mockReturnValue([] as never);
     mockGetAssetsByAccountGroupId.mockReturnValue({} as never);
     mockUseSelector.mockImplementation((selector) => {
       if (selector === getIsTokenManagementFilterEnabled) {

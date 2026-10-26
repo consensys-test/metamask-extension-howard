@@ -7,25 +7,8 @@ import { DEPRECATED_NETWORKS } from '../../../../../shared/constants/network';
 import { AddEthereumChainContext } from '../../external/add-ethereum-chain/types';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import { useSafeChains } from '../../../../components/multichain/networks-form/use-safe-chains';
-import {
-  isRpcRateLimitError,
-  jsonRpcRequest,
-} from '../../../../../shared/lib/rpc.utils';
+import { jsonRpcRequest } from '../../../../../shared/lib/rpc.utils';
 import { RowAlertKey } from '../../../../components/app/confirm/info/row/constants';
-import { EMPTY_ARRAY } from '../../../../selectors/shared';
-import { isValidASCIIURL, toPunycodeURL } from '../../utils/confirm';
-
-const ROUTEMESH_RPC_ORIGIN = 'https://lb.routeme.sh';
-
-const isRouteMeshRpcForChain = (rpcUrl: URL, chainId: string) => {
-  const pathname = rpcUrl.pathname.replace(/\/$/u, '');
-  const decimalChainId = parseInt(chainId, 16);
-
-  return (
-    rpcUrl.origin === ROUTEMESH_RPC_ORIGIN &&
-    pathname === `/rpc/evm/${decimalChainId}`
-  );
-};
 
 // Ported from templates/add-ethereum-chain.js
 export function useAddEthereumChainAlerts() {
@@ -46,30 +29,13 @@ export function useAddEthereumChainAlerts() {
 
   useEffect(() => {
     if (!pendingApproval) {
+      setAlerts([]);
       return;
     }
 
     const validate = async () => {
       const nextAlerts: Alert[] = [];
       const { requestData } = pendingApproval;
-
-      if (!requestData) {
-        setAlerts(nextAlerts);
-        return;
-      }
-
-      if (requestData.rpcUrl && !isValidASCIIURL(requestData.rpcUrl)) {
-        nextAlerts.push({
-          key: 'rpcUrlIdnHomograph',
-          message: t('networkUrlErrorWarning', [
-            toPunycodeURL(requestData.rpcUrl) ?? '',
-          ]),
-          severity: Severity.Warning,
-          field: RowAlertKey.RpcUrl,
-          inlineAlertText: '',
-          showArrow: false,
-        });
-      }
 
       // Only proceed with safe chains validation if we have a matched chain
       if (!matchedChain) {
@@ -130,14 +96,11 @@ export function useAddEthereumChainAlerts() {
         });
       }
 
-      const rpcUrl = new URL(requestData.rpcUrl);
+      const { origin } = new URL(requestData.rpcUrl);
 
       if (
-        !matchedChain.rpc
-          ?.map((rpc) => new URL(rpc).origin)
-          .includes(rpcUrl.origin) &&
-        !networkByPassingValidation?.rpcUrl?.includes(rpcUrl.origin) &&
-        !isRouteMeshRpcForChain(rpcUrl, requestData.chainId)
+        !matchedChain.rpc?.map((rpc) => new URL(rpc).origin).includes(origin) &&
+        !networkByPassingValidation?.rpcUrl?.includes(origin)
       ) {
         nextAlerts.push({
           key: 'mismatchedRpcUrl',
@@ -186,13 +149,9 @@ export function useAddEthereumChainAlerts() {
           err,
         );
 
-        const alertKey = isRpcRateLimitError(err)
-          ? 'rpcUrlRateLimited'
-          : 'errorWhileConnectingToRPC';
-
         nextAlerts.push({
-          key: alertKey,
-          message: t(alertKey),
+          key: 'errorWhileConnectingToRPC',
+          message: t('errorWhileConnectingToRPC'),
           severity: Severity.Warning,
           field: RowAlertKey.RpcUrl,
           inlineAlertText: '',
@@ -206,5 +165,5 @@ export function useAddEthereumChainAlerts() {
     validate();
   }, [chainId, matchedChain, pendingApproval, t]);
 
-  return pendingApproval ? alerts : EMPTY_ARRAY;
+  return alerts;
 }

@@ -11,8 +11,10 @@ import { toggleNetworkMenu } from '../../store/actions';
 import { setHomeDeepLinkQrCode } from '../../ducks/app/app';
 import { useDispatch } from '../../store/hooks';
 
-import { HomeQueryParams } from '../../../shared/lib/deep-links/routes/home';
-import { isDeepLinkHost } from '../../../shared/lib/deep-links/common';
+import {
+  DEEP_LINK_ORIGIN,
+  HomeQueryParams,
+} from '../../../shared/lib/deep-links/routes/home';
 
 export type HomeDeepLinkQrCode = {
   deeplinkUrl: string;
@@ -29,12 +31,7 @@ function isDeepLinkUrlForPath(urlString: string | undefined, pathname: string) {
 
   try {
     const url = new URL(urlString);
-    return (
-      url.protocol === 'https:' &&
-      !url.port &&
-      isDeepLinkHost(url.hostname) &&
-      url.pathname === pathname
-    );
+    return url.origin === DEEP_LINK_ORIGIN && url.pathname === pathname;
   } catch {
     return false;
   }

@@ -12,6 +12,7 @@
   "appState": {
     "networkDropdownOpen": false,
     "importNftsModal": { "open": false },
+    "showPermittedNetworkToastOpen": false,
     "isLoading": false,
     "modal": {
       "open": false,

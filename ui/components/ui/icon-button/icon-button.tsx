@@ -5,7 +5,6 @@ import type { ButtonBaseProps } from '../../component-library/button-base/button
 import {
   AlignItems,
   BackgroundColor,
-  BorderRadius,
   Display,
   FlexDirection,
   JustifyContent,
@@ -47,9 +46,6 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         flexDirection={FlexDirection.Column}
         alignItems={AlignItems.center}
         justifyContent={JustifyContent.center}
-        // These square action tiles keep a rounded-rectangle shape rather than
-        // inheriting the pill radius that ButtonBase applies.
-        borderRadius={BorderRadius.XL}
         paddingTop={3}
         paddingBottom={3}
         paddingLeft={2}

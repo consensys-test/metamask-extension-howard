@@ -12,7 +12,6 @@ import {
   CONFIRMATION_V_NEXT_ROUTE,
   CROSS_CHAIN_SWAP_ROUTE,
   DEFAULT_ROUTE,
-  DISCOVER_SEARCH_ROUTE,
   HARDWARE_WALLET_SIGNATURES_ROUTE,
   TOKEN_MANAGEMENT_ROUTE,
 } from '../../helpers/constants/routes';
@@ -24,7 +23,6 @@ import { CHAIN_IDS } from '../../../shared/constants/network';
 import { mockNetworkState } from '../../../test/stub/networks';
 import useMultiPolling from '../../hooks/useMultiPolling';
 import { RequireAuthenticated } from '../../layouts/require-authenticated';
-import RequireBasicFunctionality from '../../helpers/higher-order-components/require-basic-functionality/require-basic-functionality';
 import Routes, { routeConfig, TokenManagementFeatureRoute } from '.';
 
 const middlewares = [thunk];
@@ -119,6 +117,12 @@ jest.mock('../../hooks/musd', () => ({
   useMusdCtaVisibility: () => ({
     shouldShowTokenListItemCta: jest.fn().mockReturnValue(false),
     shouldShowAssetOverviewCta: jest.fn().mockReturnValue(false),
+    shouldShowBuyGetMusdCta: jest.fn().mockReturnValue({
+      shouldShowCta: false,
+      selectedChainId: null,
+      isEmptyWallet: false,
+      variant: null,
+    }),
     isTokenWithCta: jest.fn().mockReturnValue(false),
     getCtaKey: jest.fn().mockReturnValue(''),
     isGeoBlocked: false,
@@ -164,8 +168,10 @@ jest.mock('../../hooks/musd', () => ({
     customAmount: null,
     setCustomAmount: jest.fn(),
   }),
+  BuyGetMusdCtaVariant: { BUY: 'buy', GET: 'get' },
   isTokenInWildcardList: jest.fn().mockReturnValue(false),
   checkTokenAllowed: jest.fn().mockReturnValue(false),
+  isMerklClaimTransaction: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('../../hooks/useMultiPolling', () => ({
@@ -234,18 +240,6 @@ describe('Routes Component', () => {
       path,
     ]);
     expect(matches?.[0].route.element.type).toBe(RequireAuthenticated);
-  });
-
-  it('guards discover search with basic functionality', () => {
-    const matches = matchRoutes(routeConfig, DISCOVER_SEARCH_ROUTE);
-
-    expect(matches?.map(({ route }) => route.path)).toStrictEqual([
-      undefined,
-      undefined,
-      DISCOVER_SEARCH_ROUTE,
-    ]);
-    expect(matches?.[0].route.element.type).toBe(RequireAuthenticated);
-    expect(matches?.[1].route.element.type).toBe(RequireBasicFunctionality);
   });
 
   describe('render during send flow', () => {
@@ -387,14 +381,10 @@ describe('toast display', () => {
     expect(toastContainer).toBeInTheDocument();
   });
 
-  // The container is always mounted outside the home/perps/settings screens so
-  // the Basic Functionality migration toast can surface on confirmation routes,
-  // but it stays empty while no toast is scheduled.
-  it('renders an bft toastContainer on confirmation route', () => {
+  it('does not render toastContainer on confirmation route', () => {
     render(CONFIRMATION_V_NEXT_ROUTE, getToastDisplayTestState(new Date(0)));
     const toastContainer = document.querySelector('.toasts-container');
 
-    expect(toastContainer).toBeInTheDocument();
-    expect(toastContainer).toBeEmptyDOMElement();
+    expect(toastContainer).not.toBeInTheDocument();
   });
 });

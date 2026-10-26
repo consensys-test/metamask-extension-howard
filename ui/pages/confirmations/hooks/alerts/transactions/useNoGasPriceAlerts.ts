@@ -1,3 +1,5 @@
+'use no memo';
+
 import { useSelector } from 'react-redux';
 import {
   TransactionMeta,
@@ -49,5 +51,5 @@ export function useNoGasPriceAlerts(): Alert[] {
         severity: Severity.Warning,
       },
     ];
-  }, [noGasPrice, t]);
+  }, [noGasPrice]);
 }

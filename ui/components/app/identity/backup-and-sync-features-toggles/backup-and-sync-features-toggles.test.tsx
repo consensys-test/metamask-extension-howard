@@ -8,7 +8,6 @@ import { MetamaskIdentityProvider } from '../../../../contexts/identity';
 import { renderWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import {
   BackupAndSyncFeaturesToggles,
-  backupAndSyncFeaturesTogglesSections,
   backupAndSyncFeaturesTogglesTestIds,
 } from './backup-and-sync-features-toggles';
 
@@ -35,7 +34,6 @@ const initialStore = () => ({
     isBackupAndSyncEnabled: true,
     isAccountSyncingEnabled: false,
     isContactSyncingEnabled: false,
-    isRampsSyncingEnabled: false,
     consentDecisionMade: true,
     optedIn: false,
     isBackupAndSyncUpdateLoading: false,
@@ -59,32 +57,6 @@ describe('BackupAndSyncFeaturesToggles', () => {
     expect(
       getByTestId(backupAndSyncFeaturesTogglesTestIds.container),
     ).toBeInTheDocument();
-  });
-
-  it('centers feature icons and applies the standard settings icon style', () => {
-    const { container } = render(
-      <Redux.Provider store={mockStore(initialStore())}>
-        <MetamaskIdentityProvider>
-          <BackupAndSyncFeaturesToggles />
-        </MetamaskIdentityProvider>
-      </Redux.Provider>,
-    );
-
-    for (const { id } of backupAndSyncFeaturesTogglesSections) {
-      const row = container.querySelector(
-        `#backup-and-sync-features-toggles-${id}`,
-      );
-      const icon = row?.querySelector('svg');
-
-      expect(row).toHaveClass('items-center');
-      expect(icon).toHaveClass(
-        'w-5',
-        'h-5',
-        'text-icon-alternative',
-        'shrink-0',
-      );
-      expect(icon?.parentElement).toHaveClass('items-center');
-    }
   });
 
   it('tracks the toggle event', () => {
@@ -214,40 +186,11 @@ describe('BackupAndSyncFeaturesToggles', () => {
     );
   });
 
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  it.each([
-    [false, true],
-    [true, false],
-  ])(
-    'toggles ramps syncing from %s to %s',
-    (currentValue: boolean, nextValue: boolean) => {
-      const store = initialStore();
-      store.metamask.isRampsSyncingEnabled = currentValue;
-      const { setIsBackupAndSyncFeatureEnabledMock } = arrangeMocks();
-      const { getByTestId } = render(
-        <Redux.Provider store={mockStore(store)}>
-          <BackupAndSyncFeaturesToggles />
-        </Redux.Provider>,
-      );
-      fireEvent.click(
-        getByTestId(
-          backupAndSyncFeaturesTogglesTestIds.rampsSyncingToggleButton,
-        ),
-      );
-      expect(setIsBackupAndSyncFeatureEnabledMock).toHaveBeenCalledWith(
-        BACKUPANDSYNC_FEATURES.rampsSyncing,
-        nextValue,
-      );
-    },
-  );
-
   it('disables main backup and sync when all sub-features are manually turned off', async () => {
     const store = initialStore();
     store.metamask.isBackupAndSyncEnabled = true;
-    store.metamask.isAccountSyncingEnabled = false;
-    store.metamask.isContactSyncingEnabled = false;
-    store.metamask.isRampsSyncingEnabled = false;
+    store.metamask.isAccountSyncingEnabled = false; // Already off
+    store.metamask.isContactSyncingEnabled = false; // Already off
 
     const { setIsBackupAndSyncFeatureEnabledMock } = arrangeMocks();
 
@@ -269,9 +212,8 @@ describe('BackupAndSyncFeaturesToggles', () => {
   it('does not disable main backup and sync when at least one sub-feature is enabled', async () => {
     const store = initialStore();
     store.metamask.isBackupAndSyncEnabled = true;
-    store.metamask.isAccountSyncingEnabled = true;
-    store.metamask.isContactSyncingEnabled = false;
-    store.metamask.isRampsSyncingEnabled = false;
+    store.metamask.isAccountSyncingEnabled = true; // One is ON
+    store.metamask.isContactSyncingEnabled = false; // One is OFF
 
     const { setIsBackupAndSyncFeatureEnabledMock } = arrangeMocks();
 

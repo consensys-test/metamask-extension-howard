@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ErrorCode } from '@metamask/hw-wallet-sdk';
 
 import {
   Box,
@@ -26,7 +25,6 @@ import {
   useHardwareWalletActions,
   useHardwareWalletConfig,
 } from '../../contexts/hardware-wallets';
-import { getHardwareWalletErrorCode } from '../../contexts/hardware-wallets/rpcErrorUtils';
 import { HARDWARE_WALLET_REPAIR_WALLET_TYPE_PARAM } from '../../contexts/hardware-wallets/constants';
 import { HardwareWalletType } from '../../contexts/hardware-wallets/types';
 import {
@@ -41,37 +39,8 @@ import {
   getInstructionSteps,
 } from './hardware-wallet-repair-utils';
 
-/**
- * Maps repair-flow failures to user-facing copy.
- * Blind-signing errors must not collapse into "device not detected".
- *
- * @param err - Error thrown during repair connect/readiness.
- * @param t - i18n translate helper.
- * @returns Localized repair error message.
- */
-function getRepairConnectErrorMessage(
-  err: unknown,
-  t: (key: string, substitutions?: string[]) => string,
-): string {
-  if (
-    getHardwareWalletErrorCode(err) ===
-    ErrorCode.DeviceStateBlindSignNotSupported
-  ) {
-    return t('hardwareWalletErrorTitleBlindSignNotSupported');
-  }
-
-  if (err instanceof Error && err.message) {
-    return err.message;
-  }
-
-  return t('hardwareWalletRepairDeviceNotDetected');
-}
-
 export const HardwareWalletRepair: React.FC = () => {
-  const t = useI18nContext() as (
-    key: string,
-    substitutions?: string[],
-  ) => string;
+  const t = useI18nContext();
   const { search } = useLocation();
   const {
     ensureDeviceReady,
@@ -120,11 +89,10 @@ export const HardwareWalletRepair: React.FC = () => {
         }
       }
 
-      // Prefer ensureRepairDeviceReady so device-state errors (e.g. blind
-      // signing disabled) throw instead of being collapsed to a boolean false
-      // by the shared context ensureDeviceReady helper.
-      const ready = repairWalletType
-        ? await ensureRepairDeviceReady(repairWalletType)
+      const shouldUseRouteReadinessCheck =
+        routeWalletType && routeWalletType !== walletType;
+      const ready = shouldUseRouteReadinessCheck
+        ? await ensureRepairDeviceReady(routeWalletType)
         : await ensureDeviceReady();
       if (ready) {
         setConnectionReady();
@@ -133,7 +101,11 @@ export const HardwareWalletRepair: React.FC = () => {
         setError(t('hardwareWalletRepairDeviceNotDetected'));
       }
     } catch (err: unknown) {
-      setError(getRepairConnectErrorMessage(err, t));
+      const message =
+        err instanceof Error
+          ? err.message
+          : t('hardwareWalletRepairDeviceNotDetected');
+      setError(message);
     } finally {
       setIsConnecting(false);
     }
@@ -142,14 +114,14 @@ export const HardwareWalletRepair: React.FC = () => {
     setConnectionReady,
     requestHardwareWalletPermission,
     repairWalletType,
+    routeWalletType,
     t,
+    walletType,
   ]);
 
   return (
     <>
-      <div className="hidden sm:flex justify-center">
-        <MultichainMetaFoxLogo />
-      </div>
+      <MultichainMetaFoxLogo />
       <Page data-testid="hardware-wallet-repair">
         <Header
           endAccessory={

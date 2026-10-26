@@ -44,7 +44,6 @@ export type PlatformAdapterEnrichmentContext = {
   hasMarketingConsent: () => boolean;
   hasBasicFunctionalityEnabled: () => boolean;
   getRemoteFeatureFlags: () => Record<string, unknown>;
-  getFeatureFlagThresholdGroups: () => Record<string, string>;
   appVersion: string;
   userAgent: string;
 };
@@ -104,11 +103,11 @@ export function createEnrichmentContext(
     },
     getProfileIdentityProperties,
     getMarketingCampaignCookieId: () =>
-      messenger.call('AnalyticsController:getState')
-        .marketingCampaignCookieId ?? null,
+      messenger.call('MetaMetricsController:getState')
+        .marketingCampaignCookieId,
     hasMarketingConsent: () =>
-      messenger.call('AnalyticsController:getState').optedInToMarketing ===
-      true,
+      messenger.call('MetaMetricsController:getState')
+        .dataCollectionForMarketing === true,
     hasBasicFunctionalityEnabled: () =>
       messenger.call('PreferencesController:getState').useExternalServices,
     getRemoteFeatureFlags: () =>
@@ -116,10 +115,6 @@ export function createEnrichmentContext(
         messenger.call('RemoteFeatureFlagController:getState')
           ?.remoteFeatureFlags as Record<string, unknown> | undefined,
       ),
-    getFeatureFlagThresholdGroups: () =>
-      (messenger.call('RemoteFeatureFlagController:getState')
-        ?.featureFlagThresholdGroups as Record<string, string> | undefined) ??
-      {},
     appVersion,
     userAgent: typeof window === 'undefined' ? '' : window.navigator.userAgent,
   };
@@ -210,8 +205,6 @@ export function enrichWithABTestAnalytics(
       enrichWithABTests(
         { name: eventName, properties: enrichedProperties },
         ctx.getRemoteFeatureFlags(),
-        undefined,
-        ctx.getFeatureFlagThresholdGroups(),
       ).properties ?? enrichedProperties
     );
   } catch {

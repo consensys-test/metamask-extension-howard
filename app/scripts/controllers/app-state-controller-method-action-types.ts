@@ -65,16 +65,6 @@ export type AppStateControllerSetPasskeyAutoUnlockSuppressedAction = {
   handler: AppStateController['setPasskeyAutoUnlockSuppressed'];
 };
 
-/**
- * Records when the legacy passkey PRF migration reminder was last shown.
- *
- * @param lastShown - Timestamp when the reminder was shown.
- */
-export type AppStateControllerSetLastShownPrfMigrationReminderAtAction = {
-  type: `AppStateController:setLastShownPrfMigrationReminderAt`;
-  handler: AppStateController['setLastShownPrfMigrationReminderAt'];
-};
-
 export type AppStateControllerSetNewPrivacyPolicyToastClickedOrClosedAction = {
   type: `AppStateController:setNewPrivacyPolicyToastClickedOrClosed`;
   handler: AppStateController['setNewPrivacyPolicyToastClickedOrClosed'];
@@ -83,11 +73,6 @@ export type AppStateControllerSetNewPrivacyPolicyToastClickedOrClosedAction = {
 export type AppStateControllerSetNewPrivacyPolicyToastShownDateAction = {
   type: `AppStateController:setNewPrivacyPolicyToastShownDate`;
   handler: AppStateController['setNewPrivacyPolicyToastShownDate'];
-};
-
-export type AppStateControllerSetArcUsageNoticeShownAction = {
-  type: `AppStateController:setArcUsageNoticeShown`;
-  handler: AppStateController['setArcUsageNoticeShown'];
 };
 
 export type AppStateControllerSetPna25AcknowledgedAction = {
@@ -333,6 +318,16 @@ export type AppStateControllerSetProductTourAction = {
 };
 
 /**
+ * Updates the network connection banner state
+ *
+ * @param networkConnectionBanner - The new banner state
+ */
+export type AppStateControllerUpdateNetworkConnectionBannerAction = {
+  type: `AppStateController:updateNetworkConnectionBanner`;
+  handler: AppStateController['updateNetworkConnectionBanner'];
+};
+
+/**
  * Sets a unique ID for the current extension popup
  *
  * @param currentExtensionPopupId
@@ -373,8 +368,7 @@ export type AppStateControllerAddSignatureSecurityAlertResponseAction = {
 };
 
 /**
- * A setter for the currentPopupId which indicates the id of popup window that's currently active.
- * Pass `undefined` to clear when the popup is closed.
+ * A setter for the currentPopupId which indicates the id of popup window that's currently active
  *
  * @param currentPopupId
  */
@@ -399,16 +393,6 @@ export type AppStateControllerGetLastInteractedConfirmationInfoAction = {
 export type AppStateControllerSetLastInteractedConfirmationInfoAction = {
   type: `AppStateController:setLastInteractedConfirmationInfo`;
   handler: AppStateController['setLastInteractedConfirmationInfo'];
-};
-
-/**
- * Sets the entry point that initiated the last Perps deposit flow.
- *
- * @param entryPoint - The entry point identifier, or undefined to clear.
- */
-export type AppStateControllerSetLastPerpsDepositEntryPointAction = {
-  type: `AppStateController:setLastPerpsDepositEntryPoint`;
-  handler: AppStateController['setLastPerpsDepositEntryPoint'];
 };
 
 /**
@@ -519,6 +503,11 @@ export type AppStateControllerSetPendingShieldCohortAction = {
   handler: AppStateController['setPendingShieldCohort'];
 };
 
+export type AppStateControllerSetCanTrackWalletFundsObtainedAction = {
+  type: `AppStateController:setCanTrackWalletFundsObtained`;
+  handler: AppStateController['setCanTrackWalletFundsObtained'];
+};
+
 export type AppStateControllerSetIsWalletResetInProgressAction = {
   type: `AppStateController:setIsWalletResetInProgress`;
   handler: AppStateController['setIsWalletResetInProgress'];
@@ -598,10 +587,8 @@ export type AppStateControllerMethodActions =
   | AppStateControllerSetOnboardingDateAction
   | AppStateControllerSetLastViewedUserSurveyAction
   | AppStateControllerSetPasskeyAutoUnlockSuppressedAction
-  | AppStateControllerSetLastShownPrfMigrationReminderAtAction
   | AppStateControllerSetNewPrivacyPolicyToastClickedOrClosedAction
   | AppStateControllerSetNewPrivacyPolicyToastShownDateAction
-  | AppStateControllerSetArcUsageNoticeShownAction
   | AppStateControllerSetPna25AcknowledgedAction
   | AppStateControllerSetShieldPausedToastLastClickedOrClosedAction
   | AppStateControllerSetShieldEndingToastLastClickedOrClosedAction
@@ -627,6 +614,7 @@ export type AppStateControllerMethodActions =
   | AppStateControllerSetMusdConversionEducationSeenAction
   | AppStateControllerAddMusdConversionDismissedCtaKeyAction
   | AppStateControllerSetProductTourAction
+  | AppStateControllerUpdateNetworkConnectionBannerAction
   | AppStateControllerSetCurrentExtensionPopupIdAction
   | AppStateControllerSetTrezorModelAction
   | AppStateControllerUpdateNftDropDownStateAction
@@ -635,7 +623,6 @@ export type AppStateControllerMethodActions =
   | AppStateControllerSetCurrentPopupIdAction
   | AppStateControllerGetLastInteractedConfirmationInfoAction
   | AppStateControllerSetLastInteractedConfirmationInfoAction
-  | AppStateControllerSetLastPerpsDepositEntryPointAction
   | AppStateControllerGetCurrentPopupIdAction
   | AppStateControllerGetThrottledOriginStateAction
   | AppStateControllerUpdateThrottledOriginStateAction
@@ -648,6 +635,7 @@ export type AppStateControllerMethodActions =
   | AppStateControllerSetPendingRedirectRouteAction
   | AppStateControllerSetLastVisitedRouteAction
   | AppStateControllerSetPendingShieldCohortAction
+  | AppStateControllerSetCanTrackWalletFundsObtainedAction
   | AppStateControllerSetIsWalletResetInProgressAction
   | AppStateControllerGetIsWalletResetInProgressAction
   | AppStateControllerSetDefaultSubscriptionPaymentOptionsAction

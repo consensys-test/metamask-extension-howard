@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { useSelector } from 'react-redux';
 import type { TrendingAsset } from '@metamask/assets-controllers';
 import {
   AvatarNetwork,
@@ -12,6 +11,7 @@ import {
   BoxFlexDirection,
   ButtonBase,
   FontWeight,
+  IconName,
   Text,
   TextColor,
   TextVariant,
@@ -21,10 +21,7 @@ import { isCaipAssetType, parseCaipAssetType } from '@metamask/utils';
 import { getCaipAssetImageUrl } from '../../../shared/lib/asset-utils';
 import { CHAIN_ID_TO_NETWORK_IMAGE_URL_MAP } from '../../../shared/constants/network';
 import { formatCompactCurrency } from '../../helpers/utils/token-insights';
-import { useFormatters } from '../../hooks/useFormatters';
 import { useI18nContext } from '../../hooks/useI18nContext';
-import { getCurrentCurrency } from '../../ducks/metamask/metamask';
-import { getCurrencyRates } from '../../selectors';
 import { getChangeColor } from '../../components/app/perps/utils';
 import {
   getSecurityTrustBadgeConfig,
@@ -35,14 +32,10 @@ import {
 const ROW_STYLES =
   'justify-start rounded-none min-w-0 h-auto min-h-[72px] gap-3 text-left cursor-pointer bg-default px-4 py-3 hover:bg-hover active:bg-pressed';
 const USD_CURRENCY = 'USD';
+const MIN_DISPLAY_PRICE = 0.01;
 type SecurityResultType = NonNullable<
   TrendingAsset['securityData']
 >['resultType'];
-type CurrencyRate = {
-  conversionRate?: number | null;
-  usdConversionRate?: number | null;
-};
-type CurrencyRates = Record<string, CurrencyRate>;
 
 export type DiscoverAssetRowProps = {
   asset: TrendingAsset;
@@ -50,39 +43,24 @@ export type DiscoverAssetRowProps = {
   'data-testid'?: string;
 };
 
-const getAssetPrice = (price: string | undefined) => {
+const formatAssetPrice = (price: string | undefined) => {
   const value = Number(price);
   if (!Number.isFinite(value) || value === 0) {
-    return null;
+    return '—';
   }
 
-  return value;
+  if (value > 0 && value < MIN_DISPLAY_PRICE) {
+    return '<$0.01';
+  }
+
+  // narrowSymbol yields "$" for USD (not "US$"), matching Perps row prices.
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: USD_CURRENCY,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 2,
+  }).format(value);
 };
-
-const getUsdToCurrentCurrencyRate = (currencyRates?: CurrencyRates) => {
-  const currencyRate = Object.values(currencyRates ?? {}).find(
-    ({ conversionRate, usdConversionRate }) =>
-      typeof conversionRate === 'number' &&
-      typeof usdConversionRate === 'number' &&
-      Number.isFinite(conversionRate) &&
-      Number.isFinite(usdConversionRate) &&
-      conversionRate > 0 &&
-      usdConversionRate > 0,
-  );
-
-  return currencyRate?.conversionRate && currencyRate.usdConversionRate
-    ? currencyRate.conversionRate / currencyRate.usdConversionRate
-    : null;
-};
-
-const convertUsdValue = (
-  value: number,
-  shouldConvert: boolean,
-  usdToCurrentCurrencyRate: number | null,
-) =>
-  shouldConvert && usdToCurrentCurrencyRate
-    ? value * usdToCurrentCurrencyRate
-    : value;
 
 const getNetworkImageMapKey = ({
   namespace,
@@ -122,6 +100,22 @@ const getSecurityResultType = (securityData: TrendingAsset['securityData']) =>
   securityData?.resultType ??
   (securityData as { type?: SecurityResultType } | undefined)?.type;
 
+const getDiscoverSearchSecurityBadge = (
+  resultType: SecurityResultType | undefined,
+  t: SecurityTrustTranslate,
+) => {
+  const badge = getSecurityTrustBadgeConfig(resultType, t);
+
+  if (badge && (resultType === 'Warning' || resultType === 'Spam')) {
+    return {
+      ...badge,
+      icon: IconName.Danger,
+    };
+  }
+
+  return badge;
+};
+
 /**
  * Discover row for crypto / stocks: icon, name, security badge, cap·vol, price, 24h %.
  * @param options0
@@ -135,14 +129,6 @@ export const DiscoverAssetRow = ({
   'data-testid': dataTestId,
 }: DiscoverAssetRowProps) => {
   const t = useI18nContext() as SecurityTrustTranslate;
-  const { formatCurrencyWithMinThreshold } = useFormatters();
-  const currentCurrency = useSelector(getCurrentCurrency);
-  const currencyRates = useSelector(getCurrencyRates) as CurrencyRates;
-  const usdToCurrentCurrencyRate = getUsdToCurrentCurrencyRate(currencyRates);
-  const shouldConvertUsd =
-    currentCurrency.toUpperCase() !== USD_CURRENCY &&
-    usdToCurrentCurrencyRate !== null;
-  const displayCurrency = shouldConvertUsd ? currentCurrency : USD_CURRENCY;
 
   const imageUrl = useMemo(() => {
     if (!isCaipAssetType(asset.assetId)) {
@@ -166,40 +152,11 @@ export const DiscoverAssetRow = ({
   }, [asset.assetId]);
 
   const secondaryText = useMemo(() => {
-    const cap = formatCompactCurrency(
-      convertUsdValue(
-        asset.marketCap,
-        shouldConvertUsd,
-        usdToCurrentCurrencyRate,
-      ),
-      displayCurrency,
-    );
-    const vol = formatCompactCurrency(
-      convertUsdValue(
-        asset.aggregatedUsdVolume,
-        shouldConvertUsd,
-        usdToCurrentCurrencyRate,
-      ),
-      displayCurrency,
-    );
+    const cap = formatCompactCurrency(asset.marketCap, USD_CURRENCY);
+    const vol = formatCompactCurrency(asset.aggregatedUsdVolume, USD_CURRENCY);
     return `${cap} ${t('discoverSearchCap')} \u00B7 ${vol} ${t('discoverSearchVol')}`;
-  }, [
-    asset.aggregatedUsdVolume,
-    asset.marketCap,
-    displayCurrency,
-    shouldConvertUsd,
-    t,
-    usdToCurrentCurrencyRate,
-  ]);
+  }, [asset.aggregatedUsdVolume, asset.marketCap, t]);
 
-  const price = getAssetPrice(asset.price);
-  const formattedPrice =
-    price === null
-      ? '—'
-      : formatCurrencyWithMinThreshold(
-          convertUsdValue(price, shouldConvertUsd, usdToCurrentCurrencyRate),
-          displayCurrency,
-        );
   const changePct = asset.priceChangePct?.h24 ?? '';
   const formattedChange = changePct
     ? formatPriceChangePercent(changePct)
@@ -210,7 +167,10 @@ export const DiscoverAssetRow = ({
 
   const securityBadge = useMemo(
     () =>
-      getSecurityTrustBadgeConfig(getSecurityResultType(asset.securityData), t),
+      getDiscoverSearchSecurityBadge(
+        getSecurityResultType(asset.securityData),
+        t,
+      ),
     [asset.securityData, t],
   );
 
@@ -300,7 +260,7 @@ export const DiscoverAssetRow = ({
           fontWeight={FontWeight.Medium}
           className="block max-w-full truncate text-right"
         >
-          {formattedPrice}
+          {formatAssetPrice(asset.price)}
         </Text>
         <Text
           variant={TextVariant.BodySm}

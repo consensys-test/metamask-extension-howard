@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Product,
   PRODUCT_TYPES,
@@ -128,23 +122,23 @@ const TransactionShield = () => {
     | (Subscription & { rewardAccountId?: string }) // TODO: fix this type once we have controller released.
     | undefined = currentShieldSubscription ?? lastShieldSubscription;
 
-  const timeoutCancelledRef = useRef(false);
+  const [timeoutCancelled, setTimeoutCancelled] = useState(false);
   useEffect(() => {
     // cancel timeout when component unmounts
     return () => {
-      timeoutCancelledRef.current = true;
+      setTimeoutCancelled(true);
     };
   }, []);
   useEffect(() => {
     // cancel timeout when subscription is created
     if (currentShieldSubscription) {
-      timeoutCancelledRef.current = true;
+      setTimeoutCancelled(true);
     }
   }, [currentShieldSubscription]);
 
   const startSubscriptionCreationTimeout = useTimeout(
     () => {
-      if (timeoutCancelledRef.current) {
+      if (timeoutCancelled) {
         return;
       }
 

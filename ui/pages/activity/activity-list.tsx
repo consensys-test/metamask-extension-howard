@@ -1,17 +1,12 @@
-import React, {
-  useCallback,
-  useDeferredValue,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { useDeferredValue } from '../../hooks/useDeferredValue';
 import { PendingTransactionCancelSpeedUpProvider } from '../../components/app/pending-transaction-action-buttons/pending-transaction-cancel-speed-up-provider';
 import AssetListControlBar from '../../components/app/assets/asset-list/asset-list-control-bar/asset-list-control-bar';
 import { TransactionActivityEmptyState } from '../../components/app/transaction-activity-empty-state';
 import { SectionHeader } from '../../components/ui/section-header';
 import { VirtualizedList } from '../../components/ui/virtualized-list/virtualized-list';
 import { useScrollContainer } from '../../contexts/scroll-container';
-import { useRelativeMediumDate } from '../../hooks/useRelativeMediumDate';
+import { useFormatters } from '../../hooks/useFormatters';
 import { useI18nContext } from '../../hooks/useI18nContext';
 import { useItemInView } from '../../hooks/useItemInView';
 import { useEventListener } from '../../hooks/useEventListener';
@@ -53,7 +48,7 @@ export function ActivityList({
 } = {}) {
   const t = useI18nContext();
   const { trackEvent, createEventBuilder } = useAnalytics();
-  const formatRelativeMediumDate = useRelativeMediumDate();
+  const { formatMediumDate } = useFormatters();
   const scrollContainerRef = useScrollContainer();
   const dialogRef = useRef<HTMLDialogElement>(null);
   // null = not yet initialised by AssetListControlBar; [] = no filter applied
@@ -66,7 +61,7 @@ export function ActivityList({
     networks: deferredNetworks ?? [],
   };
 
-  const { data, isLoading, fetchNextVisiblePage } =
+  const { data, isInitialLoading, fetchNextVisiblePage } =
     useTransactionsQuery(filters);
 
   const localItems = useLocalTransactions(filters);
@@ -90,7 +85,7 @@ export function ActivityList({
 
   useActivityScreenViewed({
     filter,
-    isSettled: networks !== null && !isLoading,
+    isSettled: networks !== null && !isInitialLoading,
     isEmpty: groupedItems.length === 0,
     pendingLength: [...localItems, ...nonEvmItems, ...rampsItems].filter(
       (item) => item.status === 'pending',
@@ -100,19 +95,13 @@ export function ActivityList({
 
   const itemRef = useItemInView({
     targetIndex: lastEvmItemIndex,
-    rootRef: scrollContainerRef ?? undefined,
+    root: scrollContainerRef?.current ?? null,
     onVisible: fetchNextVisiblePage,
   });
 
-  const handlePopState = useCallback(() => {
+  useEventListener('popstate', () => {
     dialogRef.current?.close?.();
-  }, []);
-
-  useEventListener('popstate', handlePopState);
-
-  const handleDialogBack = useCallback(() => {
-    dialogRef.current?.close?.();
-  }, []);
+  });
 
   const handleClick = (item: ActivityListItem) => {
     const identifier = getActivityItemIdentifier(item);
@@ -179,7 +168,6 @@ export function ActivityList({
           showSortControl={false}
           showImportTokenButton={false}
           onNetworkSelect={setNetworks}
-          data-testid="parent-selector-activity-tab"
         />
       )}
 
@@ -194,7 +182,7 @@ export function ActivityList({
         keyExtractor={getItemKey}
         itemRef={itemRef}
         listEmptyComponent={
-          isLoading ? (
+          isInitialLoading ? (
             <ActivityListSkeleton />
           ) : (
             <TransactionActivityEmptyState className="mx-auto mt-5 mb-6" />
@@ -207,7 +195,7 @@ export function ActivityList({
           }
 
           if (row.type === 'date-header') {
-            return <SectionHeader label={formatRelativeMediumDate(row.date)} />;
+            return <SectionHeader label={formatMediumDate(row.date)} />;
           }
 
           return (
@@ -227,7 +215,7 @@ export function ActivityList({
         <TransactionDetails
           chainId={selectedItem?.chainId}
           txIdentifier={getActivityItemIdentifier(selectedItem)}
-          onBack={handleDialogBack}
+          onBack={() => dialogRef.current?.close?.()}
         />
       </dialog>
     </PendingTransactionCancelSpeedUpProvider>

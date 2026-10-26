@@ -70,7 +70,7 @@ export default function GasTiming({
     chainIsGasEstimatesLoading ?? rootIsGasEstimatesLoading;
 
   const gasFeeEstimates = chainGasFeeEstimates || gasFeeEstimatesFromRoot;
-  const [customEstimate, setCustomEstimate] = useState(null);
+  const [customEstimatedTime, setCustomEstimatedTime] = useState(null);
   const t = useContext(I18nContext);
 
   // If the user has chosen a value lower than the low gas fee estimate,
@@ -83,12 +83,7 @@ export default function GasTiming({
 
   const previousMaxFeePerGas = usePrevious(maxFeePerGas);
   const previousMaxPriorityFeePerGas = usePrevious(maxPriorityFeePerGas);
-  const customEstimatedTime =
-    customEstimate &&
-    customEstimate.maxFeePerGas === maxFeePerGas &&
-    customEstimate.maxPriorityFeePerGas === maxPriorityFeePerGas
-      ? customEstimate.result
-      : null;
+  const previousIsUnknownLow = usePrevious(isUnknownLow);
 
   const estimateTextMap = useMemo(
     () => ({
@@ -119,13 +114,13 @@ export default function GasTiming({
           maxPriorityFeePerGas === priority &&
           isMounted
         ) {
-          setCustomEstimate({
-            maxFeePerGas: fee,
-            maxPriorityFeePerGas: priority,
-            result,
-          });
+          setCustomEstimatedTime(result);
         }
       });
+    }
+
+    if (isUnknownLow !== false && previousIsUnknownLow === true) {
+      setCustomEstimatedTime(null);
     }
 
     return () => {
@@ -137,6 +132,7 @@ export default function GasTiming({
     isUnknownLow,
     previousMaxFeePerGas,
     previousMaxPriorityFeePerGas,
+    previousIsUnknownLow,
   ]);
 
   if (

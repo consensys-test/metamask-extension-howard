@@ -1,6 +1,6 @@
 import { Driver } from '../../webdriver/driver';
 import HomePage from '../pages/home/homepage';
-import AccountListPage from '../pages/accounts/list-page';
+import AccountListPage from '../pages/account-list-page';
 
 /**
  * Opens the account menu, adds a new multichain account, verifies it is
@@ -77,7 +77,6 @@ export const addMultipleAccounts = async ({
 
 /**
  * Opens the account menu and imports an account from a private key.
- * After a successful import, the wallet is on home with the imported account selected.
  *
  * @param driver - The WebDriver instance.
  * @param privateKey - The private key to import.
@@ -96,6 +95,5 @@ export async function importPrivateKeyAccount(
   const accountListPage = new AccountListPage(driver);
   await accountListPage.checkPageIsLoaded(options.accountListTimeout);
   await accountListPage.addNewImportedAccount(privateKey);
-  await homepage.checkPageIsLoaded();
-  await homepage.dismissAccountImportedToast();
+  await accountListPage.closeMultichainAccountsPage();
 }

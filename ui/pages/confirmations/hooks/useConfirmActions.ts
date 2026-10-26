@@ -1,10 +1,11 @@
 import { TransactionMeta } from '@metamask/transaction-controller';
 import { providerErrors, serializeError } from '@metamask/rpc-errors';
 import { useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { MetaMetricsEventLocation } from '../../../../shared/constants/metametrics';
 import { clearConfirmTransaction } from '../../../ducks/confirm-transaction/confirm-transaction.duck';
+import { DEFAULT_ROUTE } from '../../../helpers/constants/routes';
 import {
   rejectPendingApproval,
   setNextNonce,
@@ -12,14 +13,12 @@ import {
 } from '../../../store/actions';
 import { useConfirmContext } from '../context/confirm';
 import { useDispatch } from '../../../store/hooks';
-import { navigateConfirmationExit } from './useConfirmationNavigation';
 import { useConfirmSendNavigation } from './useConfirmSendNavigation';
 
 export const useConfirmActions = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { key: locationKey } = useLocation();
-  const { currentConfirmation, goBackTo, goBackAction, suppressAutoExit } =
+  const { currentConfirmation, goBackTo } =
     useConfirmContext<TransactionMeta>();
   const { navigateBackIfSend } = useConfirmSendNavigation();
   const { id: currentConfirmationId } = currentConfirmation || {};
@@ -61,27 +60,19 @@ export const useConfirmActions = () => {
         return;
       }
       if (navigateBackForSend) {
-        suppressAutoExit();
         navigateBackIfSend();
-      }
-      if (navigateBackToPreviousPage) {
-        // The auto-exit effect navigates again once the confirmation is
-        // rejected. Suppress it first so only this navigation runs.
-        suppressAutoExit();
       }
       await rejectApproval({ location });
       resetTransactionState();
       if (navigateBackToPreviousPage) {
-        // Perps deposit and mUSD conversion open the confirmation with
-        // replace, so back replaces this entry with goBackTo (TAT-3131).
-        // Money deposit and withdraw push it, so back pops. Replacing a
-        // pushed confirmation with goBackTo duplicates that page and the
-        // next in-app back press does nothing.
-        navigateConfirmationExit(navigate, {
-          goBackTo,
-          goBackAction,
-          locationKey,
-        });
+        // Replace (not push) so the transient wallet-initiated confirmation
+        // (perpsDeposit / perpsWithdraw / musdClaim) does not linger in history.
+        // Pushing here left a phantom confirm-transaction entry between the
+        // origin and the page returned to, which broke back navigation
+        // (double-tap) and post-trade navigation on the Perps order screen
+        // (TAT-3131). This matches the auto-exit path in the confirm context,
+        // which already returns with { replace: true }.
+        navigate(goBackTo ?? DEFAULT_ROUTE, { replace: true });
       }
     },
     [
@@ -91,9 +82,6 @@ export const useConfirmActions = () => {
       rejectApproval,
       resetTransactionState,
       goBackTo,
-      goBackAction,
-      locationKey,
-      suppressAutoExit,
     ],
   );
 

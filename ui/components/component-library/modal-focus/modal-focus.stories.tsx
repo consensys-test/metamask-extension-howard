@@ -1,14 +1,14 @@
 import React from 'react';
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { ComponentStory, ComponentMeta } from '@storybook/react';
+import Box from '../../ui/box';
+
 import {
-  Box,
-  BoxFlexDirection,
-  BoxBorderColor,
-} from '@metamask/design-system-react';
+  BorderColor,
+  DISPLAY,
+  FLEX_DIRECTION,
+} from '../../../helpers/constants/design-system';
 
 import { ModalFocus } from './modal-focus';
-
-type ModalFocusProps = React.ComponentProps<typeof ModalFocus>;
 
 export default {
   title: 'Components/ComponentLibrary/ModalFocus (deprecated)',
@@ -34,29 +34,30 @@ export default {
       </>
     ),
   },
-} satisfies Meta<typeof ModalFocus>;
+} as ComponentMeta<typeof ModalFocus>;
 
-export const DefaultStory: StoryObj<typeof ModalFocus> = {
-  render: (args: ModalFocusProps) => {
-    const [open, setOpen] = React.useState(false);
-    return (
-      <>
-        <button onClick={() => setOpen(true)}>Open</button>
-        {open && (
-          <ModalFocus {...args}>
-            <Box
-              padding={4}
-              borderColor={BoxBorderColor.BorderDefault}
-              flexDirection={BoxFlexDirection.Column}
-              gap={4}
-            >
-              {args.children}
-              <button onClick={() => setOpen(false)}>Close</button>
-            </Box>
-          </ModalFocus>
-        )}
-      </>
-    );
-  },
-  name: 'Default',
+const Template: ComponentStory<typeof ModalFocus> = (args) => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Open</button>
+      {open && (
+        <ModalFocus {...args}>
+          <Box
+            padding={4}
+            borderColor={BorderColor.borderDefault}
+            display={DISPLAY.FLEX}
+            flexDirection={FLEX_DIRECTION.COLUMN}
+            gap={4}
+          >
+            {args.children}
+            <button onClick={() => setOpen(false)}>Close</button>
+          </Box>
+        </ModalFocus>
+      )}
+    </>
+  );
 };
+
+export const DefaultStory = Template.bind({});
+DefaultStory.storyName = 'Default';

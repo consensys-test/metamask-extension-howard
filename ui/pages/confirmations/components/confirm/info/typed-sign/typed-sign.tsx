@@ -18,7 +18,6 @@ import { useGetTokenStandardAndDetails } from '../../../../hooks/useGetTokenStan
 import {
   isOrderSignatureRequest,
   isPermitSignatureRequest,
-  parseSanitizeTypedDataMessage,
 } from '../../../../utils';
 import { useConfirmContext } from '../../../../context/confirm';
 import { useTypesSignSimulationEnabledInfo } from '../../../../hooks/useTypesSignSimulationEnabledInfo';
@@ -37,9 +36,7 @@ const useTokenContract = () => {
   const {
     domain: { verifyingContract },
     message: { spender },
-  } = parseSanitizeTypedDataMessage(
-    currentConfirmation.msgParams.data as string,
-  );
+  } = parseTypedDataMessage(currentConfirmation.msgParams.data as string);
 
   const isPermit = isPermitSignatureRequest(currentConfirmation);
   const isOrder = isOrderSignatureRequest(currentConfirmation);

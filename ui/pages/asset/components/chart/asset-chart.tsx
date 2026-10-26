@@ -8,7 +8,9 @@ import {
   ChartOptions,
   Decimation,
   Point,
+  // @ts-expect-error suppress CommonJS vs ECMAScript error
 } from 'chart.js';
+// @ts-expect-error suppress CommonJS vs ECMAScript error
 import { Line } from 'react-chartjs-2';
 import classnames from 'clsx';
 import { brandColor } from '@metamask/design-tokens';
@@ -31,6 +33,7 @@ import {
   ButtonBase,
   ButtonBaseSize,
 } from '../../../../components/component-library';
+import { TokenFiatDisplayInfo } from '../../../../components/app/assets/types';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import { usePrevious } from '../../../../hooks/usePrevious';
 import { useHistoricalPrices } from '../../hooks/useHistoricalPrices';
@@ -137,11 +140,13 @@ const AssetChart = ({
   address,
   currentPrice,
   currency,
+  asset,
 }: {
   chainId: Hex;
   address: string;
   currentPrice?: number;
   currency: string;
+  asset?: TokenFiatDisplayInfo;
 }) => {
   const t = useI18nContext();
   const theme = useTheme();
@@ -237,6 +242,7 @@ const AssetChart = ({
             ? undefined
             : prices?.[0]?.y
         }
+        asset={asset}
       />
 
       <Box

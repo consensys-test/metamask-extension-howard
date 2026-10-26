@@ -60,8 +60,7 @@ const createMockStore = (overrides = {}) =>
       useExternalServices: true,
       consentDecisionMade: true,
       optedIn: false,
-      marketingConsentDecisionMade: true,
-      optedInToMarketing: false,
+      dataCollectionForMarketing: false,
       ...overrides,
     },
   });
@@ -133,7 +132,7 @@ describe('MetametricsToggleItem', () => {
   it('disables data collection for marketing when turning off metametrics', async () => {
     const mockStore = createMockStore({
       optedIn: true,
-      optedInToMarketing: true,
+      dataCollectionForMarketing: true,
     });
     renderWithProvider(<MetametricsToggleItem />, mockStore);
 

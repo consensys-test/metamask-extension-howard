@@ -1,14 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import {
-  matchPath,
   type NavigateOptions,
   type To,
   useLocation,
   useNavigate,
 } from 'react-router-dom';
 import {
-  type CaipAssetType,
   type CaipChainId,
   type Hex,
   parseCaipAssetType,
@@ -17,23 +15,19 @@ import {
   AssetType,
   FeatureId,
   formatAddressToCaipReference,
-  formatChainIdToCaip,
   formatChainIdToHex,
   isNativeAddress,
   isNonEvmChainId,
   UnifiedSwapBridgeEventName,
 } from '@metamask/bridge-controller';
 import type { TransactionMeta } from '@metamask/transaction-controller';
-import { v4 as uuidv4 } from 'uuid';
 import { buildAssetRoutePath } from '../../../shared/lib/asset-route';
-import { getChainIdFromAssetId } from '../../../shared/lib/asset-utils';
 import { BridgeQueryParams } from '../../../shared/lib/deep-links/routes/swap';
 import { DEFAULT_ROUTE } from '../../../shared/lib/deep-links/routes/route';
 import {
   CROSS_CHAIN_SWAP_ROUTE,
   HARDWARE_WALLET_SIGNATURES_ROUTE,
   PREPARE_SWAP_ROUTE,
-  SWAP_ASSETS_PATH,
   TRANSACTION_SHIELD_ROUTE,
 } from '../../helpers/constants/routes';
 import { getBridgeState } from '../../ducks/bridge/selectors';
@@ -43,10 +37,8 @@ import {
   resetBridgeController,
   trackUnifiedSwapBridgeEvent,
 } from '../../ducks/bridge/actions';
-import { getArcAssetDetailsRouteAssetId } from '../../components/app/assets/enablement/arc';
 import { getEnvironmentType } from '../../../shared/lib/environment-type';
 import { useDispatch } from '../../store/hooks';
-import { trace, TraceName, TraceOperation } from '../../../shared/lib/trace';
 
 export type BridgeNavigationOptions = Omit<NavigateOptions, 'state'> & {
   state: {
@@ -107,51 +99,11 @@ export type BridgeNavigationOptions = Omit<NavigateOptions, 'state'> & {
        */
       gasSymbol?: string;
     } | null;
-    swapViewTraceId?: string;
-    swapViewPrefilledAmount?: boolean;
   };
 };
 
 const clearSendBundleIfPresent = (state: BridgeNavigationOptions['state']) =>
   Object.hasOwn(state, 'sendBundle') ? { sendBundle: null } : {};
-
-export const startSwapViewLoadTrace = ({
-  token,
-  search,
-  entryPoint,
-}: {
-  token: BridgeNavigationOptions['state']['token'];
-  search: URLSearchParams;
-  entryPoint?: string;
-}) => {
-  const id = uuidv4();
-  const srcChainId = token?.chainId
-    ? formatChainIdToCaip(token.chainId)
-    : getChainIdFromAssetId(
-        search.get(BridgeQueryParams.From) as CaipAssetType,
-      );
-  const destChainId = getChainIdFromAssetId(
-    search.get(BridgeQueryParams.To) as CaipAssetType,
-  );
-
-  trace({
-    name: TraceName.SwapViewLoaded,
-    op: TraceOperation.BridgeScreenPerformance,
-    id,
-    data: {
-      /* eslint-disable @typescript-eslint/naming-convention -- Sentry trace attributes use snake_case */
-      entry_point: entryPoint ?? 'unknown',
-      view_mode: 'Unified',
-      prefilled_amount: Boolean(search.get(BridgeQueryParams.Amount)),
-      ...(srcChainId && { src_chain_id: srcChainId }),
-      ...(destChainId && { dest_chain_id: destChainId }),
-      /* eslint-enable @typescript-eslint/naming-convention */
-    },
-    startTime: Date.now(),
-  });
-
-  return id;
-};
 
 /**
  * Builds a "cleared" bridge navigation state: preserves any extra props from
@@ -196,14 +148,9 @@ export const useBridgeNavigation = () => {
    * @param to - The default route to navigate to.
    */
   const resetLocationState = useCallback(
-    (
-      to: To = { pathname },
-      options: { replace?: boolean } = {},
-      stayOnHomePage = false,
-    ) => {
+    (to: To = { pathname }, stayOnHomePage = false) => {
       navigate(to, {
         state: clearedBridgeState(state, stayOnHomePage),
-        ...options,
       });
     },
     [navigate, state, pathname],
@@ -247,21 +194,13 @@ export const useBridgeNavigation = () => {
         token: BridgeNavigationOptions['state']['token'];
         search: URLSearchParams;
         isEntrypoint: boolean;
-        entryPoint?: string;
       } = {
         token: state?.token,
         search: new URLSearchParams(''),
         isEntrypoint: false,
       },
     ) => {
-      const { token, search: searchParams, isEntrypoint, entryPoint } = params;
-      const swapViewTraceId = isEntrypoint
-        ? startSwapViewLoadTrace({
-            token,
-            search: searchParams,
-            entryPoint,
-          })
-        : undefined;
+      const { token, search: searchParams, isEntrypoint } = params;
       // Publish PageViewed event on initial page view
       isEntrypoint &&
         dispatch(
@@ -281,14 +220,6 @@ export const useBridgeNavigation = () => {
           state: {
             ...state,
             token,
-            ...(swapViewTraceId
-              ? {
-                  swapViewTraceId,
-                  swapViewPrefilledAmount: Boolean(
-                    searchParams.get(BridgeQueryParams.Amount),
-                  ),
-                }
-              : {}),
             ...clearSendBundleIfPresent(state),
           },
           replace: !isEntrypoint,
@@ -304,9 +235,8 @@ export const useBridgeNavigation = () => {
    */
   const navigateToAssetPage = useCallback(
     (asset: BridgeToken) => {
-      const routeAssetId = getArcAssetDetailsRouteAssetId(asset.assetId);
       // Parse the CAIP assetId to get the address
-      const { assetReference } = parseCaipAssetType(routeAssetId);
+      const { assetReference } = parseCaipAssetType(asset.assetId);
       const isNonEvm = isNonEvmChainId(asset.chainId);
       // For EVM: convert CAIP chainId to hex format; for non-EVM: keep CAIP format
       const routeChainId = isNonEvm
@@ -320,13 +250,13 @@ export const useBridgeNavigation = () => {
         isNonEvm ? assetReference : tokenAddress,
       );
 
-      navigate(buildAssetRoutePath(routeAssetId), {
+      navigate(buildAssetRoutePath(asset.assetId), {
         state: {
           ...state,
           bridgeState,
           token: {
             type: isNative ? AssetType.native : AssetType.token,
-            assetId: routeAssetId,
+            assetId: asset.assetId,
             address: tokenAddress,
             symbol: asset.symbol,
             name: asset.name ?? asset.symbol,
@@ -339,20 +269,6 @@ export const useBridgeNavigation = () => {
       });
     },
     [navigate, state, bridgeState],
-  );
-
-  /**
-   * Navigates to the bridge asset picker page.
-   */
-  const navigateToBridgeAssetPickerPage = useCallback(
-    (field: 'src' | 'dest') => {
-      navigate(`${SWAP_ASSETS_PATH}?field=${field}`, {
-        state: {
-          ...state,
-        },
-      });
-    },
-    [navigate, state],
   );
 
   /**
@@ -387,20 +303,17 @@ export const useBridgeNavigation = () => {
     });
   }, [navigate, state]);
 
-  const navigateToDefaultRoute = useCallback(
-    async (options: { replace?: boolean } = {}, resetController = true) => {
-      resetController && dispatch(resetBridgeController());
-      const isFromTransactionShield = new URLSearchParams(search || '').get(
-        BridgeQueryParams.IsFromTransactionShield,
-      );
-      if (isFromTransactionShield) {
-        resetLocationState(TRANSACTION_SHIELD_ROUTE, options);
-      } else {
-        resetLocationState(DEFAULT_ROUTE, options, true);
-      }
-    },
-    [dispatch, search, resetLocationState],
-  );
+  const navigateToDefaultRoute = useCallback(async () => {
+    dispatch(resetBridgeController());
+    const isFromTransactionShield = new URLSearchParams(search || '').get(
+      BridgeQueryParams.IsFromTransactionShield,
+    );
+    if (isFromTransactionShield) {
+      resetLocationState(TRANSACTION_SHIELD_ROUTE);
+    } else {
+      resetLocationState(DEFAULT_ROUTE, true);
+    }
+  }, [dispatch, search, resetLocationState]);
 
   const memoizedToken = useMemo(() => state.token, [state.token]);
   const memoizedBridgeState = useMemo(
@@ -415,23 +328,12 @@ export const useBridgeNavigation = () => {
      * from the asset page
      */
     token: memoizedToken,
-    swapViewTraceId: state.swapViewTraceId,
-    swapViewPrefilledAmount: state.swapViewPrefilledAmount,
     search,
     resetLocationState,
     resetSearchParams,
     navigateToAssetPage,
     navigateToBridgePage,
-    navigateToBridgeAssetPickerPage,
-    isDestinationAssetPickerPage:
-      new URLSearchParams(search).get('field') === 'dest',
     navigateToHwSigningPage,
-    isHardwareWalletSigningPage: Boolean(
-      matchPath(
-        `${CROSS_CHAIN_SWAP_ROUTE}${HARDWARE_WALLET_SIGNATURES_ROUTE}`,
-        pathname,
-      ),
-    ),
     navigateToActivityPage,
     navigateToDefaultRoute,
   };

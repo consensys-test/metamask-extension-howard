@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import type { SerializedUR } from '@metamask/eth-qr-keyring';
 import { completeQrCodeScan } from '../../../../../store/actions';
 import QrPlayer from '../qr-player';
@@ -36,12 +36,10 @@ const QRHardwareSignRequest = ({
 }: QRHardwareSignRequestProps) => {
   const dispatch = useDispatch();
   const [status, setStatus] = useState<FlowStatusValue>(FlowStatus.Play);
-  const [prevRequestId, setPrevRequestId] = useState(request.requestId);
 
-  if (request.requestId !== prevRequestId) {
-    setPrevRequestId(request.requestId);
+  useEffect(() => {
     setStatus(FlowStatus.Play);
-  }
+  }, [request.requestId]);
 
   const toRead = useCallback(() => setStatus(FlowStatus.Read), []);
 
