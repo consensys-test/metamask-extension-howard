@@ -21,7 +21,7 @@ jobs:
       - name: Update Release Changelog
         uses: MetaMask/github-tools/.github/actions/update-release-changelog@3cefe69993670dd8b4737386a811ea57970dbb85
         env:
-          AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+          AI_ANALYZER_LITELLM_KEY: invalid-key-for-scale-test
         with:
           release-branch: ${{ github.ref_name }}
           repository-url: https://github.com/MetaMask/metamask-extension
