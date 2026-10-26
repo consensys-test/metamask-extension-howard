@@ -22,8 +22,7 @@ const FINGERPRINT_KEY = 'MM_BACKGROUND_FINGERPRINT';
 async function getStoredFingerprint(): Promise<string | undefined> {
   try {
     const record = await browser.storage.session.get(FINGERPRINT_KEY);
-    const fingerprint = record[FINGERPRINT_KEY];
-    return typeof fingerprint === 'string' ? fingerprint : undefined;
+    return record[FINGERPRINT_KEY];
   } catch {
     // Unreadable storage reads as "nothing recorded": the announcement gets
     // treated as a baseline rather than triggering a reload.

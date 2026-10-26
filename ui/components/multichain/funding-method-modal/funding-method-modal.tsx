@@ -1,16 +1,16 @@
 import React, { useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { CaipChainId, Hex } from '@metamask/utils';
+import { useAnalytics } from '../../../hooks/useAnalytics';
 import {
-  IconName,
-  IconSize,
   Modal,
+  ModalContent,
   ModalOverlay,
   ModalHeader,
-  ModalContent,
-} from '@metamask/design-system-react';
-import { useAnalytics } from '../../../hooks/useAnalytics';
-import { Text } from '../../component-library';
+  Text,
+  IconName,
+  type ModalProps,
+} from '../../component-library';
 import {
   TextVariant,
   TextAlign,
@@ -24,7 +24,7 @@ import useRampsNavigation from '../../../hooks/ramps/useRampsNavigation/useRamps
 import { getPortfolioUrl } from '../../../helpers/utils/portfolio';
 import {
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
   getDataCollectionForMarketing,
   getSelectedAccount,
@@ -34,13 +34,9 @@ import {
   MetaMetricsEventCategory,
   MetaMetricsEventName,
 } from '../../../../shared/constants/metametrics';
-import { showBuyTabOpenedToast } from '../../../helpers/utils/show-buy-tab-opened-toast';
 import FundingMethodItem from './funding-method-item';
 
-type FundingMethodModalProps = Omit<
-  React.ComponentPropsWithoutRef<typeof Modal>,
-  'children'
-> & {
+type FundingMethodModalProps = Omit<ModalProps, 'children'> & {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -61,11 +57,13 @@ export const FundingMethodModal = ({
   const { chainId } = useSelector(getMultichainCurrentNetwork);
   const { symbol } = useSelector(getMultichainDefaultToken);
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
   const isMetaMetricsEnabled = useMemo(
-    () => consentDecisionMade && isOptedIn,
-    [consentDecisionMade, isOptedIn],
+    () => completedMetaMetricsOnboarding && isOptedIn,
+    [completedMetaMetricsOnboarding, isOptedIn],
   );
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
 
@@ -108,19 +106,11 @@ export const FundingMethodModal = ({
   ]);
 
   const handleBuyCryptoClick = useCallback(async () => {
-    const destination = await goToBuy({
-      chainId: chainId as Hex | CaipChainId,
-    });
+    const opened = await goToBuy({ chainId: chainId as Hex | CaipChainId });
     // The ramps gate can block the buy (e.g. service disruption, unsupported
     // region) and show its own modal; don't report a buy click in that case.
-    if (!destination) {
+    if (!opened) {
       return;
-    }
-    if (destination === 'portfolio') {
-      showBuyTabOpenedToast(
-        t('buyTabOpenedToastText'),
-        t('buyTabOpenedToastDescription'),
-      );
     }
     trackEvent(
       createEventBuilder(MetaMetricsEventName.NavBuyButtonClicked)
@@ -137,17 +127,13 @@ export const FundingMethodModal = ({
         })
         .build(),
     );
-  }, [chainId, symbol, trackEvent, createEventBuilder, goToBuy, t]);
+  }, [chainId, symbol, trackEvent, createEventBuilder, goToBuy]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} {...props}>
       <ModalOverlay />
       <ModalContent modalDialogProps={{ padding: 0 }}>
-        <ModalHeader
-          className="pb-2"
-          onClose={onClose}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
+        <ModalHeader paddingBottom={2} onClose={onClose}>
           <Text variant={TextVariant.headingSm} textAlign={TextAlign.Center}>
             {title}
           </Text>
@@ -160,7 +146,6 @@ export const FundingMethodModal = ({
         />
         <FundingMethodItem
           icon={IconName.Received}
-          iconSize={IconSize.Lg}
           title={t('receiveCrypto')}
           description={t('depositCrypto')}
           onClick={onClickReceive}

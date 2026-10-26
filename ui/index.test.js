@@ -2,17 +2,12 @@ import configureMockStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
 import { setupLocale } from '../shared/lib/error-utils';
 import { FirstTimeFlowType } from '../shared/constants/onboarding';
-import { START_UI_SYNC } from '../shared/constants/ui-initialization';
 import * as browserRuntimeUtils from '../shared/lib/browser-runtime.utils';
 import * as actions from './store/actions';
 import * as selectors from './selectors';
 import * as metamaskBaseSelectors from './ducks/metamask/base-selectors';
 import { SEEDLESS_PASSWORD_OUTDATED_CHECK_INTERVAL_MS } from './constants';
-import {
-  readPerpsLifecycleContext,
-  primePerpsLifecycleContext,
-} from './helpers/perps/entry-trace';
-import { connectToBackground, getCleanAppState, runInitialActions } from '.';
+import { getCleanAppState, runInitialActions } from '.';
 
 const enMessages = {
   troubleStarting: {
@@ -25,6 +20,9 @@ const enMessages = {
   stillGettingMessage: {
     message: 'Still getting this message?',
   },
+  sendBugReport: {
+    message: 'Send us a bug report.',
+  },
 };
 
 const esMessages = {
@@ -34,6 +32,9 @@ const esMessages = {
   },
   restartMetamask: {
     message: 'Reiniciar metamáscara',
+  },
+  sendBugReport: {
+    message: 'Envíenos un informe de errores.',
   },
 };
 
@@ -64,26 +65,6 @@ describe('Index Tests', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
   });
-  it('primes Perps lifecycle once the background starts UI sync', async () => {
-    const background = {
-      perpsGetLifecycleContext: jest.fn().mockResolvedValue('cold_process'),
-      onNotification: jest.fn(),
-    };
-    connectToBackground(background, jest.fn());
-    expect(background.perpsGetLifecycleContext).not.toHaveBeenCalled();
-    await background.onNotification.mock.calls[0][0]({
-      method: START_UI_SYNC,
-      params: [{}],
-    });
-    await primePerpsLifecycleContext();
-    expect(background.perpsGetLifecycleContext).toHaveBeenCalledTimes(1);
-    expect(readPerpsLifecycleContext()).toBe('cold_process');
-    await background.onNotification.mock.calls[0][0]({
-      method: 'perpsStreamUpdate',
-      params: [{ channel: 'lifecycleContext', data: 'warm' }],
-    });
-    expect(readPerpsLifecycleContext()).toBe('warm');
-  });
 
   it('should get locale messages by calling setupLocale', async () => {
     let result = await setupLocale('en');
@@ -97,6 +78,8 @@ describe('Index Tests', () => {
     expect(clm.stillGettingMessage).toStrictEqual(
       enMessages.stillGettingMessage,
     );
+
+    expect(clm.sendBugReport).toStrictEqual(enMessages.sendBugReport);
 
     result = await setupLocale('es_419');
 
@@ -112,6 +95,8 @@ describe('Index Tests', () => {
     expect(elm2.stillGettingMessage).toStrictEqual(
       enMessages.stillGettingMessage,
     );
+
+    expect(clm2.sendBugReport).toStrictEqual(esMessages.sendBugReport);
   });
 
   it('should get clean app state with socialLoginEmail undefined', async () => {

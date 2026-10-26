@@ -13,46 +13,21 @@ import {
 import {
   getDataCollectionForMarketing,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
-  getIsEvmMultichainNetworkSelected,
 } from '../../../../../selectors';
 
-const EMPTY_STATE_CLASSNAME = 'mx-auto mt-5 mb-6 max-w-48';
-
-const DeFiEmptyStateIcon = () => {
+export const DeFiEmptyStateMessage = () => {
   const t = useI18nContext();
   const theme = useTheme();
-
-  const defiIcon =
-    theme === ThemeType.dark
-      ? '/images/empty-state-defi-dark.png'
-      : '/images/empty-state-defi-light.png';
-
-  return <img src={defiIcon} alt={t('defi')} width={72} height={72} />;
-};
-
-export const DeFiUnsupportedEmptyStateMessage = () => {
-  const t = useI18nContext();
-
-  return (
-    <TabEmptyState
-      icon={<DeFiEmptyStateIcon />}
-      description={t('defiUnsupportedEmptyDescription')}
-      data-testid="defi-tab-unsupported-empty-state"
-      className={EMPTY_STATE_CLASSNAME}
-    />
-  );
-};
-
-const DeFiDefaultEmptyStateMessage = () => {
-  const t = useI18nContext();
   const { trackEvent, createEventBuilder } = useAnalytics();
 
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
-  const isMetaMetricsEnabled = consentDecisionMade && isOptedIn;
+  const isMetaMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
 
   const handleExploreDefi = useCallback(() => {
@@ -81,24 +56,19 @@ const DeFiDefaultEmptyStateMessage = () => {
     trackEvent,
   ]);
 
+  const defiIcon =
+    theme === ThemeType.dark
+      ? '/images/empty-state-defi-dark.png'
+      : '/images/empty-state-defi-light.png';
+
   return (
     <TabEmptyState
-      icon={<DeFiEmptyStateIcon />}
+      icon={<img src={defiIcon} alt={t('defi')} width={72} height={72} />}
       description={t('defiEmptyDescription')}
       actionButtonText={t('exploreDefi')}
       onAction={handleExploreDefi}
       data-testid="defi-tab-empty-state"
-      className={EMPTY_STATE_CLASSNAME}
+      className="mx-auto mt-5 mb-6 max-w-48"
     />
   );
-};
-
-export const DeFiEmptyStateMessage = () => {
-  const isEvmNetworkSelected = useSelector(getIsEvmMultichainNetworkSelected);
-
-  if (!isEvmNetworkSelected) {
-    return <DeFiUnsupportedEmptyStateMessage />;
-  }
-
-  return <DeFiDefaultEmptyStateMessage />;
 };

@@ -128,10 +128,7 @@ describe('Smart Transactions', function () {
         });
 
         await transactionConfirmation.selectTokenFee('USDC');
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'disappear',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
         // 2 toast notifications appear, one for the gas payment and one for the main transaction.
         // The 2nd toast obfuscates the Activity tab, so we need to actively close one to be able to click on the Activity tab without error.
@@ -226,7 +223,7 @@ describe('Smart Transactions', function () {
         await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
 
         const confirmation = new TransactionConfirmation(driver);
-        await confirmation.clickFooterButton({ button: 'confirm' });
+        await confirmation.clickFooterConfirmButton();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );

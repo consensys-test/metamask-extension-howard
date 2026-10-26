@@ -1,19 +1,14 @@
 import { useMemo } from 'react';
 import { NameType } from '@metamask/name-controller';
 import { TransactionMeta } from '@metamask/transaction-controller';
-import type { Hex } from '@metamask/utils';
 
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import { useConfirmContext } from '../../context/confirm';
-import {
-  isEip712PrimaryTypeField,
-  isSignatureTransactionType,
-  parseSanitizeTypedDataMessage,
-} from '../../utils';
+import { isSignatureTransactionType } from '../../utils';
 import { SignatureRequestType } from '../../types/confirm';
 import {
-  parseApprovalTransactionData,
   parseTypedDataMessage,
+  parseApprovalTransactionData,
 } from '../../../../../shared/lib/transaction.utils';
 import { PRIMARY_TYPES_PERMIT } from '../../../../../shared/constants/signatures';
 import { Alert } from '../../../../ducks/confirm-alerts/confirm-alerts';
@@ -75,34 +70,19 @@ function getAlertSkipReason(
     return AlertSkipReason.None;
   }
 
-  const { primaryType } = parseTypedDataMessage(msgData);
+  const { primaryType, message, domain } = parseTypedDataMessage(msgData);
   const isPermit = PRIMARY_TYPES_PERMIT.some((type) => type === primaryType);
   if (!isPermit) {
     return AlertSkipReason.None;
   }
 
-  const { message, domain, types } = parseSanitizeTypedDataMessage(msgData);
   const isDaiPermit =
-    isEip712PrimaryTypeField(types, primaryType, 'allowed', 'bool') &&
-    isEip712PrimaryTypeField(
-      types,
-      'EIP712Domain',
-      'verifyingContract',
-      'address',
-    ) &&
-    typeof domain.verifyingContract === 'string' &&
-    domain.verifyingContract.toLowerCase() ===
-      DAI_CONTRACT_ADDRESS.toLowerCase();
-  const hasErc2612Value = isEip712PrimaryTypeField(
-    types,
-    primaryType,
-    'value',
-    'uint256',
-  );
+    domain?.verifyingContract?.toLowerCase() ===
+    DAI_CONTRACT_ADDRESS.toLowerCase();
 
   const isZeroValuePermit = isDaiPermit
-    ? message.allowed === false // DAI uses `allowed` boolean
-    : hasErc2612Value && isZeroAmount(message.value); // Standard EIP-2612 uses `value`
+    ? message?.allowed === false // DAI uses `allowed` boolean
+    : isZeroAmount(message?.value); // Standard EIP-2612 uses `value`
 
   return isZeroValuePermit ? AlertSkipReason.ZeroValue : AlertSkipReason.None;
 }
@@ -209,18 +189,11 @@ export function useSpenderAlerts(): Alert[] {
       const msgData = signatureRequest.msgParams?.data as string;
 
       if (msgData) {
-        const { primaryType } = parseTypedDataMessage(msgData);
+        const typedDataMessage = parseTypedDataMessage(msgData);
+        const { primaryType } = typedDataMessage;
 
         if (PRIMARY_TYPES_PERMIT.some((type) => type === primaryType)) {
-          const { message, types } = parseSanitizeTypedDataMessage(msgData);
-          return isEip712PrimaryTypeField(
-            types,
-            primaryType,
-            'spender',
-            'address',
-          )
-            ? message.spender || null
-            : null;
+          return typedDataMessage.message?.spender || null;
         }
       }
     }
@@ -231,7 +204,7 @@ export function useSpenderAlerts(): Alert[] {
   const { state: trustSignalDisplayState } = useTrustSignal(
     spenderAddress || '',
     NameType.ETHEREUM_ADDRESS,
-    currentConfirmation?.chainId as Hex | undefined,
+    currentConfirmation?.chainId,
   );
 
   return useMemo(() => {
@@ -248,7 +221,7 @@ export function useSpenderAlerts(): Alert[] {
         isBlocking: false,
         key: 'spenderTrustSignalMalicious',
         message: t('alertMessageAddressTrustSignalMalicious'),
-        reason: t('alertReasonAddressTrustSignalMalicious'),
+        reason: t('nameModalTitleMalicious'),
         severity: Severity.Danger,
       });
     } else if (trustSignalDisplayState === TrustSignalDisplayState.Warning) {
@@ -258,7 +231,7 @@ export function useSpenderAlerts(): Alert[] {
         isBlocking: false,
         key: 'spenderTrustSignalWarning',
         message: t('alertMessageAddressTrustSignal'),
-        reason: t('alertReasonAddressTrustSignalWarning'),
+        reason: t('nameModalTitleWarning'),
         severity: Severity.Warning,
       });
     }

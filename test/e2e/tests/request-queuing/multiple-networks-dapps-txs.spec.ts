@@ -116,7 +116,7 @@ describe('Request Queuing for Multiple Dapps and Txs on different networks.', fu
         const transactionConfirmation = new TransactionConfirmation(driver);
         await transactionConfirmation.checkPageIsLoaded();
         await transactionConfirmation.checkPageNumbers(1, 2);
-        await transactionConfirmation.clickFooterButton({ button: 'cancel' });
+        await transactionConfirmation.clickFooterCancelButton();
 
         // TODO: No second confirmation from dapp two will show, have to go back to the extension to see the switch chain & dapp two's tx.
         await driver.switchToWindowWithTitle(
@@ -133,10 +133,7 @@ describe('Request Queuing for Multiple Dapps and Txs on different networks.', fu
         // Pending confirm stays in the dialog popup on Firefox.
         await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
         await transactionConfirmation.checkPageIsLoaded();
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
 
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,

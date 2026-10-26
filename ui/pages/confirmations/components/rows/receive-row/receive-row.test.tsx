@@ -8,17 +8,15 @@ import type { Json } from '@metamask/utils';
 import { getMockPersonalSignConfirmState } from '../../../../../../test/data/confirmations/helper';
 import { renderWithConfirmContextProvider } from '../../../../../../test/lib/confirmations/render-helpers';
 import {
-  useIsTransactionPayQuotePending,
+  useIsTransactionPayLoading,
   useTransactionPayQuotes,
   useTransactionPayTotals,
 } from '../../../hooks/pay/useTransactionPayData';
-import { useIsPaidByMetaMask } from '../../../hooks/pay/useIsPaidByMetaMask';
 import { enLocale as messages } from '../../../../../../test/lib/i18n-helpers';
 import { ConfirmInfoRowSize } from '../../../../../components/app/confirm/info/row/row';
 import { ReceiveRow, ReceiveRowProps } from './receive-row';
 
 jest.mock('../../../hooks/pay/useTransactionPayData');
-jest.mock('../../../hooks/pay/useIsPaidByMetaMask');
 
 const mockStore = configureMockStore([]);
 
@@ -35,18 +33,14 @@ function render(
 describe('ReceiveRow', () => {
   const useTransactionPayTotalsMock = jest.mocked(useTransactionPayTotals);
   const useTransactionPayQuotesMock = jest.mocked(useTransactionPayQuotes);
-  const useIsTransactionPayQuotePendingMock = jest.mocked(
-    useIsTransactionPayQuotePending,
+  const useIsTransactionPayLoadingMock = jest.mocked(
+    useIsTransactionPayLoading,
   );
-  const useIsPaidByMetaMaskMock = jest.mocked(useIsPaidByMetaMask);
 
   beforeEach(() => {
     jest.resetAllMocks();
 
-    useIsPaidByMetaMaskMock.mockReturnValue(false);
-
     useTransactionPayTotalsMock.mockReturnValue({
-      isInputBased: false,
       fees: {
         provider: { usd: '1.00' },
         sourceNetwork: { estimate: { usd: '0.20' } },
@@ -55,7 +49,7 @@ describe('ReceiveRow', () => {
       },
     } as TransactionPayTotals);
 
-    useIsTransactionPayQuotePendingMock.mockReturnValue(false);
+    useIsTransactionPayLoadingMock.mockReturnValue(false);
 
     useTransactionPayQuotesMock.mockReturnValue([
       {} as TransactionPayQuote<Json>,
@@ -69,7 +63,7 @@ describe('ReceiveRow', () => {
   });
 
   it('renders skeleton with label when loading', () => {
-    useIsTransactionPayQuotePendingMock.mockReturnValue(true);
+    useIsTransactionPayLoadingMock.mockReturnValue(true);
 
     const { getByTestId, queryByTestId, getByText } = render();
 
@@ -85,24 +79,7 @@ describe('ReceiveRow', () => {
     expect(getByTestId('receive-value')).toHaveTextContent('$8.50');
   });
 
-  it('uses the target amount for input-based totals', () => {
-    useTransactionPayTotalsMock.mockReturnValue({
-      isInputBased: true,
-      fees: {
-        provider: { usd: '1.00' },
-        sourceNetwork: { estimate: { usd: '0.20' } },
-        targetNetwork: { usd: '0.05' },
-        metaMask: { usd: '0.25' },
-      },
-      targetAmount: { fiat: '9', usd: '9' },
-    } as TransactionPayTotals);
-
-    const { getByTestId } = render({ inputAmountUsd: '10' });
-
-    expect(getByTestId('receive-value')).toHaveTextContent('$9.00');
-  });
-
-  it('uses withdrawal fee calculation when isInputBased is missing', () => {
+  it('treats a missing metaMask fee as zero', () => {
     useTransactionPayTotalsMock.mockReturnValue({
       fees: {
         provider: { usd: '1.00' },
@@ -123,14 +100,6 @@ describe('ReceiveRow', () => {
     expect(getByTestId('receive-value')).toHaveTextContent('$0.00');
   });
 
-  it('does not subtract sponsored network gas from the receive amount', () => {
-    useIsPaidByMetaMaskMock.mockReturnValue(true);
-
-    const { getByTestId } = render({ inputAmountUsd: '0.05' });
-
-    expect(getByTestId('receive-value')).toHaveTextContent('$0.05');
-  });
-
   it('renders an empty value when there are no quotes', () => {
     useTransactionPayQuotesMock.mockReturnValue([]);
 
@@ -140,7 +109,9 @@ describe('ReceiveRow', () => {
   });
 
   it('renders an empty value when totals are not available', () => {
-    useTransactionPayTotalsMock.mockReturnValue(undefined);
+    useTransactionPayTotalsMock.mockReturnValue(
+      undefined as unknown as TransactionPayTotals,
+    );
 
     const { getByTestId } = render();
 

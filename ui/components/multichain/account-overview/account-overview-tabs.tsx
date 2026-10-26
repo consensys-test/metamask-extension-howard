@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Hex } from '@metamask/utils';
 import {
   Box,
   BoxAlignItems,
@@ -24,7 +25,6 @@ import { useSafeChains } from '../networks-form/use-safe-chains';
 import {
   getDefaultHomeActiveTabName,
   getEnabledChainIds,
-  getIsDefiPositionsEnabled,
 } from '../../../selectors';
 import {
   getIsPerpsExperienceAvailable,
@@ -48,6 +48,7 @@ import {
   PERPS_TAB_BADGE_VARIANTS,
   PERPS_TAB_BADGE_AB_TEST_EXPOSURE_METADATA,
 } from '../../../../shared/lib/ab-testing/configs/perps-tab-badge';
+import { useTokenBalances } from '../../../hooks/useTokenBalances';
 import { ActivityList } from '../../../pages/activity/activity-list';
 import { usePrefetchTransactions } from '../../../pages/activity/useTransactionsQuery';
 import { transitionForward } from '../../ui/transition';
@@ -55,19 +56,38 @@ import { ScreenViewedEntryPoint } from '../../../../shared/constants/metametrics
 import { AccountOverviewCommonProps } from './common';
 
 export type AccountOverviewTabsProps = AccountOverviewCommonProps & {
+  showTokens: boolean;
   showTokensLinks?: boolean;
-  showTokens?: boolean;
-  showNfts?: boolean;
+  showNfts: boolean;
+  showActivity: boolean;
   showDefi?: boolean;
-  showActivity?: boolean;
+};
+
+/**
+ * Isolated component that starts/stops EVM token balance polling.
+ *
+ * This intentionally returns null and only runs a hook. While that may seem
+ * like an anti-pattern, it is the correct React performance pattern here:
+ * `useTokenBalances` internally calls `useSelector(getTokenBalances)`, which
+ * subscribes the calling component to every token-balance state update
+ * (every ~30 s). By placing the call in this tiny component instead of in
+ * `AccountOverviewTabs`, only this component re-renders when balances change,
+ * rather than the entire tabs subtree and all of its children.
+ *
+ * @param options - Component options.
+ * @param options.chainIds - The chain IDs to poll balances for.
+ */
+const TokenBalancesPoller = ({ chainIds }: { chainIds: Hex[] }) => {
+  useTokenBalances({ chainIds });
+  return null;
 };
 
 export const AccountOverviewTabs = ({
+  showTokens,
   showTokensLinks,
-  showTokens = true,
-  showNfts = true,
-  showDefi = true,
-  showActivity = true,
+  showNfts,
+  showActivity,
+  showDefi,
 }: AccountOverviewTabsProps) => {
   const persistedTab = useSelector(getDefaultHomeActiveTabName);
   const [urlTab, setActiveTabKey] = useTabState();
@@ -90,7 +110,6 @@ export const AccountOverviewTabs = ({
   const dispatch = useDispatch();
   const selectedChainIds = useSelector(getEnabledChainIds);
   const prefetchTransactions = usePrefetchTransactions();
-  const defiPositionsEnabled = useSelector(getIsDefiPositionsEnabled);
 
   const perpsTabBadgeSeen = useSelector(getPerpsTabBadgeSeen);
   const isPerpsExperienceAvailable = useSelector(getIsPerpsExperienceAvailable);
@@ -122,7 +141,7 @@ export const AccountOverviewTabs = ({
     ...(isPerpsExperienceAvailable && !showBottomNav
       ? [AccountOverviewTabKey.Perps]
       : []),
-    ...(showDefi && defiPositionsEnabled ? [AccountOverviewTabKey.DeFi] : []),
+    ...(showDefi ? [AccountOverviewTabKey.DeFi] : []),
     ...(showNfts ? [AccountOverviewTabKey.Nfts] : []),
     ...(showActivity && !showBottomNav ? [AccountOverviewTabKey.Activity] : []),
   ]);
@@ -146,6 +165,10 @@ export const AccountOverviewTabs = ({
       dispatch(setPerpsTabBadgeSeen(true));
     }
   }, [showPerpsTabBadge, perpsIsEffectiveActiveTab, dispatch]);
+
+  // EVM token-balance polling is handled by TokenBalancesPoller (rendered below).
+  // Keeping it in an isolated child prevents balance updates from re-rendering
+  // this entire subtree every ~30 s.
 
   const handleTabClick = useCallback(
     (tabName: AccountOverviewTab) => {
@@ -189,17 +212,14 @@ export const AccountOverviewTabs = ({
 
   return (
     <>
+      <TokenBalancesPoller chainIds={selectedChainIds as Hex[]} />
       <Tabs<AccountOverviewTab>
         animated
         activeTab={activeTabKey}
         onTabClick={handleTabClick}
         tabListProps={{
           className:
-            'px-4 overflow-x-auto overscroll-x-contain [scrollbar-width:none] tablist-fade border-b border-b-transparent transition-[border-color] duration-200 ease-out stuck-top-border',
-        }}
-        tabListWrapperProps={{
-          className:
-            'sticky top-0 z-10 bg-background-default [container-name:overview-tabs] [container-type:scroll-state]',
+            'mx-4 overflow-x-auto overscroll-x-contain [scrollbar-width:none] tablist-fade',
         }}
       >
         {showTokens && (
@@ -264,7 +284,7 @@ export const AccountOverviewTabs = ({
           </Tab>
         )}
 
-        {showDefi && defiPositionsEnabled && (
+        {showDefi && (
           <Tab
             name={t('defi')}
             tabKey={AccountOverviewTabKey.DeFi}

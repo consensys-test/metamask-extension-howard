@@ -1,12 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { AnalyticsEventFragment } from '@metamask/analytics-controller';
 import {
   TransactionStatus,
   TransactionType,
 } from '@metamask/transaction-controller';
 import { TransactionPayStrategy } from '@metamask/transaction-pay-controller';
 import { TransactionMetaMetricsEvent } from '../../../../../shared/constants/transaction';
-import { HYPERLIQUID_DEPOSIT_PROMPT } from '../../../../../shared/constants/hyperliquid-deposit-prompt';
 import { getManifestFlags } from '../../../../../shared/lib/manifestFlags';
 import { createBuilderRequest } from './test-utils';
 import { getMetaMaskPayProperties } from './metamask-pay';
@@ -141,41 +139,6 @@ describe('getMetaMaskPayProperties', () => {
       expect(result.properties.mm_pay_use_case).toBe('perps_withdraw');
     });
 
-    (
-      [
-        [TransactionType.predictDeposit, 'predict_deposit'],
-        [TransactionType.predictDepositAndOrder, 'predict_deposit_and_order'],
-        [TransactionType.predictWithdraw, 'predict_withdraw'],
-        [TransactionType.moneyAccountDeposit, 'money_account_deposit'],
-        [TransactionType.moneyAccountWithdraw, 'money_account_withdraw'],
-      ] as const
-    ).forEach(([type, useCase]) => {
-      it(`sets ${useCase} for ${type} transactions`, async () => {
-        const request = createPayRequest({
-          transactionMeta: {
-            ...createPayRequest().transactionMeta,
-            type,
-          },
-        });
-        const result = await getMetaMaskPayProperties(request);
-
-        expect(result.properties.mm_pay_use_case).toBe(useCase);
-      });
-    });
-
-    it('sets money_account_deposit for batch transactions with a nested money account deposit', async () => {
-      const request = createPayRequest({
-        transactionMeta: {
-          ...createPayRequest().transactionMeta,
-          type: TransactionType.batch,
-          nestedTransactions: [{ type: TransactionType.moneyAccountDeposit }],
-        },
-      });
-      const result = await getMetaMaskPayProperties(request);
-
-      expect(result.properties.mm_pay_use_case).toBe('money_account_deposit');
-    });
-
     it('sets musd_conversion for musdConversion transactions', async () => {
       const request = createPayRequest({
         transactionMeta: {
@@ -210,61 +173,6 @@ describe('getMetaMaskPayProperties', () => {
       const result = await getMetaMaskPayProperties(request);
 
       expect(result.properties.mm_pay_use_case).toBeUndefined();
-    });
-  });
-
-  describe('mm_pay_entry_point', () => {
-    it('includes entry point from UI metrics fragment', async () => {
-      const base = createPayRequest();
-      const request = createBuilderRequest({
-        transactionMeta: base.transactionMeta,
-        transactionMetricsRequest: {
-          ...base.transactionMetricsRequest,
-          getTransactionUIMetricsFragment: jest.fn().mockReturnValue({
-            properties: {
-              mm_pay_entry_point: HYPERLIQUID_DEPOSIT_PROMPT,
-            },
-          }),
-        },
-      });
-
-      const result = await getMetaMaskPayProperties(request);
-
-      expect(result.properties.mm_pay_entry_point).toBe(
-        HYPERLIQUID_DEPOSIT_PROMPT,
-      );
-    });
-
-    it('does not include entry point when fragment has no entry point', async () => {
-      const base = createPayRequest();
-      const request = createBuilderRequest({
-        transactionMeta: base.transactionMeta,
-        transactionMetricsRequest: {
-          ...base.transactionMetricsRequest,
-          getTransactionUIMetricsFragment: jest.fn().mockReturnValue({
-            properties: {},
-          }),
-        },
-      });
-
-      const result = await getMetaMaskPayProperties(request);
-
-      expect(result.properties.mm_pay_entry_point).toBeUndefined();
-    });
-
-    it('does not include entry point when no fragment exists', async () => {
-      const base = createPayRequest();
-      const request = createBuilderRequest({
-        transactionMeta: base.transactionMeta,
-        transactionMetricsRequest: {
-          ...base.transactionMetricsRequest,
-          getTransactionUIMetricsFragment: jest.fn().mockReturnValue(undefined),
-        },
-      });
-
-      const result = await getMetaMaskPayProperties(request);
-
-      expect(result.properties.mm_pay_entry_point).toBeUndefined();
     });
   });
 
@@ -334,16 +242,15 @@ describe('getMetaMaskPayProperties', () => {
       expect(result.properties.mm_pay_amount_input_type).toBeUndefined();
     });
 
-    it('copies prefill metrics for perps deposits', async () => {
+    it('does not tag pay types without prefill support even when the flag default is enabled', async () => {
       const base = createPayRequest();
       const request = createBuilderRequest({
         transactionMeta: base.transactionMeta,
         transactionMetricsRequest: {
           ...base.transactionMetricsRequest,
-          getTransactionUIMetricsFragment: jest.fn().mockReturnValue({
-            properties: {
-              mm_pay_amount_input_type: 'prefilled_50',
-              mm_pay_prefilled_amount: 250,
+          getFeatureFlags: jest.fn().mockReturnValue({
+            confirmations_pay_extended: {
+              prefilledAmount: { default: { enabled: true } },
             },
           }),
         },
@@ -352,8 +259,7 @@ describe('getMetaMaskPayProperties', () => {
       const result = await getMetaMaskPayProperties(request);
 
       expect(result.properties.mm_pay_use_case).toBe('perps_deposit');
-      expect(result.properties.mm_pay_amount_input_type).toBe('prefilled_50');
-      expect(result.properties.mm_pay_prefilled_amount).toBe(250);
+      expect(result.properties.mm_pay_amount_input_type).toBeUndefined();
     });
 
     it('prefers the input type recorded on the UI metrics fragment', async () => {
@@ -408,16 +314,12 @@ describe('getMetaMaskPayProperties', () => {
           ]),
           getTransactionUIMetricsFragment: jest.fn((transactionId: string) =>
             transactionId === 'parent-1'
-              ? ({
-                  id: 'transaction-ui-parent-1',
+              ? {
                   properties: {
                     mm_pay_amount_input_type: 'prefilled_max',
                     mm_pay_prefilled_amount: 250,
                   },
-                  sensitiveProperties: {},
-                  createdAt: 0,
-                  lastUpdated: 0,
-                } satisfies AnalyticsEventFragment)
+                }
               : undefined,
           ),
         },
@@ -457,26 +359,6 @@ describe('getMetaMaskPayProperties', () => {
       });
       const result = await getMetaMaskPayProperties(request);
 
-      expect(result.properties.mm_pay_receiving_value_usd).toBe(99);
-    });
-
-    it('falls back to persisted USD values when transaction pay data is unavailable', async () => {
-      const request = createPayRequest({
-        transactionMeta: {
-          ...createPayRequest().transactionMeta,
-          assetsFiatValues: {
-            sending: '100',
-            receiving: '98',
-          },
-          metamaskPay: {
-            ...createPayRequest().transactionMeta.metamaskPay,
-            targetFiat: '99',
-          },
-        },
-      });
-      const result = await getMetaMaskPayProperties(request);
-
-      expect(result.properties.mm_pay_sending_value_usd).toBe(100);
       expect(result.properties.mm_pay_receiving_value_usd).toBe(99);
     });
 

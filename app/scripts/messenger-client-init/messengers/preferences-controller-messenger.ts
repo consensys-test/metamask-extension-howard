@@ -28,9 +28,6 @@ export function getPreferencesControllerMessenger(
     actions: [
       'AccountsController:getAccountByAddress',
       'AccountsController:setAccountName',
-      'LegacyBackgroundApiService:toggleExternalServices',
-      'OnboardingController:getState',
-      'SeedlessOnboardingController:getState',
     ],
   });
   return preferencesControllerMessenger;

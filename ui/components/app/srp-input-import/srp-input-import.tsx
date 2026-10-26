@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { wordlist } from '@metamask/scure-bip39/dist/wordlists/english';
 import { isValidMnemonic } from '@ethersproject/hdnode';
@@ -49,20 +43,17 @@ type ListOfTextFieldRefs = {
 type SrpInputImportProps = {
   onChange: (srp: string) => void;
   onClearCallback?: () => void;
-  onClearClipboardRetry?: () => void;
-  onClipboardClearFailed?: () => void;
 };
 
 export default function SrpInputImport({
   onChange,
   onClearCallback,
-  onClearClipboardRetry,
-  onClipboardClearFailed,
 }: SrpInputImportProps) {
   const t = useI18nContext();
   const [draftSrp, setDraftSrp] = useState<DraftSrp[]>([]);
   const [firstWord, setFirstWord] = useState('');
   const [misSpelledWords, setMisSpelledWords] = useState<DraftSrp[]>([]);
+  const [hasInvalidChecksum, setHasInvalidChecksum] = useState(false);
 
   const srpRefs = useRef<ListOfTextFieldRefs>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -130,16 +121,6 @@ export default function SrpInputImport({
 
     checkForInvalidWords(newDraftSrp);
     setDraftSrp(newDraftSrp);
-  };
-
-  const handleAcceptedSrpPaste = async (rawSrp: string) => {
-    onSrpPaste(rawSrp);
-
-    try {
-      await navigator.clipboard.writeText('');
-    } catch {
-      onClipboardClearFailed?.();
-    }
   };
 
   const setWordActive = (srp: DraftSrp[], wordId: string) => {
@@ -232,13 +213,14 @@ export default function SrpInputImport({
     }
   };
 
-  const handleOnPaste = async (
+  const handleOnPaste = (
     clipBoardEvent: React.ClipboardEvent<HTMLTextAreaElement>,
   ) => {
     clipBoardEvent.preventDefault();
     const newSrp = clipBoardEvent.clipboardData.getData('text');
     if (newSrp.trim().match(/\s/u)) {
-      await handleAcceptedSrpPaste(newSrp);
+      clipBoardEvent.preventDefault();
+      onSrpPaste(newSrp);
     }
   };
 
@@ -286,7 +268,7 @@ export default function SrpInputImport({
       textareaRef.current?.focus();
       const newSrp = await navigator.clipboard.readText();
       if (newSrp.trim().match(/\s/u)) {
-        await handleAcceptedSrpPaste(newSrp);
+        onSrpPaste(newSrp);
       }
     } catch (error) {
       console.error('Error requesting clipboard permission', error);
@@ -319,32 +301,13 @@ export default function SrpInputImport({
       ) {
         const newSrp = await navigator.clipboard.readText();
         if (newSrp.trim().match(/\s/u)) {
-          await handleAcceptedSrpPaste(newSrp);
+          onSrpPaste(newSrp);
         }
       }
     } catch (error) {
       console.error('Error reading clipboard', error);
     }
   };
-
-  const hasInvalidChecksum = useMemo(() => {
-    if (
-      !SRP_LENGTHS.includes(draftSrp.length) ||
-      draftSrp.some((word) => word.word.length === 0)
-    ) {
-      return false;
-    }
-
-    const hasInvalidWords = draftSrp.some(
-      (word) => word.word !== '' && !wordlist.includes(word.word),
-    );
-    if (hasInvalidWords) {
-      return false;
-    }
-
-    const stringSrp = draftSrp.map((word) => word.word).join(' ');
-    return !isValidMnemonic(stringSrp);
-  }, [draftSrp]);
 
   useEffect(() => {
     const activeWord = draftSrp.find((word) => word.active);
@@ -363,17 +326,21 @@ export default function SrpInputImport({
 
       if (hasInvalidWords) {
         onChangeRef.current('');
+        setHasInvalidChecksum(false);
       } else {
         const stringSrp = draftSrp.map((word) => word.word).join(' ');
         // Only pass valid mnemonic (with correct checksum) to parent
         if (isValidMnemonic(stringSrp)) {
           onChangeRef.current(stringSrp);
+          setHasInvalidChecksum(false);
         } else {
           onChangeRef.current('');
+          setHasInvalidChecksum(true);
         }
       }
     } else {
       onChangeRef.current('');
+      setHasInvalidChecksum(false);
     }
   }, [draftSrp]);
 
@@ -489,8 +456,8 @@ export default function SrpInputImport({
               onClick={async () => {
                 setDraftSrp([]);
                 setMisSpelledWords([]);
+                setHasInvalidChecksum(false);
                 onClearCallback?.();
-                onClearClipboardRetry?.();
               }}
               size={ButtonSize.Md}
             >

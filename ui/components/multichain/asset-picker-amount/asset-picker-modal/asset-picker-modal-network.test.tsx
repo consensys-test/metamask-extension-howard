@@ -92,32 +92,33 @@ describe('AssetPickerModalNetwork', () => {
     jest.clearAllMocks();
   });
 
+  it('renders modal with no network list by default', () => {
+    const { baseElement } = renderWithProvider(
+      <AssetPickerModalNetwork {...defaultProps} />,
+      store,
+    );
+
+    expect(baseElement).toMatchSnapshot();
+  });
+
   it('should not show selected network when network prop is not passed in', () => {
-    renderWithProvider(
+    const { baseElement } = renderWithProvider(
       <AssetPickerModalNetwork
         {...defaultProps}
         networks={networkProps.networks}
       />,
       store,
     );
-
-    expect(
-      screen.getByTestId(`network-list-item-${CHAIN_IDS.MAINNET}`),
-    ).toHaveClass('multichain-network-list-item--deselected');
+    expect(baseElement).toMatchSnapshot();
   });
 
   it('should use passed in network as default when network prop is passed in', () => {
-    renderWithProvider(
+    const { baseElement } = renderWithProvider(
       <AssetPickerModalNetwork {...defaultProps} {...networkProps} />,
       store,
     );
 
-    expect(
-      screen.getByTestId(`network-list-item-${CHAIN_IDS.MAINNET}`),
-    ).toHaveClass('multichain-network-list-item--selected');
-    expect(
-      screen.getByTestId(`network-list-item-${CHAIN_IDS.OPTIMISM}`),
-    ).toHaveClass('multichain-network-list-item--deselected');
+    expect(baseElement).toMatchSnapshot();
   });
 
   it('should call onClose and onBack when header buttons are clicked', () => {

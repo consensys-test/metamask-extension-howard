@@ -9,15 +9,13 @@ import {
   Display,
   OverflowWrap,
   IconColor,
-  FlexDirection,
 } from '../../../../helpers/constants/design-system';
 import { useCopyToClipboard } from '../../../../hooks/useCopyToClipboard';
-import { SensitiveClipboardCleanup } from '../../../ui/sensitive-clipboard-cleanup/sensitive-clipboard-cleanup';
 import { Icon, IconName, Box, Text } from '../../../component-library';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import Tooltip from '../../../ui/tooltip';
 import { ShowMore } from '../show-more';
-import { SECOND } from '../../../../../shared/constants/time';
+import { MINUTE, SECOND } from '../../../../../shared/constants/time';
 import { useTimeout } from '../../../../hooks/useTimeout';
 
 export const Copyable = ({
@@ -29,9 +27,9 @@ export const Copyable = ({
   const t = useI18nContext();
 
   // useCopyToClipboard analysis: Could be sensitive or non-sensitive, so the param decides
-  const [, handleCopy, , sensitiveClipboard] = useCopyToClipboard(
-    sensitive ? { sensitive: true } : undefined,
-  );
+  const [, handleCopy] = useCopyToClipboard({
+    clearDelayMs: sensitive ? MINUTE : null,
+  });
   const [isVisible, setIsVisible] = useState(!sensitive);
   const [isClicked, setIsClicked] = useState(false);
 
@@ -42,12 +40,9 @@ export const Copyable = ({
     setIsVisible((state) => !state);
   };
 
-  const handleCopyClick = async (e) => {
+  const handleCopyClick = (e) => {
     e.stopPropagation();
-    const copied = await handleCopy(text);
-    if (!copied) {
-      return;
-    }
+    handleCopy(text);
     setIsClicked(true);
     startTimeout();
   };
@@ -55,124 +50,93 @@ export const Copyable = ({
   return (
     <Box
       display={Display.Flex}
-      flexDirection={FlexDirection.Column}
+      onClick={
+        sensitive && !isVisible ? handleVisibilityClick : handleCopyClick
+      }
+      className={classnames('copyable', {
+        sensitive,
+        clicked: isClicked,
+        visible: isVisible,
+      })}
+      backgroundColor={
+        isVisible && sensitive
+          ? BackgroundColor.errorMuted
+          : BackgroundColor.primaryMuted
+      }
+      borderRadius={BorderRadius.LG}
+      padding={2}
       marginTop={marginTop}
       marginBottom={marginBottom}
     >
-      <Box
-        display={Display.Flex}
-        flexDirection={
-          sensitive && isVisible ? FlexDirection.Column : FlexDirection.Row
-        }
-        onClick={
-          sensitive && !isVisible ? handleVisibilityClick : handleCopyClick
-        }
-        className={classnames('copyable', {
-          sensitive,
-          clicked: isClicked,
-          visible: isVisible,
-        })}
-        backgroundColor={
-          isVisible && sensitive
-            ? BackgroundColor.errorMuted
-            : BackgroundColor.primaryMuted
-        }
-        borderRadius={BorderRadius.LG}
-        padding={2}
-      >
-        {sensitive && isVisible && (
-          <Box className="copyable__sensitive-controls">
-            <Tooltip
-              wrapperClassName="copyable__tooltip"
-              html={<Text>{t('hideSentitiveInfo')}</Text>}
-              position="bottom"
-            >
-              <Icon
-                name={IconName.EyeSlash}
-                onClick={handleVisibilityClick}
-                color={Color.errorAlternative}
-                data-testid="reveal-icon"
-              />
-            </Tooltip>
+      {sensitive && (
+        <Box marginRight={2} className="copyable__icon">
+          <Tooltip
+            wrapperClassName="copyable__tooltip"
+            html={
+              <Text>
+                {isVisible ? t('hideSentitiveInfo') : t('doNotShare')}
+              </Text>
+            }
+            position="bottom"
+          >
             <Icon
-              className="copyable__icon"
-              name={isClicked ? IconName.CopySuccess : IconName.Copy}
-              color={Color.errorAlternative}
-              data-testid="copy-icon"
+              name={isVisible ? IconName.EyeSlash : IconName.Eye}
+              onClick={handleVisibilityClick}
+              color={
+                isVisible && sensitive
+                  ? Color.errorAlternative
+                  : IconColor.iconAlternative
+              }
+              data-testid="reveal-icon"
             />
-          </Box>
-        )}
-        {sensitive && !isVisible && (
-          <Box marginRight={2} className="copyable__icon">
-            <Tooltip
-              wrapperClassName="copyable__tooltip"
-              html={<Text>{t('doNotShare')}</Text>}
-              position="bottom"
-            >
-              <Icon
-                name={IconName.Eye}
-                onClick={handleVisibilityClick}
-                color={IconColor.iconAlternative}
-                data-testid="reveal-icon"
-              />
-            </Tooltip>
-          </Box>
-        )}
-        {sensitive && !isVisible && (
+          </Tooltip>
+        </Box>
+      )}
+      {sensitive && !isVisible && (
+        <Text
+          color={Color.textAlternative}
+          marginRight={2}
+          marginBottom={0}
+          overflowWrap={OverflowWrap.Anywhere}
+        >
+          {t('revealSensitiveContent')}
+        </Text>
+      )}
+      {isVisible && (
+        <ShowMore
+          marginRight={2}
+          buttonBackground={
+            isVisible && sensitive
+              ? BackgroundColor.errorMuted
+              : BackgroundColor.backgroundAlternative
+          }
+        >
           <Text
-            color={Color.textAlternative}
-            marginRight={2}
+            color={
+              isVisible && sensitive
+                ? Color.errorAlternative
+                : TextColor.textAlternative
+            }
             marginBottom={0}
             overflowWrap={OverflowWrap.Anywhere}
           >
-            {t('revealSensitiveContent')}
+            {text}
           </Text>
-        )}
-        {isVisible && (
-          <Box
-            style={{
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            <ShowMore
-              marginRight={2}
-              buttonBackground={
-                isVisible && sensitive
-                  ? BackgroundColor.errorMuted
-                  : BackgroundColor.backgroundAlternative
-              }
-            >
-              <Text
-                color={
-                  isVisible && sensitive
-                    ? Color.errorAlternative
-                    : TextColor.textAlternative
-                }
-                marginBottom={0}
-                overflowWrap={OverflowWrap.Anywhere}
-              >
-                {text}
-              </Text>
-            </ShowMore>
-          </Box>
-        )}
-        {isVisible && !sensitive && (
-          <Icon
-            className="copyable__icon"
-            name={isClicked ? IconName.CopySuccess : IconName.Copy}
-            color={IconColor.iconAlternative}
-            marginLeft="auto"
-            data-testid="copy-icon"
-          />
-        )}
-      </Box>
-      {sensitive ? (
-        <SensitiveClipboardCleanup
-          state={sensitiveClipboard.state}
-          onClear={sensitiveClipboard.clear}
+        </ShowMore>
+      )}
+      {isVisible && (
+        <Icon
+          className="copyable__icon"
+          name={isClicked ? IconName.CopySuccess : IconName.Copy}
+          color={
+            isVisible && sensitive
+              ? Color.errorAlternative
+              : IconColor.iconAlternative
+          }
+          marginLeft="auto"
+          data-testid="copy-icon"
         />
-      ) : null}
+      )}
     </Box>
   );
 };

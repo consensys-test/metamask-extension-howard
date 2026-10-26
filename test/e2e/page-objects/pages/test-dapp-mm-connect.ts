@@ -3,26 +3,21 @@ import { DAPP_URL, MM_CONNECT_FEATURED_CHAIN_IDS } from '../../constants';
 import { Driver } from '../../webdriver/driver';
 
 /**
- * MM Connect / browser-playground dapp for multichain and legacy EVM connect.
+ * Page object for MM Connect Test Dapp
+ * Package: @metamask/browser-playground | Repo: metamask/connect-monorepo
  *
- * Screen: `DAPP_URL` when serving `@metamask/browser-playground` (port 8080
- * when no default test-dapps run alongside it).
- * Owns: multichain/legacy/wagmi/window.ethereum connect buttons, disconnect,
- * network checkbox selection, scope cards, and legacy EVM sign/send helpers.
- * Boundaries: the playground dapp only. MetaMask connect/permissions
- * confirmations belong to confirmation page objects.
- * Related: connect-account and review-permissions confirmations.
+ * The dapp is served at DAPP_URL (port 8080 when no default test-dapps
+ * are running alongside it).
  *
- * Selector notes (from `@metamask/playground-ui` TEST_IDS + App.tsx):
- * - Network checkboxes live inside DynamicInputs; testId is
- * `createTestId('dynamic-inputs', 'checkbox', chainId)`.
- * - `app-section-connected` is always in the DOM; use `app-section-scopes` to
+ * Selector notes (from @metamask/playground-ui TEST_IDS + App.tsx):
+ * - Network checkboxes live inside DynamicInputs, not FeaturedNetworks.
+ * Their testId is: createTestId('dynamic-inputs', 'checkbox', chainId)
+ * - app-section-connected is always in the DOM; use app-section-scopes to
  * confirm a multichain session is active.
- * - On localhost/127.0.0.1, `eip155:1337` is pre-checked on page load (≥0.6.1).
- * - Method selector in each ScopeCard is a native HTML `<select>`.
- * - Solana is included via `selectNetworks()` as a ScopeCard.
- *
- * @see node_modules/@metamask/browser-playground/build/index.html
+ * - On localhost/127.0.0.1, eip155:1337 is pre-checked on page load (≥0.6.1).
+ * - The method selector in each ScopeCard is a native HTML <select>.
+ * - Solana is included in the multichain session via selectNetworks() and
+ * appears as a ScopeCard (not a separate wallet-standard flow).
  */
 export class TestDappMmConnect {
   // ──────────────────────────────────────────────────────────────────────────

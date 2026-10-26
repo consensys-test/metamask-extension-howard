@@ -1,12 +1,15 @@
 import { renderHook } from '@testing-library/react';
 import { TransactionType } from '@metamask/transaction-controller';
+import { useSearchParams } from 'react-router-dom';
 import { merge } from 'lodash';
 
 import { updateEditableParams } from '../../../../../../store/actions';
 import { useConfirmContext } from '../../../../context/confirm';
 import { useTransactionEventFragment } from '../../../../hooks/useTransactionEventFragment';
-import { getCrossChainMetaMaskCachedBalances } from '../../../../../../selectors';
-import { selectMaxValueModeForTransaction } from '../../../../../../ducks/send-max-value/send-max-value';
+import {
+  getCrossChainMetaMaskCachedBalances,
+  selectMaxValueModeForTransaction,
+} from '../../../../../../selectors';
 import { useIsGaslessSupported } from '../../../../hooks/gas/useIsGaslessSupported';
 import { useMaxValueRefresher } from './useMaxValueRefresher';
 import { useSupportsEIP1559 } from './useSupportsEIP1559';
@@ -14,6 +17,7 @@ import { useSupportsEIP1559 } from './useSupportsEIP1559';
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useLocation: () => ({ pathname: '/send/asset' }),
+  useSearchParams: jest.fn().mockReturnValue([{ get: () => null }]),
 }));
 
 const mockDispatch = jest.fn();
@@ -30,9 +34,6 @@ jest.mock('../../../../../../store/actions', () => ({
 
 jest.mock('../../../../../../selectors', () => ({
   getCrossChainMetaMaskCachedBalances: jest.fn(),
-}));
-
-jest.mock('../../../../../../ducks/send-max-value/send-max-value', () => ({
   selectMaxValueModeForTransaction: jest.fn(),
 }));
 
@@ -61,6 +62,7 @@ describe('useMaxValueRefresher', () => {
     selectMaxValueModeForTransaction,
   );
   const updateEditableParamsMock = jest.mocked(updateEditableParams);
+  const mockUseSearchParams = jest.mocked(useSearchParams);
   const mockUseIsGaslessSupported = jest.mocked(useIsGaslessSupported);
 
   const baseTransactionMeta = {
@@ -226,14 +228,24 @@ describe('useMaxValueRefresher', () => {
     expect(updateEditableParamsMock).not.toHaveBeenCalled();
   });
 
-  it('does not update transaction value when max amount mode is enabled for another transaction', () => {
-    selectMaxValueModeForTransactionMock.mockImplementation(
-      (_state, transactionId) => transactionId === 'another-transaction-id',
-    );
+  it('updates transaction event fragment with max amount mode status from url params', () => {
+    selectMaxValueModeForTransactionMock.mockReturnValue(false);
+    mockUseSearchParams.mockReturnValue([
+      { get: () => 'true' },
+    ] as unknown as ReturnType<typeof useSearchParams>);
 
     renderHook(() => useMaxValueRefresher());
 
-    expect(updateEditableParamsMock).not.toHaveBeenCalled();
+    expect(updateTransactionEventFragmentMock).toHaveBeenCalledWith(
+      {
+        properties: {
+          // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          is_send_max: true,
+        },
+      },
+      baseTransactionMeta.id,
+    );
   });
 
   describe('Transaction Value Updates - Edge Cases', () => {
@@ -325,7 +337,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: '0x1631f457a756000',
           },
         );
@@ -354,7 +365,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: defaultBalance,
           },
         );
@@ -384,7 +394,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: '0x1631f457a756000',
           },
         );
@@ -409,7 +418,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: defaultBalance, // Full balance since gas fee is 0
           },
         );
@@ -439,7 +447,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: '0x1631f457a756000',
           },
         );
@@ -464,7 +471,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: defaultBalance,
           },
         );
@@ -492,7 +498,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: '0x163325c97f3cc00',
           },
         );
@@ -517,7 +522,6 @@ describe('useMaxValueRefresher', () => {
         expect(updateEditableParamsMock).toHaveBeenCalledWith(
           transactionMeta.id,
           {
-            updateType: false,
             value: '0x163325eebffb000',
           },
         );
@@ -542,7 +546,6 @@ describe('useMaxValueRefresher', () => {
       expect(updateEditableParamsMock).toHaveBeenCalledWith(
         transactionMeta.id,
         {
-          updateType: false,
           value: defaultBalance,
         },
       );
@@ -566,7 +569,6 @@ describe('useMaxValueRefresher', () => {
     expect(updateEditableParamsMock).toHaveBeenLastCalledWith(
       baseTransactionMeta.id,
       {
-        updateType: false,
         value: '0x2373d8fe36b000',
       },
     );

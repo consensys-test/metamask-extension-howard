@@ -17,8 +17,7 @@ export type AddPrecreatedOrderParams = {
   orderId: string;
   providerCode: string;
   walletAddress: string;
-  // Required since ramps-controller v20: precreated stubs must carry a network.
-  chainId: string;
+  chainId?: string;
 };
 
 export type UseRampsOrdersResult = {

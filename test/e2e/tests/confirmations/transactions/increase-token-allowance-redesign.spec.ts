@@ -38,7 +38,7 @@ describe('Confirmation Redesign ERC20 Increase Allowance', function () {
         await txConfirmation.editSpendingCap('3');
 
         await txConfirmation.clickScrollToBottomButton();
-        await txConfirmation.clickFooterButton({ button: 'confirm' });
+        await txConfirmation.clickFooterConfirmButton();
 
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,

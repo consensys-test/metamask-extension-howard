@@ -236,9 +236,9 @@ describe('PPOM Blockaid Alert - Malicious ERC20 Approval', function () {
         await login(driver, { expectedBalance: '1.37T ETH' });
         await driver.openNewPage(DAPP_URL_LOCALHOST);
 
-        const expectedTitle = 'Risk signals detected';
+        const expectedTitle = 'This is a deceptive request';
         const expectedDescription =
-          'Security partners found risk signals in this request. Review before continuing.';
+          'If you approve this request, you might lose your assets.';
 
         // Click TestDapp button to send JSON-RPC request
         await driver.clickElement('#maliciousApprovalButton');

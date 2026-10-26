@@ -11,23 +11,12 @@
 
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { getSelectedInternalAccount } from '../../../../shared/lib/selectors/accounts';
 import {
   getPerpsStreamManager,
   type PerpsStreamManager,
 } from '../../../providers/perps/PerpsStreamManager';
-import {
-  getIsPerpsTerminalBackendEnabled,
-  getIsPerpsExperienceAvailable,
-} from '../../../selectors/perps';
-import {
-  getSelectedEvmInternalAccount,
-  selectEvmAddress,
-  getUseExternalServices,
-} from '../../../selectors';
-import {
-  selectPerpsActiveProvider,
-  selectPerpsIsTestnet,
-} from '../../../selectors/perps-controller';
+import { getIsPerpsTerminalBackendEnabled } from '../../../selectors/perps';
 
 export type UsePerpsStreamManagerReturn = {
   /** The stream manager instance (null while initializing) */
@@ -63,16 +52,10 @@ export type UsePerpsStreamManagerReturn = {
  * ```
  */
 export function usePerpsStreamManager(): UsePerpsStreamManagerReturn {
-  // The background Perps session uses the EVM account, even on BTC assets.
-  const selectedEvmAddress = useSelector(selectEvmAddress);
-  const lastEvmAccount = useSelector(getSelectedEvmInternalAccount);
-  const selectedAddress = selectedEvmAddress ?? lastEvmAccount?.address ?? null;
+  // Get the selected account address from Redux
+  const selectedAccount = useSelector(getSelectedInternalAccount);
+  const selectedAddress = selectedAccount?.address ?? null;
   const useTerminalApi = useSelector(getIsPerpsTerminalBackendEnabled);
-  const useExternalServices = useSelector(getUseExternalServices);
-  const available = useSelector(getIsPerpsExperienceAvailable);
-  const enabled = available && useExternalServices;
-  const provider = useSelector(selectPerpsActiveProvider);
-  const isTestnet = useSelector(selectPerpsIsTestnet);
 
   const streamManager = getPerpsStreamManager();
   // Configure the singleton before any dependent hook reads its market cache.
@@ -86,62 +69,26 @@ export function usePerpsStreamManager(): UsePerpsStreamManagerReturn {
     () =>
       selectedAddress !== null && streamManager.isInitialized(selectedAddress),
   );
-  const [error, setError] = useState<Error | null>(() =>
-    selectedAddress ? null : new Error('No account selected'),
-  );
-  // Start unset so the first address (including null) syncs on mount.
-  const [prevSelectedAddress, setPrevSelectedAddress] = useState<
-    string | null | undefined
-  >(undefined);
-  const [prevEnabled, setPrevEnabled] = useState(enabled);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Only changes after mount invalidate this hook's subscribed network data.
-  const [previousNetwork, setPreviousNetwork] = useState({
-    provider,
-    isTestnet,
-  });
-  const networkChanged =
-    provider !== previousNetwork.provider ||
-    isTestnet !== previousNetwork.isTestnet;
-
-  if (
-    selectedAddress !== prevSelectedAddress ||
-    enabled !== prevEnabled ||
-    networkChanged
-  ) {
-    setPrevSelectedAddress(selectedAddress);
-    setPrevEnabled(enabled);
-    setPreviousNetwork({ provider, isTestnet });
+  useEffect(() => {
     if (!selectedAddress) {
       setIsReady(false);
       setError(new Error('No account selected'));
-    } else if (!enabled) {
-      setIsReady(false);
-      setError(
-        new Error(
-          available
-            ? 'Perps requires Basic Functionality'
-            : 'Perps is unavailable',
-        ),
-      );
-    } else if (
-      !networkChanged &&
-      streamManager.isInitialized(selectedAddress)
-    ) {
+      return undefined;
+    }
+
+    // Already initialized by a previous call
+    if (streamManager.isInitialized(selectedAddress)) {
       setIsReady(true);
       setError(null);
-    } else {
-      setIsReady(false);
-      setError(null);
-    }
-  }
-
-  useEffect(() => {
-    if (!selectedAddress || !enabled) {
       return undefined;
     }
 
     let cancelled = false;
+
+    setIsReady(false);
+    setError(null);
 
     // initForAddress deduplicates: multiple hooks sharing this singleton
     // only trigger a single perpsInit RPC + channel reset round-trip.
@@ -164,7 +111,7 @@ export function usePerpsStreamManager(): UsePerpsStreamManagerReturn {
     return () => {
       cancelled = true;
     };
-  }, [selectedAddress, streamManager, enabled, provider, isTestnet]);
+  }, [selectedAddress, streamManager]);
 
   return {
     streamManager: isReady ? streamManager : null,

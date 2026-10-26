@@ -30,7 +30,7 @@ describe('Portfolio site', function () {
       {
         dappOptions: { numberOfTestDapps: 1 },
         fixtures: new FixtureBuilderV2()
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,

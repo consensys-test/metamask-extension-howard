@@ -53,10 +53,10 @@ function toLogEntry(
 }
 
 /**
- * Collect React Compiler statistics from all modules' buildInfo.
+ * Collect React Compiler statistics from all modules' buildMeta.
  *
  * NOTE: This does NOT work with thread-loader because workers cannot access
- * `_module.buildInfo` (it's null in worker contexts). The webpack config
+ * `_module.buildMeta` (it's null in worker contexts). The webpack config
  * automatically disables thread-loader when --reactCompilerVerbose is used.
  *
  * @param compilation - The webpack compilation object.
@@ -86,8 +86,8 @@ function collectStats(compilation: Compilation): ReactCompilerStats {
   };
 
   const processModule = (module: Module) => {
-    const buildInfo = module.buildInfo as Record<string, unknown> | undefined;
-    const stored = buildInfo?.[REACT_COMPILER_STATUS_KEY];
+    const buildMeta = module.buildMeta as Record<string, unknown> | undefined;
+    const stored = buildMeta?.[REACT_COMPILER_STATUS_KEY];
 
     if (stored === null || stored === undefined) {
       return;
@@ -245,13 +245,13 @@ export class ReactCompilerPlugin {
         logSummary(stats);
       }
 
-      // Clear buildInfo from all modules to prevent accumulation in watch mode
+      // Clear buildMeta from all modules to prevent accumulation in watch mode
       for (const module of compilation.modules) {
-        const buildInfo = module.buildInfo as
+        const buildMeta = module.buildMeta as
           | Record<string, unknown>
           | undefined;
-        if (buildInfo && REACT_COMPILER_STATUS_KEY in buildInfo) {
-          delete buildInfo[REACT_COMPILER_STATUS_KEY];
+        if (buildMeta && REACT_COMPILER_STATUS_KEY in buildMeta) {
+          delete buildMeta[REACT_COMPILER_STATUS_KEY];
         }
       }
     });

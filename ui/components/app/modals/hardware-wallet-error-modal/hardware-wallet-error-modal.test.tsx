@@ -168,14 +168,14 @@ describe('HardwareWalletErrorModal', () => {
   });
 
   describe('Error Display', () => {
-    it('renders device locked title and single unlock description', () => {
+    it('renders device locked title and recovery instructions', () => {
       const error = createTestError(
         ErrorCode.AuthenticationDeviceLocked,
         'Device is locked',
         'Your Ledger device is locked. Please unlock it to continue.',
       );
 
-      const { getByText, queryByText } = renderWithMetrics(
+      const { getByText } = renderWithMetrics(
         <HardwareWalletErrorModal error={error} />,
       );
 
@@ -183,14 +183,11 @@ describe('HardwareWalletErrorModal', () => {
         getByText('[hardwareWalletErrorTitleDeviceLocked]'),
       ).toBeInTheDocument();
       expect(
-        getByText('[hardwareWalletErrorDeviceLockedDescription]'),
+        getByText('[hardwareWalletErrorRecoveryUnlock1]'),
       ).toBeInTheDocument();
       expect(
-        queryByText('[hardwareWalletErrorRecoveryUnlock1]'),
-      ).not.toBeInTheDocument();
-      expect(
-        queryByText('[hardwareWalletErrorRecoveryUnlock2]'),
-      ).not.toBeInTheDocument();
+        getByText('[hardwareWalletErrorRecoveryUnlock2]'),
+      ).toBeInTheDocument();
     });
 
     it('renders nothing when error is not provided', () => {
@@ -307,14 +304,14 @@ describe('HardwareWalletErrorModal', () => {
   });
 
   describe('Recovery Instructions', () => {
-    it('displays the unlock description for AuthenticationDeviceLocked', () => {
+    it('displays unlock instructions for AuthenticationDeviceLocked', () => {
       const error = createTestError(
         ErrorCode.AuthenticationDeviceLocked,
         'Device is locked',
         'Your device is locked.',
       );
 
-      const { getByText, queryByText } = renderWithMetrics(
+      const { getByText } = renderWithMetrics(
         <HardwareWalletErrorModal error={error} />,
       );
 
@@ -322,14 +319,11 @@ describe('HardwareWalletErrorModal', () => {
         getByText('[hardwareWalletErrorTitleDeviceLocked]'),
       ).toBeInTheDocument();
       expect(
-        getByText('[hardwareWalletErrorDeviceLockedDescription]'),
+        getByText('[hardwareWalletErrorRecoveryUnlock1]'),
       ).toBeInTheDocument();
       expect(
-        queryByText('[hardwareWalletErrorRecoveryUnlock1]'),
-      ).not.toBeInTheDocument();
-      expect(
-        queryByText('[hardwareWalletErrorRecoveryUnlock2]'),
-      ).not.toBeInTheDocument();
+        getByText('[hardwareWalletErrorRecoveryUnlock2]'),
+      ).toBeInTheDocument();
     });
 
     it('displays blind signing instructions for DeviceStateBlindSignNotSupported', () => {
@@ -356,29 +350,6 @@ describe('HardwareWalletErrorModal', () => {
           '[hardwareWalletErrorTitleBlindSignNotSupportedInstruction2]',
         ),
       ).toBeInTheDocument();
-    });
-
-    it('displays unsupported signature copy for DeviceStateOnlyV4Supported', () => {
-      const error = createTestError(
-        ErrorCode.DeviceStateOnlyV4Supported,
-        'Ledger: Only version 4 of typed data signing is supported',
-        'This device can only sign version 4 (V4) typed data.',
-      );
-
-      const { getByText, queryByText } = renderWithMetrics(
-        <HardwareWalletErrorModal error={error} />,
-      );
-
-      expect(
-        getByText('[hardwareWalletErrorTitleUnsupportedSignature]'),
-      ).toBeInTheDocument();
-      expect(
-        getByText('[hardwareWalletErrorOnlyV4SupportedDescription]'),
-      ).toBeInTheDocument();
-      expect(getByText('[confirm]')).toBeInTheDocument();
-      expect(
-        queryByText('[hardwareWalletErrorReconnectButton]'),
-      ).not.toBeInTheDocument();
     });
 
     it('displays app instructions for DeviceStateEthAppClosed', () => {

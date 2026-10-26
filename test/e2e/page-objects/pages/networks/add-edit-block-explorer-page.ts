@@ -20,7 +20,8 @@ class AddEditBlockExplorerPage {
   };
 
   private readonly confirmButton = {
-    testId: 'add-block-explorer-url-button',
+    text: 'Add URL',
+    tag: 'button',
   };
 
   private readonly driver: Driver;

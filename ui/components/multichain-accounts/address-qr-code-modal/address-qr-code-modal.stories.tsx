@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Meta, StoryObj } from '@storybook/react-webpack5';
+import { Meta, StoryObj } from '@storybook/react';
 import { Button } from '@metamask/design-system-react';
 import { AddressQRCodeModal } from './address-qr-code-modal';
 

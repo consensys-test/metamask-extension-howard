@@ -4,21 +4,14 @@ import {
 } from '@metamask/assets-controllers';
 import { buildControllerInitRequestMock } from '../test/utils';
 import { MessengerClientInitRequest } from '../types';
-import {
-  getMultichainAssetsControllerInitMessenger,
-  getMultichainAssetsControllerMessenger,
-  MultichainAssetsControllerInitMessenger,
-} from '../messengers/multichain/multichain-assets-controller-messenger';
+import { getMultichainAssetsControllerMessenger } from '../messengers/multichain';
 import { getRootMessenger } from '../../lib/messenger';
 import { MultichainAssetsControllerInit } from './multichain-assets-controller-init';
 
 jest.mock('@metamask/assets-controllers');
 
 function buildInitRequestMock(): jest.Mocked<
-  MessengerClientInitRequest<
-    MultichainAssetsControllerMessenger,
-    MultichainAssetsControllerInitMessenger
-  >
+  MessengerClientInitRequest<MultichainAssetsControllerMessenger>
 > {
   const baseControllerMessenger = getRootMessenger();
 
@@ -27,9 +20,7 @@ function buildInitRequestMock(): jest.Mocked<
     controllerMessenger: getMultichainAssetsControllerMessenger(
       baseControllerMessenger,
     ),
-    initMessenger: getMultichainAssetsControllerInitMessenger(
-      baseControllerMessenger,
-    ),
+    initMessenger: undefined,
   };
 }
 
@@ -56,7 +47,6 @@ describe('MultichainAssetsControllerInit', () => {
     expect(MultichainAssetsControllerClassMock).toHaveBeenCalledWith({
       messenger: requestMock.controllerMessenger,
       state: requestMock.persistedState.MultichainAssetsController,
-      isDeprecated: expect.any(Function),
     });
   });
 });

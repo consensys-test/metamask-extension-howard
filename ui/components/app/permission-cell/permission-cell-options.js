@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState, useRef } from 'react';
 import PropTypes from 'prop-types';
 import Box from '../../ui/box';
 import { useI18nContext } from '../../../hooks/useI18nContext';
@@ -27,10 +27,7 @@ export const PermissionCellOptions = ({
 }) => {
   const t = useI18nContext();
   const dispatch = useDispatch();
-  const [anchorElement, setAnchorElement] = useState(null);
-  const setAnchorRef = useCallback((node) => {
-    setAnchorElement(node);
-  }, []);
+  const ref = useRef(false);
   const [showOptions, setShowOptions] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -64,7 +61,7 @@ export const PermissionCellOptions = ({
   }
 
   return (
-    <Box ref={setAnchorRef}>
+    <Box ref={ref}>
       <ButtonIcon
         iconName={IconName.MoreVertical}
         ariaLabel={t('options')}
@@ -72,7 +69,7 @@ export const PermissionCellOptions = ({
         data-testid={permissionName}
       />
       {showOptions && (
-        <Menu anchorElement={anchorElement} onHide={handleClose}>
+        <Menu anchorElement={ref.current} onHide={handleClose}>
           {description && (
             <MenuItem onClick={handleDetailsOpen}>
               <Text

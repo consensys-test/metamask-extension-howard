@@ -4,10 +4,7 @@ import mockState from '../../../../test/data/mock-state.json';
 import configureStore from '../../../store/store';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { submitRequestToBackground } from '../../../store/background-connection';
-import { enLocale as messages } from '../../../../test/lib/i18n-helpers';
 import { PerpsTab } from './perps-tab';
-
-let mockPerpsViewShouldThrow = false;
 
 jest.mock('../../../store/background-connection', () => ({
   submitRequestToBackground: jest.fn().mockResolvedValue(undefined),
@@ -20,10 +17,6 @@ jest.mock('./perps-view-stream-boundary', () => ({
 
 jest.mock('./perps-view', () => ({
   PerpsView: () => {
-    if (mockPerpsViewShouldThrow) {
-      throw new Error('perps home failed to load');
-    }
-
     const { useAccessRestrictedModal } = jest.requireActual('../compliance');
     const { showAccessRestrictedModal } = useAccessRestrictedModal();
 
@@ -47,7 +40,6 @@ const mockSubmitRequestToBackground =
 describe('PerpsTab', () => {
   beforeEach(() => {
     mockSubmitRequestToBackground.mockClear();
-    mockPerpsViewShouldThrow = false;
   });
 
   it('renders the "basic functionality off" empty state when useExternalServices is false', () => {
@@ -62,35 +54,6 @@ describe('PerpsTab', () => {
 
     expect(queryByTestId('perps-basic-functionality-off')).not.toBeNull();
     expect(queryByTestId('perps-view-mock')).toBeNull();
-  });
-
-  it('keeps the outage banner visible when perps home content fails to load', () => {
-    mockPerpsViewShouldThrow = true;
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const store = configureStore({
-      metamask: {
-        ...mockState.metamask,
-        useExternalServices: true,
-        remoteFeatureFlags: {
-          ...mockState.metamask.remoteFeatureFlags,
-          perpsPerpTradingServiceInterruptionBannerEnabled: true,
-        },
-      },
-    });
-
-    try {
-      renderWithProvider(<PerpsTab />, store);
-
-      expect(
-        screen.getByTestId('perps-service-interruption-banner'),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(messages.somethingWentWrong.message),
-      ).toBeInTheDocument();
-      expect(screen.queryByTestId('perps-view-mock')).not.toBeInTheDocument();
-    } finally {
-      jest.restoreAllMocks();
-    }
   });
 
   it('renders the perps view when useExternalServices is true', () => {

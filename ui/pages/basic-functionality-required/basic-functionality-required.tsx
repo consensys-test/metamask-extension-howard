@@ -90,7 +90,6 @@ export const BasicFunctionalityOff = () => {
       display={Display.Flex}
       alignItems={AlignItems.center}
       flexDirection={FlexDirection.Column}
-      data-testid="parent-selector-basic-functionality-off-page"
       style={CONTAINER_STYLE}
     >
       <Box

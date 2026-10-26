@@ -19,10 +19,6 @@ import mockState from '../../../../../test/data/mock-state.json';
 import { SecurityAlertResponse } from '../../types/confirm';
 import useBlockaidAlert from './useBlockaidAlerts';
 
-jest.mock('./useSendingAssetsFiatTotal', () => ({
-  useSendingAssetsFiatTotal: jest.fn(() => null),
-}));
-
 const mockSecurityAlertResponse: SecurityAlertResponse = {
   securityAlertId: 'test-id-mock',
   reason: 'test-reason',
@@ -43,11 +39,10 @@ const currentConfirmationMock = {
 const EXPECTED_ALERT = {
   key: mockSecurityAlertResponse.securityAlertId,
   severity: Severity.Danger,
-  message:
-    'Security partners found risk signals in this request. Review before continuing.',
+  message: 'If you approve this request, you might lose your assets.',
   alertDetails: mockSecurityAlertResponse.features,
   provider: SecurityProvider.Blockaid,
-  reason: 'Risk signals detected',
+  reason: 'This is a deceptive request',
 };
 
 const IGNORED_TYPES = [

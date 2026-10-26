@@ -1,9 +1,6 @@
 import { TransactionMeta } from '@metamask/transaction-controller';
+import { parseTypedDataMessage } from '../../../../../shared/lib/transaction.utils';
 import { Confirmation, SignatureRequestType } from '../../types/confirm';
-import {
-  isEip712PrimaryTypeField,
-  parseSanitizeTypedDataMessage,
-} from '../../utils';
 import { DAI_CONTRACT_ADDRESS } from './info/shared/constants';
 
 export const getConfirmationSender = (
@@ -28,20 +25,9 @@ export const getIsRevokeDAIPermit = (confirmation: SignatureRequestType) => {
   const {
     message,
     domain: { verifyingContract },
-    primaryType,
-    types,
-  } = parseSanitizeTypedDataMessage(msgData as string);
+  } = parseTypedDataMessage(msgData as string);
   const isRevokeDAIPermit =
-    message.allowed === false &&
-    isEip712PrimaryTypeField(types, primaryType, 'allowed', 'bool') &&
-    isEip712PrimaryTypeField(
-      types,
-      'EIP712Domain',
-      'verifyingContract',
-      'address',
-    ) &&
-    typeof verifyingContract === 'string' &&
-    verifyingContract.toLowerCase() === DAI_CONTRACT_ADDRESS.toLowerCase();
+    message.allowed === false && verifyingContract === DAI_CONTRACT_ADDRESS;
 
   return isRevokeDAIPermit;
 };

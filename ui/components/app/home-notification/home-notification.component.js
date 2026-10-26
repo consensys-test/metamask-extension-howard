@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
 import classnames from 'clsx';
 import PropTypes from 'prop-types';
-import {
-  Button,
-  ButtonVariant,
-  Checkbox,
-  Icon,
-  IconName,
-  TextVariant,
-} from '@metamask/design-system-react';
+import { Button, ButtonVariant, Icon, IconName } from '../../component-library';
+import Checkbox from '../../ui/check-box';
 import Tooltip from '../../ui/tooltip';
 import { IconColor } from '../../../helpers/constants/design-system';
 
@@ -40,10 +34,9 @@ const HomeNotification = ({
   const checkboxElement = checkboxText && (
     <Checkbox
       id="homeNotification_checkbox"
-      label={checkboxText}
-      labelProps={{ variant: TextVariant.BodySm }}
-      isSelected={checkboxState}
-      onChange={setCheckBoxState}
+      checked={checkboxState}
+      className="home-notification__checkbox"
+      onClick={() => setCheckBoxState((checked) => !checked)}
     />
   );
 
@@ -97,6 +90,12 @@ const HomeNotification = ({
             ) : (
               checkboxElement
             )}
+            <label
+              className="home-notification__checkbox-label"
+              htmlFor="homeNotification_checkbox"
+            >
+              {checkboxText}
+            </label>
           </div>
         ) : null}
       </div>

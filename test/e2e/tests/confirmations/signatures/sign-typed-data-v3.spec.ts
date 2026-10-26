@@ -82,10 +82,7 @@ describe('Confirmation Signature - Sign Typed Data V3', function (this: Suite) {
           SignatureType.SignTypedDataV3,
         );
 
-        await confirmation.clickFooterButton({
-          button: 'cancel',
-          waitUntil: 'windowClose',
-        });
+        await confirmation.clickFooterCancelButtonAndAndWaitForWindowToClose();
 
         await assertSignatureRejectedMetrics({
           driver,

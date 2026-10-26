@@ -3,9 +3,8 @@ import type {
   TransactionMeta,
 } from '@metamask/transaction-controller';
 import { TransactionStatus } from '@metamask/transaction-controller';
-import { EMPTY_ARRAY, EMPTY_OBJECT } from './shared';
+import { EMPTY_ARRAY } from './shared';
 import {
-  selectBatchTransactionCounts,
   selectTransactions,
   selectOrderedTransactions,
   selectRequiredTransactionIds,
@@ -13,7 +12,6 @@ import {
   selectRequiredTransactionHashes,
   selectTransactionById,
   selectUnapprovedTransactionById,
-  selectNonReplacedTransactions,
 } from './transactionController';
 
 type TransactionState = {
@@ -40,7 +38,6 @@ describe('transactionController selectors', () => {
     selectRequiredTransactionHashes.clearCache();
     selectTransactionById.clearCache();
     selectUnapprovedTransactionById.clearCache();
-    selectNonReplacedTransactions.clearCache();
   });
 
   describe('selectTransactions', () => {
@@ -63,28 +60,6 @@ describe('transactionController selectors', () => {
       const state = { metamask: undefined } as unknown as TransactionState;
 
       expect(selectTransactions(state)).toBe(EMPTY_ARRAY);
-    });
-  });
-
-  describe('selectBatchTransactionCounts', () => {
-    it('returns batch transaction counts from state', () => {
-      const state = {
-        metamask: {
-          batchTransactionCounts: { '0xbatch': 2 },
-        } as unknown as TransactionControllerState,
-      };
-
-      expect(selectBatchTransactionCounts(state)).toStrictEqual({
-        '0xbatch': 2,
-      });
-    });
-
-    it('returns EMPTY_OBJECT when batch transaction counts are undefined', () => {
-      const state = {
-        metamask: {} as unknown as TransactionControllerState,
-      };
-
-      expect(selectBatchTransactionCounts(state)).toBe(EMPTY_OBJECT);
     });
   });
 
@@ -331,62 +306,6 @@ describe('transactionController selectors', () => {
       const state = createMockState([tx]);
 
       expect(selectUnapprovedTransactionById(state, undefined)).toBeUndefined();
-    });
-  });
-
-  describe('selectNonReplacedTransactions', () => {
-    it('drops originals that carry a complete replacement shape', () => {
-      const original = makeTx({
-        id: 'original',
-        time: 1,
-        hash: '0xaaa',
-        replacedBy: '0xbbb',
-        replacedById: 'replacement',
-      });
-      const replacement = makeTx({
-        id: 'replacement',
-        time: 2,
-        hash: '0xbbb',
-      });
-      const state = createMockState([original, replacement]);
-
-      expect(
-        selectNonReplacedTransactions(state).map((tx) => tx.id),
-      ).toStrictEqual(['replacement']);
-    });
-
-    it('keeps originals when replacement metadata is only partial', () => {
-      const missingHash = makeTx({
-        id: 'missing-hash',
-        time: 1,
-        replacedBy: '0xbbb',
-        replacedById: 'replacement',
-      });
-      const missingReplacedBy = makeTx({
-        id: 'missing-replaced-by',
-        time: 2,
-        hash: '0xaaa',
-        replacedById: 'replacement',
-      });
-      const missingReplacedById = makeTx({
-        id: 'missing-replaced-by-id',
-        time: 3,
-        hash: '0xaaa',
-        replacedBy: '0xbbb',
-      });
-      const state = createMockState([
-        missingHash,
-        missingReplacedBy,
-        missingReplacedById,
-      ]);
-
-      expect(
-        selectNonReplacedTransactions(state).map((tx) => tx.id),
-      ).toStrictEqual([
-        'missing-hash',
-        'missing-replaced-by',
-        'missing-replaced-by-id',
-      ]);
     });
   });
 });

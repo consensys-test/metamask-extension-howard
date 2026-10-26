@@ -5,7 +5,6 @@ import type { AccountsControllerState } from '@metamask/accounts-controller';
 import type { AccountTreeControllerState } from '@metamask/account-tree-controller';
 import type { AddressBookControllerState } from '@metamask/address-book-controller';
 import type { AnnouncementControllerState } from '@metamask/announcement-controller';
-import type { BridgeStatusControllerState } from '@metamask/bridge-status-controller';
 import type {
   AccountTrackerControllerState,
   CurrencyRateState,
@@ -28,9 +27,7 @@ import type { SelectedNetworkControllerState } from '@metamask/selected-network-
 import type {
   PermissionConstraint,
   PermissionControllerState,
-  SubjectMetadataControllerState,
 } from '@metamask/permission-controller';
-import type { AuthenticationControllerState } from '@metamask/profile-sync-controller/auth';
 import type { UserStorageControllerState } from '@metamask/profile-sync-controller/user-storage';
 import {
   type NetworkMetadata,
@@ -48,6 +45,7 @@ import type { AssetsControllerState } from '@metamask/assets-controller';
 import type { PerpsControllerState } from '@metamask/perps-controller';
 import type { PasskeyControllerState } from '@metamask/passkey-controller';
 import type { AppStateControllerState } from '../../../app/scripts/controllers/app-state-controller';
+import type { MetaMetricsControllerState } from '../../../app/scripts/controllers/metametrics-controller';
 import type { OnboardingControllerState } from '../../../app/scripts/controllers/onboarding';
 import type { Preferences } from '../../../shared/types/preferences';
 import type { PreferencesControllerState } from '../../../app/scripts/controllers/preferences-controller';
@@ -130,11 +128,13 @@ type TransactionControllerFixtureInput = Partial<
   transactions?: TransactionMeta[];
 };
 
-type AnalyticsControllerFixturePatch = {
+type MetaMetricsControllerFixturePatch = Partial<MetaMetricsControllerState> & {
+  /** Patches `AnalyticsController`, not `MetaMetricsController`. */
   analyticsId?: string | null;
+  /** Patches `AnalyticsController`, not `MetaMetricsController`. */
   optedIn?: boolean;
+  /** Patches `AnalyticsController`, not `MetaMetricsController`. */
   consentDecisionMade?: boolean;
-  dataCollectionForMarketing?: boolean;
 };
 
 type StorageServiceNamespaceMap = {
@@ -283,29 +283,11 @@ class FixtureBuilderV2 {
     return this;
   }
 
-  withAuthenticationController(
-    data: Partial<AuthenticationControllerState>,
-  ): this {
-    merge(this.fixture.data.AuthenticationController, data);
-    return this;
-  }
-
   withAppStateController(data: Partial<AppStateControllerState>): this {
     merge(this.fixture.data.AppStateController, data);
     return this;
   }
 
-  withBridgeStatusController(data: Partial<BridgeStatusControllerState>): this {
-    merge(this.fixture.data.BridgeStatusController, data);
-    return this;
-  }
-
-  /**
-   * @deprecated Assets-unify reads fiat from `AssetsController`. Set a displayed
-   * rate with {@link FixtureBuilderV2.withAssetsController} `assetsPrice`, and
-   * the selected currency with `selectedCurrency`.
-   * @param data - Legacy CurrencyController state to merge.
-   */
   withCurrencyController(data: Partial<CurrencyRateState>): this {
     merge(this.fixture.data.CurrencyController, data);
     return this;
@@ -316,19 +298,20 @@ class FixtureBuilderV2 {
     return this;
   }
 
-  withAnalyticsController(data: AnalyticsControllerFixturePatch): this {
+  withMetaMetricsController(data: MetaMetricsControllerFixturePatch): this {
     const {
       analyticsId,
       optedIn,
       consentDecisionMade,
-      dataCollectionForMarketing,
+      ...metaMetricsControllerPatch
     } = data;
+
+    merge(this.fixture.data.MetaMetricsController, metaMetricsControllerPatch);
 
     if (
       analyticsId !== undefined ||
       optedIn !== undefined ||
-      consentDecisionMade !== undefined ||
-      dataCollectionForMarketing !== undefined
+      consentDecisionMade !== undefined
     ) {
       const fixtureData = this.fixture.data as Record<string, unknown>;
       if (!fixtureData.AnalyticsController) {
@@ -348,21 +331,12 @@ class FixtureBuilderV2 {
       if (consentDecisionMade !== undefined) {
         analyticsPatch.consentDecisionMade = consentDecisionMade;
       }
-      if (dataCollectionForMarketing !== undefined) {
-        analyticsPatch.optedInToMarketing = dataCollectionForMarketing;
-        analyticsPatch.marketingConsentDecisionMade = true;
-      }
       merge(analyticsController, analyticsPatch);
     }
 
     return this;
   }
 
-  /**
-   * @deprecated Assets-unify reads non-EVM fiat from `AssetsController.assetsPrice`.
-   * Set that price with {@link FixtureBuilderV2.withAssetsController}.
-   * @param data - Legacy MultichainAssetsRatesController state to merge.
-   */
   withMultichainAssetsRatesController(
     data: MultichainAssetsRatesControllerFixturePatch,
   ): this {
@@ -418,16 +392,6 @@ class FixtureBuilderV2 {
     data: Partial<PermissionControllerState<PermissionConstraint>>,
   ): this {
     merge(this.fixture.data.PermissionController, data);
-    return this;
-  }
-
-  withSubjectMetadataController(
-    data: Partial<SubjectMetadataControllerState>,
-  ): this {
-    merge(
-      (this.fixture.data as Record<string, unknown>).SubjectMetadataController,
-      data,
-    );
     return this;
   }
 
@@ -755,10 +719,6 @@ class FixtureBuilderV2 {
     });
   }
 
-  /**
-   * @deprecated Set the non-EVM price with {@link FixtureBuilderV2.withAssetsController}.
-   * @param conversionRates - Legacy conversion rates to merge.
-   */
   withConversionRates(
     conversionRates: Partial<
       MultichainAssetsRatesControllerState['conversionRates']
@@ -767,10 +727,6 @@ class FixtureBuilderV2 {
     return this.withMultichainAssetsRatesController({ conversionRates });
   }
 
-  /**
-   * @deprecated Set the displayed native price with {@link FixtureBuilderV2.withAssetsController}.
-   * @param currencyRates - Legacy currency rates to merge.
-   */
   withCurrencyRates(
     currencyRates: CurrencyRateState['currencyRates'] = {},
   ): this {
@@ -1015,60 +971,6 @@ class FixtureBuilderV2 {
       },
       networksMetadata: {
         [seiClientId]: {
-          EIPS: {},
-          status: NetworkStatus.Available,
-        },
-      },
-    });
-  }
-
-  /**
-   * Injects and selects a custom EVM network that is absent from the default
-   * fixture, pointing its RPC endpoint at the local Anvil node on port 8545.
-   *
-   * Chains that ship in the default fixture should use
-   * {@link withNetworkRpcUrlOnLocalhost} instead; this method throws nothing
-   * when the chain is missing — it injects the config. Prefer
-   * `prepareCustomNetwork` from `test/e2e/helpers/custom-network-harness.ts`
-   * for custom-network E2E specs so enablement, native asset ids, and Token/Price
-   * mocks stay behind one interface.
-   *
-   * @param config - Custom network configuration.
-   * @param config.chainId - Hex chain id (e.g. `0x6f0` for Injective).
-   * @param config.clientId - Network client id used as the rpc endpoint key.
-   * @param config.name - Display name shown in the network picker.
-   * @param config.nativeCurrency - Native currency ticker (e.g. `INJ`).
-   * @param config.blockExplorerUrl - Block explorer URL for the chain.
-   * @returns The builder for further chaining.
-   */
-  withNetworkControllerOnCustomNetwork(config: {
-    chainId: Hex;
-    clientId: string;
-    name: string;
-    nativeCurrency: string;
-    blockExplorerUrl: string;
-  }): this {
-    return this.withNetworkController({
-      selectedNetworkClientId: config.clientId,
-      networkConfigurationsByChainId: {
-        [config.chainId]: {
-          blockExplorerUrls: [config.blockExplorerUrl],
-          chainId: config.chainId,
-          defaultBlockExplorerUrlIndex: 0,
-          defaultRpcEndpointIndex: 0,
-          name: config.name,
-          nativeCurrency: config.nativeCurrency,
-          rpcEndpoints: [
-            {
-              networkClientId: config.clientId,
-              type: RpcEndpointType.Custom,
-              url: 'http://localhost:8545',
-            },
-          ],
-        },
-      },
-      networksMetadata: {
-        [config.clientId]: {
           EIPS: {},
           status: NetworkStatus.Available,
         },
@@ -1474,7 +1376,6 @@ class FixtureBuilderV2 {
       isAccountSyncingEnabled: false,
       isBackupAndSyncEnabled: false,
       isContactSyncingEnabled: false,
-      isRampsSyncingEnabled: false,
     });
   }
 

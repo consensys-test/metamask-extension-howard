@@ -1,7 +1,6 @@
 import { escapeRegExp } from 'lodash';
 import { BUILT_IN_CUSTOM_NETWORKS_RPC } from '@metamask/controller-utils';
 import { CHAIN_SPEC_URL, FEATURED_RPCS } from '../constants/network';
-import { type CachedFetchStorageEntry } from './fetch-with-cache';
 import { getStorageItem } from './storage-helpers';
 
 const cacheKey = `cachedFetch:${CHAIN_SPEC_URL}`;
@@ -45,9 +44,8 @@ const KNOWN_CUSTOM_ENDPOINT_URLS = [
  */
 export async function getSafeChainsListFromCacheOnly(): Promise<ChainInfo[]> {
   try {
-    const { cachedResponse } =
-      (await getStorageItem<CachedFetchStorageEntry>(cacheKey)) ?? {};
-    return Array.isArray(cachedResponse) ? (cachedResponse as ChainInfo[]) : [];
+    const { cachedResponse } = (await getStorageItem(cacheKey)) || {};
+    return cachedResponse || [];
   } catch (error) {
     console.error('Error retrieving chains list from cache', error);
     return [];

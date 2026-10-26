@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Hex } from '@metamask/utils';
 import { GasFeeEstimates } from '@metamask/gas-fee-controller';
 import { TransactionMeta } from '@metamask/transaction-controller';
@@ -38,34 +38,44 @@ export const MaxBaseFeeInput = ({
     currentConfirmation?.txParams?.maxFeePerGas as string,
   ).toString();
   const [value, setValue] = useState(initialMaxBaseFee);
+  const [error, setError] = useState<string | undefined>(undefined);
 
   const { gasFeeEstimates } = useGasFeeEstimates(
     currentConfirmation?.networkClientId,
   );
 
-  const maxPriorityFeeInDec = hexWEIToDecGWEI(maxPriorityFeePerGas).toString();
+  const validateMaxBaseFeeCallback = useCallback(
+    (valueToBeValidated: string): string | undefined => {
+      const maxPriorityFeeInDec =
+        hexWEIToDecGWEI(maxPriorityFeePerGas).toString();
 
-  const error = useMemo(
-    () => validateMaxBaseFee(value, maxPriorityFeeInDec, t),
-    [maxPriorityFeeInDec, t, value],
+      const validationError = validateMaxBaseFee(
+        valueToBeValidated,
+        maxPriorityFeeInDec,
+        t,
+      );
+      setError(validationError);
+      return validationError;
+    },
+    [maxPriorityFeePerGas, t],
   );
 
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = event.target.value;
-      const validationError = validateMaxBaseFee(
-        newValue,
-        maxPriorityFeeInDec,
-        t,
-      );
+      const validationError = validateMaxBaseFeeCallback(newValue);
       setValue(newValue);
       if (!validationError) {
         const updatedMaxBaseFee = decGWEIToHexWEI(newValue) as Hex;
         onChange(updatedMaxBaseFee);
       }
     },
-    [maxPriorityFeeInDec, onChange, t],
+    [onChange, validateMaxBaseFeeCallback],
   );
+
+  useEffect(() => {
+    validateMaxBaseFeeCallback(value);
+  }, [validateMaxBaseFeeCallback, value]);
 
   useEffect(() => {
     onErrorChange(error);

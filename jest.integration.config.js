@@ -1,5 +1,4 @@
 const consoleReporterRules = require('./test/jest/console-reporter-rules-integration');
-const { ESM_DEPENDENCIES_TO_TRANSPILE } = require('./test/jest/constants');
 
 module.exports = {
   collectCoverageFrom: [
@@ -75,9 +74,7 @@ module.exports = {
     '^(?!.*\\.(js|jsx|mjs|cjs|ts|tsx|css|json)$)':
       'jest-preview/transforms/file',
   },
-  transformIgnorePatterns: [
-    `/node_modules/(?!(${ESM_DEPENDENCIES_TO_TRANSPILE.join('|')})/)`,
-  ],
+  transformIgnorePatterns: ['/node_modules/'],
   // Ensure console output is buffered (not streamed) so reporters can access testResult.console
   // Without this, Jest uses verbose mode for single-file runs which bypasses buffering
   verbose: false,

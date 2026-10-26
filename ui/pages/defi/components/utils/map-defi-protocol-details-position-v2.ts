@@ -8,10 +8,7 @@ import {
   type DeFiUnderlyingPosition,
 } from '@metamask/assets-controllers';
 import { decimalToPrefixedHex } from '../../../../../shared/lib/conversion.utils';
-import {
-  isEvmChainId,
-  isNativeCaipAssetId,
-} from '../../../../../shared/lib/asset-utils';
+import { isEvmChainId } from '../../../../../shared/lib/asset-utils';
 import { toChecksumHexAddress } from '../../../../../shared/lib/hexstring-utils';
 import type { TokenWithFiatAmount } from '../../../../components/app/assets/types';
 
@@ -47,7 +44,7 @@ function toTokenCellAddress(
   );
   const hexChainId = toTokenCellChainId(position.chainId) as Hex;
 
-  if (isNativeCaipAssetId(position.assetId)) {
+  if (assetNamespace === 'slip44') {
     return getNativeTokenAddress(hexChainId);
   }
 
@@ -82,7 +79,8 @@ function getNormalizedBalance(position: DeFiUnderlyingPosition): number {
 export function mapDefiProtocolDetailsPositionV2ToToken(
   position: DeFiUnderlyingPosition,
 ): TokenWithFiatAmount {
-  const isNative = isNativeCaipAssetId(position.assetId);
+  const { assetNamespace } = parseCaipAssetType(position.assetId);
+  const isNative = assetNamespace === 'slip44';
   const normalizedBalance = getNormalizedBalance(position);
 
   return {

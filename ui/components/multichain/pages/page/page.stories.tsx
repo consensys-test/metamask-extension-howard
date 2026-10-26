@@ -1,11 +1,10 @@
 import React from 'react';
 import {
-  Button,
   ButtonIcon,
   ButtonIconSize,
-  ButtonVariant,
+  ButtonPrimary,
   IconName,
-} from '@metamask/design-system-react';
+} from '../../../component-library';
 import { BackgroundColor } from '../../../../helpers/constants/design-system';
 import { Page, Header, Content, Footer } from '.';
 
@@ -81,12 +80,10 @@ export const FullscreenStory = (args) => (
         {scrollingContent}
       </Content>
       <Footer backgroundColor={BackgroundColor.warningDefault}>
-        <Button variant={ButtonVariant.Primary} isFullWidth isDisabled>
+        <ButtonPrimary block disabled>
           Cancel
-        </Button>
-        <Button variant={ButtonVariant.Primary} isFullWidth>
-          Confirm
-        </Button>
+        </ButtonPrimary>
+        <ButtonPrimary block>Confirm</ButtonPrimary>
       </Footer>
     </Page>
   </div>
@@ -116,12 +113,10 @@ export const HeaderFooterStory = (args) => (
         Content
       </Content>
       <Footer backgroundColor={BackgroundColor.warningDefault}>
-        <Button variant={ButtonVariant.Primary} isFullWidth isDisabled>
+        <ButtonPrimary block disabled>
           Cancel
-        </Button>
-        <Button variant={ButtonVariant.Primary} isFullWidth>
-          Confirm
-        </Button>
+        </ButtonPrimary>
+        <ButtonPrimary block>Confirm</ButtonPrimary>
       </Footer>
     </Page>
   </div>
@@ -148,12 +143,10 @@ export const ScrollingStory = (args) => (
         {scrollingContent}
       </Content>
       <Footer backgroundColor={BackgroundColor.warningDefault}>
-        <Button variant={ButtonVariant.Primary} isFullWidth isDisabled>
+        <ButtonPrimary block disabled>
           Cancel
-        </Button>
-        <Button variant={ButtonVariant.Primary} isFullWidth>
-          Confirm
-        </Button>
+        </ButtonPrimary>
+        <ButtonPrimary block>Confirm</ButtonPrimary>
       </Footer>
     </Page>
   </div>

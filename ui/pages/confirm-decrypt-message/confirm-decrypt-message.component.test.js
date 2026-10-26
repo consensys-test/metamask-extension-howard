@@ -1,7 +1,7 @@
 import React from 'react';
 import configureMockStore from 'redux-mock-store';
 import { merge } from 'lodash';
-import { act, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import mockState from '../../../test/data/mock-state.json';
 import { renderWithProvider } from '../../../test/lib/render-helpers-navigate';
 import { flushPromises } from '../../../test/lib/timer-helpers';
@@ -80,16 +80,6 @@ jest.mock('../../hooks/useScrollRequired', () => ({
   useScrollRequired: jest.fn(),
 }));
 
-jest.mock('../../hooks/useCopyToClipboard', () => ({
-  useCopyToClipboard: () => [
-    false,
-    async (text) => {
-      await globalThis.navigator.clipboard.writeText(text);
-      return true;
-    },
-  ],
-}));
-
 jest.mock('../../store/actions', () => ({
   cancelDecryptMsg: jest.fn(),
   decryptMsg: jest.fn(),
@@ -136,10 +126,8 @@ describe('ConfirmDecryptMessage Component', () => {
     const result = renderWithProvider(<ConfirmDecryptMessage />, store);
 
     const unlockButton = result.getByTestId('message-lock');
-    await act(async () => {
-      fireEvent.click(unlockButton);
-      await flushPromises();
-    });
+    fireEvent.click(unlockButton);
+    await flushPromises();
 
     if (expectError) {
       await waitFor(() => {
@@ -194,10 +182,8 @@ describe('ConfirmDecryptMessage Component', () => {
     const { getByText } = renderWithProvider(<ConfirmDecryptMessage />, store);
 
     const confirmButton = getByText(messages.decrypt.message);
-    await act(async () => {
-      fireEvent.click(confirmButton);
-      await flushPromises();
-    });
+    fireEvent.click(confirmButton);
+    await flushPromises();
 
     expect(mockDecryptMsg).toHaveBeenCalled();
     expect(mockTrackEvent).toHaveBeenCalled();
@@ -207,10 +193,8 @@ describe('ConfirmDecryptMessage Component', () => {
     const { getByText } = renderWithProvider(<ConfirmDecryptMessage />, store);
 
     const confirmButton = getByText(messages.cancel.message);
-    await act(async () => {
-      fireEvent.click(confirmButton);
-      await flushPromises();
-    });
+    fireEvent.click(confirmButton);
+    await flushPromises();
 
     expect(mockCancelDecryptMsg).toHaveBeenCalled();
     expect(mockTrackEvent).toHaveBeenCalled();
@@ -229,13 +213,13 @@ describe('ConfirmDecryptMessage Component', () => {
     const copyButton = getByTestId('message-copy');
     expect(copyButton).toBeInTheDocument();
 
-    await act(async () => {
-      fireEvent.click(copyButton);
-      await flushPromises();
-    });
+    fireEvent.click(copyButton);
+    await flushPromises();
     await waitFor(() => {
       expect(mockWriteText).toHaveBeenCalledWith(mockRawSignatureMessage);
     });
+    // Settle useCopyToClipboard's setCopied(true) from writeText().then(...)
+    await flushPromises();
     expect(mockTrackEvent).toHaveBeenCalled();
   });
 
@@ -281,9 +265,7 @@ describe('ConfirmDecryptMessage Component', () => {
       const { getByTestId } = await renderAndUnlockMessage();
 
       const scrollToBottomButton = getByTestId('scroll-to-bottom');
-      await act(async () => {
-        fireEvent.click(scrollToBottomButton);
-      });
+      fireEvent.click(scrollToBottomButton);
 
       expect(spyScrollToBottomAction).toHaveBeenCalled();
     });

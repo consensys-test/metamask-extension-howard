@@ -17,15 +17,9 @@ import {
   hasTransactionType,
   isPerpsWithdrawTransaction,
 } from '../../../../shared/lib/transactions.utils';
-import {
-  isMoneyAccountChildTx,
-  isMoneyAccountTx,
-} from '../../../helpers/money/money-transaction-guards';
-import { isKnownMoneyBatchChild } from '../../../helpers/money/money-batch-registry';
 import type { RouteMessengerFromCapabilities } from '../../../messengers/route-messenger';
 import { defineAllowedRouteCapabilities } from '../../../helpers/route-messenger-helpers';
 import type { MetaMaskReduxState } from '../../../store/store';
-import { selectTransactions } from '../../../selectors/transactionController';
 import {
   dismissToast,
   showPendingToast,
@@ -34,7 +28,6 @@ import {
 } from './shared';
 import {
   clearToastPhase,
-  setApprovedOrSignedToastPhase,
   shouldShowPendingToast,
   shouldShowTerminalToast,
 } from './toast-lifecycle';
@@ -66,28 +59,15 @@ const earlyPendingToastTypes = new Set([
   TransactionType.musdClaim,
 ]);
 
-// Separate batch txs that share one toast with the main send/swap/bridge tx.
-export const batchHelperTransactionTypes = [
-  TransactionType.bridgeApproval,
-  TransactionType.swapApproval,
-  TransactionType.gasPayment,
-];
-
-function isExcludedTransactionType(
-  transactionMeta: TransactionMeta,
-  transactions: TransactionMeta[],
-): boolean {
+function isExcludedTransactionType(transactionMeta: TransactionMeta): boolean {
+  // Top-level only — nested swapApproval inside batch txs must still toast.
   if (
-    transactionMeta.type &&
-    batchHelperTransactionTypes.includes(transactionMeta.type)
+    transactionMeta.type === TransactionType.bridgeApproval ||
+    transactionMeta.type === TransactionType.swapApproval
   ) {
     return true;
   }
-  return (
-    hasTransactionType(transactionMeta, excludedTransactionTypes) ||
-    isMoneyAccountTx(transactionMeta) ||
-    isMoneyAccountChildTx(transactionMeta, transactions)
-  );
+  return hasTransactionType(transactionMeta, excludedTransactionTypes);
 }
 
 const failedStatuses = new Set(['failed', 'dropped', 'rejected', 'cancelled']);
@@ -185,11 +165,7 @@ export function useTransactionEventToasts(): void {
         return;
       }
 
-      const transactions = selectTransactions(store.getState());
-      if (
-        isKnownMoneyBatchChild(id) ||
-        isExcludedTransactionType(transactionMeta, transactions)
-      ) {
+      if (isExcludedTransactionType(transactionMeta)) {
         return;
       }
 
@@ -199,13 +175,6 @@ export function useTransactionEventToasts(): void {
         to: getDetailsRoute(chainId, hash),
       };
 
-      if (
-        status === TransactionStatus.approved ||
-        status === TransactionStatus.signed
-      ) {
-        setApprovedOrSignedToastPhase(id);
-      }
-
       if (isPendingToastStatus(transactionMeta, status)) {
         if (shouldShowPendingToast(id)) {
           showPendingToast(toastId, props);
@@ -214,6 +183,7 @@ export function useTransactionEventToasts(): void {
         showSuccessToast(toastId, props);
       } else if (failedStatuses.has(status)) {
         if (transactionMeta.replacedById) {
+          const transactions = store.getState().metamask?.transactions ?? [];
           if (
             isSpeedUpReplacement(transactionMeta.replacedById, transactions)
           ) {

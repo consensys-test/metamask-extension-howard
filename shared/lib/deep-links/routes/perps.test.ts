@@ -105,7 +105,6 @@ describe('perpsRoute', () => {
       [
         'all',
         'crypto',
-        'memecoin',
         'stock',
         'pre-ipo',
         'index',

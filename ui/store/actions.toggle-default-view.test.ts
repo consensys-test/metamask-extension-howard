@@ -161,6 +161,10 @@ describe('toggleDefaultView', () => {
       await store.dispatch(toggleDefaultView() as never);
 
       expect(browserMock.sidePanel.open).toHaveBeenCalledWith({ windowId: 1 });
+      expect(setPreferenceCalls(setPreferenceBackground)).not.toContainEqual([
+        'useSidePanelAsDefault',
+        true,
+      ]);
       expect(closeSpy).not.toHaveBeenCalled();
     });
 

@@ -72,7 +72,7 @@ export class AddressBookPetnamesBridge extends AbstractPetnamesBridge<
           name,
           variation: normalizedChainId,
           type: NameType.ETHEREUM_ADDRESS,
-          sourceId: isEns ? 'npm:@metamask/ens-resolver-snap' : undefined,
+          sourceId: isEns ? 'ens' : undefined,
           origin: NameOrigin.ADDRESS_BOOK,
         });
       }

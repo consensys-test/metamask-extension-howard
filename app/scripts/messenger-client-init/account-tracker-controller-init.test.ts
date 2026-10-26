@@ -109,7 +109,6 @@ describe('AccountTrackerControllerInit', () => {
       accountsApiChainIds: expect.any(Function),
       fetchingEnabled: expect.any(Function),
       isOnboarded: expect.any(Function),
-      isDeprecated: expect.any(Function),
     });
   });
 

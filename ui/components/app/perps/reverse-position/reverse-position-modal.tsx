@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
   BoxFlexDirection,
@@ -44,7 +44,6 @@ import { PERPS_TOAST_KEYS, usePerpsToast } from '../perps-toast';
 import { PerpsGeoBlockModal } from '../perps-geo-block-modal';
 import { PerpsFeesDisplay } from '../perps-fees-display';
 import { usePerpsOrderFees } from '../../../../hooks/perps/usePerpsOrderFees';
-import { getPerpsNotionalUsd } from '../../../../hooks/perps/perps-fee-utils';
 import type { Position } from '../types';
 import { useVipTier } from '../../../../hooks/rewards/useVipTier';
 import { useSelectedAccountComplianceGate } from '../../compliance';
@@ -82,13 +81,11 @@ export const ReversePositionModal = ({
   const { gate } = useSelectedAccountComplianceGate();
   const [isGeoBlockModalOpen, setIsGeoBlockModalOpen] = useState(false);
 
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
+  useEffect(() => {
     if (isOpen) {
       setIsGeoBlockModalOpen(false);
     }
-  }
+  }, [isOpen]);
 
   usePerpsEventTracking({
     eventName: MetaMetricsEventName.PerpsScreenViewed,
@@ -111,20 +108,6 @@ export const ReversePositionModal = ({
       ? `${t('perpsLong')} → ${t('perpsShort')}`
       : `${t('perpsShort')} → ${t('perpsLong')}`;
   const sizeNum = Math.abs(parseFloat(position.size));
-  // flipPosition resolves its fee against twice the controller position value.
-  let flipNotionalUsd: number | undefined;
-  try {
-    flipNotionalUsd = getPerpsNotionalUsd({
-      usdAmount: position.positionValue,
-      multiplier: 2,
-      allowEmpty: false,
-    });
-  } catch (notionalError) {
-    if (!(notionalError instanceof RangeError)) {
-      throw notionalError;
-    }
-    // Invalid live values leave the preview unavailable until the next update.
-  }
   const estSizeLabel = `${formatPositionSize(sizeNum, sizeDecimals)} ${getDisplaySymbol(position.symbol)}`;
 
   const {
@@ -138,31 +121,28 @@ export const ReversePositionModal = ({
   } = usePerpsOrderFees({
     symbol: position.symbol,
     orderType: 'market',
-    amount: flipNotionalUsd?.toString(),
   });
 
   const estimatedFees = useMemo(
     () =>
-      feeRate === undefined || flipNotionalUsd === undefined
-        ? undefined
-        : flipNotionalUsd * feeRate,
-    [flipNotionalUsd, feeRate],
+      feeRate === undefined ? undefined : 2 * sizeNum * currentPrice * feeRate,
+    [sizeNum, currentPrice, feeRate],
   );
 
   const originalEstimatedFees = useMemo(
     () =>
-      undiscountedFeeRate === undefined || flipNotionalUsd === undefined
+      undiscountedFeeRate === undefined
         ? undefined
-        : flipNotionalUsd * undiscountedFeeRate,
-    [flipNotionalUsd, undiscountedFeeRate],
+        : 2 * sizeNum * currentPrice * undiscountedFeeRate,
+    [sizeNum, currentPrice, undiscountedFeeRate],
   );
 
   const estimatedMetamaskFee = useMemo(
     () =>
-      metamaskFeeRate === undefined || flipNotionalUsd === undefined
+      metamaskFeeRate === undefined
         ? undefined
-        : flipNotionalUsd * metamaskFeeRate,
-    [flipNotionalUsd, metamaskFeeRate],
+        : 2 * sizeNum * currentPrice * metamaskFeeRate,
+    [sizeNum, currentPrice, metamaskFeeRate],
   );
 
   const shouldShowFeePlaceholder =
@@ -387,7 +367,7 @@ export const ReversePositionModal = ({
             submitButtonProps={{
               'data-testid': 'perps-reverse-position-modal-save',
               children: isSubmitting ? t('perpsSubmitting') : t('confirm'),
-              disabled: isSubmitting || flipNotionalUsd === undefined,
+              disabled: isSubmitting,
             }}
           />
         </ModalContent>

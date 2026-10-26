@@ -7,7 +7,6 @@ import {
   type SmartTransaction,
   type SmartTransactionsNetworkConfig,
   type SignedTransactionWithMetadata,
-  getErrorData,
 } from '@metamask/smart-transactions-controller';
 import {
   TransactionController,
@@ -20,6 +19,7 @@ import type { Hex } from '@metamask/utils';
 import log from 'loglevel';
 import { Messenger } from '@metamask/messenger';
 import { ORIGIN_METAMASK } from '../../../../shared/constants/app';
+import { CANCEL_GAS_LIMIT_DEC } from '../../../../shared/constants/smartTransactions';
 import { decimalToHex } from '../../../../shared/lib/conversion.utils';
 import {
   getIsSmartTransaction,
@@ -130,7 +130,7 @@ class SmartTransactionHook {
     this.#transactions = transactions;
   }
 
-  async submit(): Promise<{ transactionHash?: string; getFeesError?: string }> {
+  async submit() {
     const isUnsupportedTransactionTypeForSmartTransaction =
       this.#transactionMeta.type
         ? [
@@ -167,11 +167,7 @@ class SmartTransactionHook {
           'Error in smart transaction publish hook, falling back to regular transaction submission',
           error,
         );
-        // Fallback to regular transaction submission and expose the error to the caller.
-        return {
-          ...useRegularTransactionSubmit,
-          getFeesError: getErrorData(error),
-        };
+        return useRegularTransactionSubmit; // Fallback to regular transaction submission.
       }
     }
     try {
@@ -332,6 +328,7 @@ class SmartTransactionHook {
       // Single transaction mode requiring signing
       const signed = await this.#createSignedTransactions(
         getFeesResponse.tradeTxFees?.fees ?? [],
+        false,
       );
       signedTransactionsWithMetadata = signed.map((signedTx) => ({
         tx: signedTx,
@@ -348,6 +345,7 @@ class SmartTransactionHook {
     const submitRequest: SmartTransactionSubmitSignedTransactionsRequest = {
       signedTransactions,
       signedTransactionsWithMetadata,
+      signedCanceledTransactions: [],
       txParams,
       transactionMeta,
       networkClientId: this.#transactionMeta.networkClientId,
@@ -358,25 +356,38 @@ class SmartTransactionHook {
     );
   }
 
-  #applyFeeToTransaction(fee: Fee): TransactionParams {
+  #applyFeeToTransaction(fee: Fee, isCancel: boolean): TransactionParams {
     if (!this.#txParams) {
       throw new Error('Transaction params are required');
     }
 
-    return {
+    const unsignedTransaction = {
       ...this.#txParams,
       maxFeePerGas: `0x${decimalToHex(fee.maxFeePerGas)}`,
       maxPriorityFeePerGas: `0x${decimalToHex(fee.maxPriorityFeePerGas)}`,
+      gas: isCancel
+        ? `0x${decimalToHex(CANCEL_GAS_LIMIT_DEC)}` // It has to be 21000 for cancel transactions, otherwise the API would reject it.
+        : this.#txParams.gas,
     } as TransactionParams;
+
+    if (isCancel) {
+      unsignedTransaction.to = unsignedTransaction.from;
+      unsignedTransaction.data = '0x';
+    }
+
+    return unsignedTransaction;
   }
 
-  async #createSignedTransactions(fees: Fee[]): Promise<string[]> {
+  async #createSignedTransactions(
+    fees: Fee[],
+    isCancel: boolean,
+  ): Promise<string[]> {
     if (!this.#txParams || !this.#chainId) {
       throw new Error('Transaction params and chainId are required');
     }
 
     const unsignedTransactions = fees.map((fee) => {
-      return this.#applyFeeToTransaction(fee);
+      return this.#applyFeeToTransaction(fee, isCancel);
     });
 
     const transactionsWithChainId = unsignedTransactions.map((tx) => ({

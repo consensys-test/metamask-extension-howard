@@ -5,7 +5,7 @@ import FixtureBuilderV2 from '../../../fixtures/fixture-builder-v2';
 import { login } from '../../../page-objects/flows/login.flow';
 import { addAccount } from '../../../page-objects/flows/add-account.flow';
 import ConnectAccountConfirmation from '../../../page-objects/pages/confirmations/connect-account-confirmation';
-import EditConnectedAccountsPage from '../../../page-objects/pages/permission/edit-connected-accounts-page';
+import EditConnectedAccountsModal from '../../../page-objects/pages/dialog/edit-connected-accounts-modal';
 import TestDappMultichain from '../../../page-objects/pages/test-dapp-multichain';
 import { DEFAULT_MULTICHAIN_TEST_DAPP_FIXTURE_OPTIONS } from '../testHelpers';
 
@@ -80,12 +80,12 @@ describe('Multichain API - Non EVM', function () {
           await connectAccountConfirmation.checkPageIsLoaded();
           await connectAccountConfirmation.openEditAccountsModal();
 
-          const editConnectedAccountsPage = new EditConnectedAccountsPage(
+          const editConnectedAccountsModal = new EditConnectedAccountsModal(
             driver,
           );
-          await editConnectedAccountsPage.checkPageIsLoaded();
+          await editConnectedAccountsModal.checkPageIsLoaded();
 
-          await editConnectedAccountsPage.waitForAccountSelectedStatus({
+          await editConnectedAccountsModal.waitForAccountSelectedStatus({
             accountIndex: 1,
             status: 'selected',
           });

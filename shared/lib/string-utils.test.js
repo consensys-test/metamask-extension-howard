@@ -2,7 +2,6 @@ import {
   isEqualCaseInsensitive,
   prependZero,
   toCamelCase,
-  toSnakeCase,
 } from './string-utils';
 
 describe('string-utils', () => {
@@ -40,13 +39,6 @@ describe('string-utils', () => {
 
     it('converts multi-segment kebab-case to camelCase', () => {
       expect(toCamelCase('my-variable-name')).toBe('myVariableName');
-    });
-  });
-
-  describe('toSnakeCase', () => {
-    it('converts camelCase to snake_case', () => {
-      expect(toSnakeCase('walletAddress')).toBe('wallet_address');
-      expect(toSnakeCase('traceId')).toBe('trace_id');
     });
   });
 });

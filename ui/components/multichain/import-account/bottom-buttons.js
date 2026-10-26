@@ -5,7 +5,7 @@ import {
   ButtonSize,
   ButtonVariant,
 } from '@metamask/design-system-react';
-import { Box } from '../../component-library';
+import { Box, ButtonPrimary, ButtonPrimarySize } from '../../component-library';
 import { Display } from '../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 
@@ -28,7 +28,7 @@ export default function BottomButtons({
       >
         {t('cancel')}
       </Button>
-      <Button
+      <ButtonPrimary
         onClick={async () => {
           try {
             const result = await importAccountFunc();
@@ -39,14 +39,13 @@ export default function BottomButtons({
             // Take no action
           }
         }}
-        isDisabled={isPrimaryDisabled}
-        size={ButtonSize.Lg}
-        variant={ButtonVariant.Primary}
+        disabled={isPrimaryDisabled}
+        size={ButtonPrimarySize.Lg}
         data-testid="import-account-confirm-button"
-        isFullWidth
+        block
       >
         {t('import')}
-      </Button>
+      </ButtonPrimary>
     </Box>
   );
 }

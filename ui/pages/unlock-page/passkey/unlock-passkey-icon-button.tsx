@@ -15,10 +15,7 @@ import {
   MetaMetricsEventName,
 } from '../../../../shared/constants/metametrics';
 import { useI18nContext } from '../../../hooks/useI18nContext';
-import {
-  getPasskeyAuthenticatorId,
-  getPasskeyDerivationMethod,
-} from '../../../selectors';
+import { getPasskeyDerivationMethod } from '../../../selectors';
 
 export type UnlockPasskeyIconButtonProps = {
   disabled: boolean;
@@ -33,7 +30,6 @@ export const UnlockPasskeyIconButton = ({
   const passkeyMethodLabel = t(getPasskeyAuthMethodKey());
   const { trackEvent, createEventBuilder } = useAnalytics();
   const passkeyDerivationMethod = useSelector(getPasskeyDerivationMethod);
-  const passkeyAuthenticatorId = useSelector(getPasskeyAuthenticatorId);
 
   const handleClick = useCallback(() => {
     trackEvent(
@@ -43,19 +39,11 @@ export const UnlockPasskeyIconButton = ({
           status: 'passkey_icon_clicked',
           // eslint-disable-next-line @typescript-eslint/naming-convention
           derivation_method: passkeyDerivationMethod,
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          authenticator_id: passkeyAuthenticatorId,
         })
         .build(),
     );
     onClick();
-  }, [
-    onClick,
-    passkeyDerivationMethod,
-    trackEvent,
-    createEventBuilder,
-    passkeyAuthenticatorId,
-  ]);
+  }, [onClick, passkeyDerivationMethod, trackEvent, createEventBuilder]);
 
   return (
     <ButtonIcon

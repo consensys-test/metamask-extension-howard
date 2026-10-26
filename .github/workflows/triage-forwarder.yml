@@ -19,10 +19,8 @@ jobs:
     steps:
       - name: Determine trigger mode
         id: trigger
-        env:
-          GITHUB_EVENT_ACTION: ${{ github.event.action }}
         run: |
-          if [ "${GITHUB_EVENT_ACTION}" = "opened" ]; then
+          if [ "${{ github.event.action }}" = "opened" ]; then
             TRIGGER_MODE="on_create"
           else
             TRIGGER_MODE="label"
@@ -55,9 +53,6 @@ jobs:
       - name: Dispatch to triage-agent
         env:
           TOKEN: ${{ steps.exchange.outputs.token }}
-          GITHUB_EVENT_REPOSITORY_NAME: ${{ github.event.repository.name }}
-          GITHUB_EVENT_ACTION: ${{ github.event.action }}
-          GITHUB_EVENT_LABEL_NAME: ${{ github.event.label.name }}
         run: |
           curl -sSf -X POST \
             -H "Authorization: token $TOKEN" \
@@ -65,9 +60,9 @@ jobs:
             "https://api.github.com/repos/MetaMask/triage-agent/dispatches" \
             -d "$(jq -cn \
               --arg owner "${{ github.repository_owner }}" \
-              --arg name "${GITHUB_EVENT_REPOSITORY_NAME}" \
+              --arg name "${{ github.event.repository.name }}" \
               --arg number "${{ github.event.issue.number }}" \
-              --arg action "${GITHUB_EVENT_ACTION}" \
-              --arg label "${GITHUB_EVENT_LABEL_NAME}" \
+              --arg action "${{ github.event.action }}" \
+              --arg label "${{ github.event.label.name }}" \
               --arg trigger_mode "${{ steps.trigger.outputs.trigger_mode }}" \
               '{event_type: "triage-issue", client_payload: {repo_owner: $owner, repo_name: $name, issue_number: $number, event_action: $action, event_label_name: $label, trigger_mode: $trigger_mode}}')"

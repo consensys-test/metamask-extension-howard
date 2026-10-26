@@ -262,3 +262,9 @@ export function selectTransactionAvailableBalance(
   const accounts = getMetaMaskAccounts(state, chainId);
   return accounts[sender]?.balance;
 }
+const maxValueModeSelector = (state) => state.confirmTransaction.maxValueMode;
+
+export function selectMaxValueModeForTransaction(state, transactionId) {
+  const maxValueModes = maxValueModeSelector(state);
+  return maxValueModes[transactionId];
+}

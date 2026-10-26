@@ -15,7 +15,7 @@ import {
 import {
   getFirstTimeFlowType,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
   getIsSocialLoginFlow,
   getIsPasskeyFeatureAvailable,
@@ -58,9 +58,9 @@ export default function CreatePassword({
   importWithRecoveryPhrase,
   secretRecoveryPhrase,
 }: CreatePasswordProps) {
-  const [walletSetupInProgress, setWalletSetupInProgress] = useState(false);
+  const [newAccountCreationInProgress, setNewAccountCreationInProgress] =
+    useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasCreationError, setHasCreationError] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const isFirefox = useIsFirefox();
@@ -76,35 +76,14 @@ export default function CreatePassword({
   const utmProperties = useSelector(getDeferredDeepLinkParameters);
 
   const isOptedIn = useSelector(getOptedIn);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const analyticsId = useSelector(getAnalyticsId);
   const accountTypeForMetrics = useSelector(getAccountTypeForOnboardingMetrics);
   const base64AnalyticsId = Buffer.from(analyticsId ?? '').toString('base64');
-
-  const startOnboardingWalletSetupTrace = (traceName: TraceName) => {
-    bufferedTrace?.({
-      name: traceName,
-      op: TraceOperation.OnboardingUserJourney,
-      data: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        account_type: accountTypeForMetrics,
-      },
-      parentContext: onboardingParentContext?.current,
-    });
-  };
-
-  const endOnboardingWalletSetupTrace = useCallback(
-    (traceName: TraceName, success: boolean) => {
-      bufferedEndTrace?.({
-        name: traceName,
-        data: { success },
-      });
-    },
-    [bufferedEndTrace],
-  );
-
   const shouldInjectMetametricsIframe = Boolean(
-    consentDecisionMade && isOptedIn && base64AnalyticsId,
+    completedMetaMetricsOnboarding && isOptedIn && base64AnalyticsId,
   );
   const analyticsIframeQuery = {
     mmi: base64AnalyticsId,
@@ -123,7 +102,11 @@ export default function CreatePassword({
   }, [dispatch, navigate]);
 
   useEffect(() => {
-    if (currentKeyring && !walletSetupInProgress && !isWalletResetInProgress) {
+    if (
+      currentKeyring &&
+      !newAccountCreationInProgress &&
+      !isWalletResetInProgress
+    ) {
       // route to passkey setup
       if (
         isPasskeyFeatureAvailable &&
@@ -146,7 +129,7 @@ export default function CreatePassword({
           navigate(ONBOARDING_COMPLETION_ROUTE, { replace: true });
         } else {
           navigate(
-            consentDecisionMade
+            completedMetaMetricsOnboarding
               ? ONBOARDING_COMPLETION_ROUTE
               : ONBOARDING_METAMETRICS,
             { replace: true },
@@ -168,9 +151,9 @@ export default function CreatePassword({
     isFirefox,
     navigate,
     firstTimeFlowType,
-    walletSetupInProgress,
+    newAccountCreationInProgress,
     secretRecoveryPhrase,
-    consentDecisionMade,
+    completedMetaMetricsOnboarding,
     isWalletResetInProgress,
     isPasskeyFeatureAvailable,
   ]);
@@ -192,26 +175,7 @@ export default function CreatePassword({
         .build(),
     );
 
-    setWalletSetupInProgress(true);
-    startOnboardingWalletSetupTrace(TraceName.OnboardingSRPAccountImportTime);
-
-    try {
-      await importWithRecoveryPhrase(password, secretRecoveryPhrase);
-      endOnboardingWalletSetupTrace(
-        TraceName.OnboardingSRPAccountImportTime,
-        true,
-      );
-    } catch (error) {
-      endOnboardingWalletSetupTrace(
-        TraceName.OnboardingSRPAccountImportTime,
-        false,
-      );
-      // reset wallet setup in progress state
-      // so that if the keyring creation succeeds,
-      // user can move on to the next step
-      setWalletSetupInProgress(false);
-      throw error;
-    }
+    await importWithRecoveryPhrase(password, secretRecoveryPhrase);
 
     bufferedEndTrace?.({ name: TraceName.OnboardingExistingSrpImport });
     bufferedEndTrace?.({ name: TraceName.OnboardingJourneyOverall });
@@ -264,22 +228,8 @@ export default function CreatePassword({
         .build(),
     );
 
-    setWalletSetupInProgress(true);
-    startOnboardingWalletSetupTrace(TraceName.OnboardingSRPAccountCreationTime);
-
-    try {
-      await createNewAccount(password);
-      endOnboardingWalletSetupTrace(
-        TraceName.OnboardingSRPAccountCreationTime,
-        true,
-      );
-    } catch (error) {
-      endOnboardingWalletSetupTrace(
-        TraceName.OnboardingSRPAccountCreationTime,
-        false,
-      );
-      throw error;
-    }
+    setNewAccountCreationInProgress(true);
+    await createNewAccount(password);
 
     if (isSocialLoginFlow) {
       bufferedEndTrace?.({ name: TraceName.OnboardingNewSocialCreateWallet });
@@ -371,7 +321,6 @@ export default function CreatePassword({
     }
 
     setIsSubmitting(true);
-    setHasCreationError(false);
     try {
       // If secretRecoveryPhrase is defined we are in import wallet flow
       if (
@@ -391,7 +340,7 @@ export default function CreatePassword({
           .addCategory(MetaMetricsEventCategory.Onboarding)
           .build(),
       );
-      setHasCreationError(true);
+      setNewAccountCreationInProgress(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -403,7 +352,6 @@ export default function CreatePassword({
         isSocialLoginFlow={isSocialLoginFlow}
         onSubmit={handleCreatePassword}
         onBack={handleBackClick}
-        error={hasCreationError}
         loading={isSubmitting}
       />
       {shouldInjectMetametricsIframe ? (

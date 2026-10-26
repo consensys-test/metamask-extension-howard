@@ -1,18 +1,21 @@
 import React, { useContext, useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import {
-  AvatarIcon,
-  AvatarIconSeverity,
-  AvatarIconSize,
-  IconColor,
-  IconName,
-} from '@metamask/design-system-react';
 import { I18nContext } from '../../../contexts/i18n';
 import Confusable from '../../ui/confusable';
-import { Box, BadgeWrapper, Text } from '../../component-library';
+import {
+  Box,
+  AvatarIcon,
+  AvatarIconSize,
+  BadgeWrapper,
+  IconName,
+  Text,
+} from '../../component-library';
 import {
   AlignItems,
   Display,
+  BackgroundColor,
+  BorderColor,
+  IconColor,
   TextColor,
   TextVariant,
 } from '../../../helpers/constants/design-system';
@@ -102,11 +105,14 @@ export const DomainInputResolutionCell = ({
             <AvatarIcon
               iconName={IconName.Snaps}
               size={AvatarIconSize.Xs}
-              severity={AvatarIconSeverity.Info}
-              className="multichain-send-page__recipient__item__avatar border-2 border-background-default bg-info-default"
+              className="multichain-send-page__recipient__item__avatar"
+              backgroundColor={BackgroundColor.infoDefault}
+              borderColor={BorderColor.backgroundDefault}
+              borderWidth={2}
               iconProps={{
-                color: IconColor.InfoInverse,
+                color: IconColor.infoInverse,
                 style: { width: '12px', height: '12px' },
+                name: IconName.Snaps,
               }}
             />
           }

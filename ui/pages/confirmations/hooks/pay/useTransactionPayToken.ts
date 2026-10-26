@@ -14,7 +14,7 @@ import { updateTransactionPaymentToken } from '../../../../store/controller-acti
 export function useTransactionPayToken(): {
   isNative?: boolean;
   payToken: TransactionPaymentToken | undefined;
-  setPayToken: (newPayToken: { address: Hex; chainId: Hex }) => Promise<void>;
+  setPayToken: (newPayToken: { address: Hex; chainId: Hex }) => void;
 } {
   const { currentConfirmation } = useConfirmContext<TransactionMeta>();
   const transactionId = currentConfirmation?.id ?? '';
@@ -27,12 +27,16 @@ export function useTransactionPayToken(): {
     payToken && payToken?.address === getNativeTokenAddress(payToken?.chainId);
 
   const setPayToken = useCallback(
-    async (newPayToken: { address: Hex; chainId: Hex }) => {
-      await updateTransactionPaymentToken({
-        transactionId: transactionId as string,
-        tokenAddress: newPayToken.address,
-        chainId: newPayToken.chainId,
-      });
+    (newPayToken: { address: Hex; chainId: Hex }) => {
+      try {
+        updateTransactionPaymentToken({
+          transactionId: transactionId as string,
+          tokenAddress: newPayToken.address,
+          chainId: newPayToken.chainId,
+        });
+      } catch (e) {
+        console.error('Error updating payment token', e);
+      }
     },
     [transactionId],
   );

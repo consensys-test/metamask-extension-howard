@@ -6,13 +6,7 @@ import {
   UserInputEventType,
 } from '@metamask/snaps-sdk';
 import { encodeBase64 } from '@metamask/snaps-utils';
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-} from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import {
   handleSnapRequest as handleSnapRequestFunction,
   updateInterfaceState,
@@ -43,15 +37,13 @@ export type HandleFileChange = (
 
 export type SetCurrentInputFocus = (name: string | null) => void;
 
-export type GetFocusedInput = () => string | null;
-
 export type SnapInterfaceContextType = {
   handleEvent: HandleEvent;
   getValue: GetValue;
   handleInputChange: HandleInputChange;
   handleFileChange: HandleFileChange;
   setCurrentFocusedInput: SetCurrentInputFocus;
-  getFocusedInput: GetFocusedInput;
+  focusedInput: string | null;
   snapId: string;
 };
 
@@ -86,7 +78,7 @@ export const SnapInterfaceContextProvider = ({
   // UI. It's kept in a ref to avoid useless re-rendering of the entire tree of
   // components.
   const internalState = useRef<InterfaceState>(initialState ?? {});
-  const focusedInputRef = useRef<string | null>(null);
+  const focusedInput = useRef<string | null>(null);
 
   // Since the internal state is kept in a reference, it won't update when the
   // interface is updated. We have to manually update it.
@@ -252,14 +244,8 @@ export const SnapInterfaceContextProvider = ({
     return undefined;
   };
 
-  const setCurrentFocusedInput: SetCurrentInputFocus = useCallback((name) => {
-    focusedInputRef.current = name;
-  }, []);
-
-  const getFocusedInput: GetFocusedInput = useCallback(
-    () => focusedInputRef.current,
-    [],
-  );
+  const setCurrentFocusedInput: SetCurrentInputFocus = (name) =>
+    (focusedInput.current = name);
 
   return (
     <SnapInterfaceContext.Provider
@@ -269,7 +255,7 @@ export const SnapInterfaceContextProvider = ({
         handleInputChange,
         handleFileChange,
         setCurrentFocusedInput,
-        getFocusedInput,
+        focusedInput: focusedInput.current,
         snapId,
       }}
     >

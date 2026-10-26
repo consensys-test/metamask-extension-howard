@@ -37,32 +37,32 @@ export function usePerpsChannel<TData>(
   const { streamManager, isInitializing } = usePerpsStreamManager();
 
   const getChannelRef = useRef(getChannel);
+  getChannelRef.current = getChannel;
+
   const emptyValueRef = useRef(emptyValue);
+  emptyValueRef.current = emptyValue;
+
   const prevResetKeyRef = useRef<string | number | undefined>(undefined);
 
-  useLayoutEffect(() => {
-    getChannelRef.current = getChannel;
-    emptyValueRef.current = emptyValue;
-  }, [getChannel, emptyValue]);
-
+  // Initialize state from cache if available (synchronous)
   const [data, setData] = useState<TData>(() => {
-    if (isInitializing || !streamManager) {
-      return emptyValue;
+    if (streamManager) {
+      return getChannelRef.current(streamManager).getCachedData();
     }
-    const channel = getChannel(streamManager);
-    return channel.hasCachedData() ? channel.getCachedData() : emptyValue;
+    return emptyValue;
   });
 
-  const hasReceivedData = useRef(
-    !isInitializing &&
-      streamManager !== null &&
-      getChannel(streamManager).hasCachedData(),
-  );
+  // Track whether we've received real data
+  const hasReceivedData = useRef(false);
   const [isInitialLoading, setIsInitialLoading] = useState(() => {
-    if (isInitializing || !streamManager) {
-      return true;
+    if (streamManager) {
+      const channel = getChannelRef.current(streamManager);
+      if (channel.hasCachedData()) {
+        hasReceivedData.current = true;
+        return false;
+      }
     }
-    return !getChannel(streamManager).hasCachedData();
+    return true;
   });
 
   useLayoutEffect(() => {
@@ -88,8 +88,10 @@ export function usePerpsChannel<TData>(
 
     if (channel.hasCachedData()) {
       setData(channel.getCachedData());
-      hasReceivedData.current = true;
-      setIsInitialLoading(false);
+      if (!hasReceivedData.current) {
+        hasReceivedData.current = true;
+        setIsInitialLoading(false);
+      }
     } else {
       // Channel was reset (e.g. account switch) — clear stale data
       // so the component shows loading instead of the old account's data.
@@ -113,10 +115,6 @@ export function usePerpsChannel<TData>(
   }, [streamManager, isInitializing]);
 
   if (!streamManager || isInitializing) {
-    if (!isInitialLoading) {
-      setData(emptyValue);
-      setIsInitialLoading(true);
-    }
     return { data: emptyValue, isInitialLoading: true };
   }
 

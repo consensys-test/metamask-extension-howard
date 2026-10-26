@@ -17,7 +17,7 @@ import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useTheme } from '../../../../../hooks/useTheme';
 import {
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
   getDataCollectionForMarketing,
 } from '../../../../../selectors';
@@ -27,9 +27,11 @@ export const BatchSellEmptySelectTokens = () => {
   const t = useI18nContext();
   const theme = useTheme();
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
-  const isMetaMetricsEnabled = consentDecisionMade && isOptedIn;
+  const isMetaMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
 
   const defiIcon =
@@ -43,7 +45,7 @@ export const BatchSellEmptySelectTokens = () => {
       'ext_batch_sell_empty',
       analyticsId,
       isMetaMetricsEnabled ?? undefined,
-      isMarketingEnabled ?? undefined,
+      isMarketingEnabled,
     );
     globalThis.platform.openTab({ url });
   }, [analyticsId, isMetaMetricsEnabled, isMarketingEnabled]);

@@ -5,7 +5,6 @@ import { enLocale as messages } from '../../../../test/lib/i18n-helpers';
 import mockState from '../../../../test/data/mock-state.json';
 import configureStore from '../../../store/store';
 import {
-  MULTICHAIN_ACCOUNT_DETAILS_PAGE_ROUTE,
   ONBOARDING_REVIEW_SRP_ROUTE,
   REVEAL_SEED_ROUTE,
 } from '../../../helpers/constants/routes';
@@ -22,18 +21,14 @@ jest.mock('react-router-dom', () => {
 });
 
 describe('MultichainSrpBackup', () => {
-  const renderComponent = (props = {}, pathname = '/') => {
+  const renderComponent = (props = {}) => {
     const store = configureStore({
       metamask: {
         ...mockState.metamask,
       },
     });
 
-    return renderWithProvider(
-      <MultichainSrpBackup {...props} />,
-      store,
-      pathname,
-    );
+    return renderWithProvider(<MultichainSrpBackup {...props} />, store);
   };
 
   beforeEach(() => {
@@ -52,11 +47,6 @@ describe('MultichainSrpBackup', () => {
 
     const buttonElement = screen.getByTestId(srpBackupRowTestId);
     expect(buttonElement).toHaveClass('multichain-srp-backup');
-    expect(
-      screen.getByRole('button', {
-        name: messages.secretRecoveryPhrase.message,
-      }),
-    ).toBeInTheDocument();
   });
 
   it('applies custom className when provided', () => {
@@ -85,22 +75,6 @@ describe('MultichainSrpBackup', () => {
 
     expect(mockUseNavigate).toHaveBeenCalledWith(
       `${ONBOARDING_REVIEW_SRP_ROUTE}/?isFromReminder=true`,
-    );
-  });
-
-  it('forwards the configured return route to the SRP review route', () => {
-    const accountDetailsPage = `${MULTICHAIN_ACCOUNT_DETAILS_PAGE_ROUTE}?accountGroupId=entropy%3A01JKAF%2F0`;
-    renderComponent({
-      shouldShowBackupReminder: true,
-      backupFlowReturnRoute: accountDetailsPage,
-    });
-
-    fireEvent.click(screen.getByTestId(srpBackupRowTestId));
-
-    expect(mockUseNavigate).toHaveBeenCalledWith(
-      `${ONBOARDING_REVIEW_SRP_ROUTE}/?isFromReminder=true&previousPage=${encodeURIComponent(
-        accountDetailsPage,
-      )}`,
     );
   });
 

@@ -18,9 +18,11 @@ import {
 import { MultichainAccountCell } from '../../../../components/multichain-accounts/multichain-account-cell';
 import { AccountTreeWallets } from '../../../../selectors/multichain-accounts/account-tree.types';
 import { selectBalanceForAllWallets } from '../../../../selectors/assets';
-import { getShowDefaultAddressPreference } from '../../../../selectors';
+import {
+  getIsDefaultAddressEnabled,
+  getShowDefaultAddressPreference,
+} from '../../../../selectors';
 import { useFormatters } from '../../../../hooks/useFormatters';
-import { getAccountGroupDisplayBalance } from '../../../../helpers/utils/account-group-balance';
 import { VirtualizedList } from '../../../../components/ui/virtualized-list/virtualized-list';
 
 type WalletGroupData =
@@ -56,6 +58,7 @@ export const WalletSelectionList = ({
 }: WalletSelectionListProps) => {
   const allBalances = useSelector(selectBalanceForAllWallets);
   const { formatCurrencyWithMinThreshold } = useFormatters();
+  const isDefaultAddressEnabled = useSelector(getIsDefaultAddressEnabled);
   const showDefaultAddress = useSelector(getShowDefaultAddressPreference);
 
   const [collapsedWallets, setCollapsedWallets] = useState<Set<string>>(
@@ -179,32 +182,26 @@ export const WalletSelectionList = ({
         );
       }
 
-      // Undefined when this group has no known balance yet, so the cell renders
-      // nothing instead of a misleading "$0.00".
-      const groupBalance = getAccountGroupDisplayBalance(
-        allBalances?.wallets?.[item.walletId]?.groups?.[item.groupId],
-      );
-      const balance =
-        groupBalance &&
-        formatCurrencyWithMinThreshold(
-          groupBalance.amount,
-          groupBalance.currency,
-        );
+      const account =
+        allBalances?.wallets?.[item.walletId]?.groups?.[item.groupId];
+      const balance = account?.totalBalanceInUserCurrency ?? 0;
+      const currency = account?.userCurrency ?? '';
 
       return (
         <MultichainAccountCell
           accountId={item.groupId}
           accountName={item.groupData.metadata.name}
           accountNameString={item.groupData.metadata.name}
-          balance={balance}
+          balance={formatCurrencyWithMinThreshold(balance, currency)}
           selected={false}
-          showDefaultAddress={showDefaultAddress}
+          showDefaultAddress={isDefaultAddressEnabled && showDefaultAddress}
         />
       );
     },
     [
       allBalances,
       formatCurrencyWithMinThreshold,
+      isDefaultAddressEnabled,
       showDefaultAddress,
       selectedSet,
       toggleWallet,

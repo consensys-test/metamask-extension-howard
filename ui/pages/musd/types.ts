@@ -92,6 +92,8 @@ export type MusdFeatureFlags = {
   earnMusdConversionGeoBlockedCountries: GeoBlockingConfig;
   /** Minimum token balance in USD for conversion eligibility */
   earnMusdConversionMinAssetBalanceRequired: number;
+  /** Enable Merkl rewards claiming (supports version gating) */
+  earnMerklCampaignClaiming: BooleanFeatureFlagValue;
 };
 
 /**

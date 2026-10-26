@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
+'use no memo';
 
 import {
   Box,
@@ -18,17 +19,15 @@ import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { RevertReason } from '../../../components/revert-reason/revert-reason';
 import { useEstimationFailed } from '../../gas/useEstimationFailed';
 import { useIsGasSponsored } from '../../gas/useIsGasSponsored';
-import { useIsMonadReserveViolation } from './useIsMonadReserveViolation';
 
 export function useGasEstimateFailedAlerts(): Alert[] {
   const t = useI18nContext();
   const estimationFailed = useEstimationFailed();
+
   const isGasSponsored = useIsGasSponsored();
-  const isMonadReserveViolation = useIsMonadReserveViolation();
 
   return useMemo(() => {
-    // Prefer the specific Monad reserve alert over a generic estimate-failed warning.
-    if (!estimationFailed || isGasSponsored || isMonadReserveViolation) {
+    if (!estimationFailed || isGasSponsored) {
       return [];
     }
 
@@ -47,7 +46,7 @@ export function useGasEstimateFailedAlerts(): Alert[] {
         severity: Severity.Warning,
       },
     ];
-  }, [t, estimationFailed, isGasSponsored, isMonadReserveViolation]);
+  }, [t, estimationFailed, isGasSponsored]);
 }
 
 function GasEstimateFailedAlertMessage() {

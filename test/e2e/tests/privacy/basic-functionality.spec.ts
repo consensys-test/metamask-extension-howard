@@ -218,7 +218,13 @@ describe('MetaMask onboarding', function () {
       await arrange();
     await withFixtures(
       {
-        fixtures: new FixtureBuilderV2({ onboarding: true }).build(),
+        fixtures: new FixtureBuilderV2({ onboarding: true })
+          .withEnabledNetworks({
+            eip155: {
+              [CHAIN_IDS.MAINNET]: true,
+            },
+          })
+          .build(),
         title: this.test?.fullTitle(),
         testSpecificMock: async (server: Mockttp) => {
           await mockFeatureFlagsForPrivacyTest(server);
@@ -234,7 +240,6 @@ describe('MetaMask onboarding', function () {
 
         const homePage = new HomePage(driver);
         await homePage.checkPageIsLoaded();
-        await homePage.checkExpectedBalanceIsDisplayed('$42,500.00');
 
         await switchToNetworkFromNetworkSelect(driver, 'Ethereum');
         const tokensTab = new TokensTab(driver);

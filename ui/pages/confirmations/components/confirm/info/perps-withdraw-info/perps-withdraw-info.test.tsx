@@ -4,7 +4,6 @@ import configureStore from '../../../../../../store/store';
 import mockState from '../../../../../../../test/data/mock-state.json';
 import { renderWithProvider } from '../../../../../../../test/lib/render-helpers-navigate';
 import { useAddToken } from '../../../../hooks/tokens/useAddToken';
-import { useDefaultPaySelectedSection } from '../../../../hooks/pay/useDefaultPaySelectedSection';
 import { usePerpsWithdrawDefaultToken } from '../../../../hooks/pay/usePerpsWithdrawDefaultToken';
 import { usePerpsLiveAccount } from '../../../../../../hooks/perps/stream';
 import { CustomAmountInfo } from '../../../info/custom-amount-info';
@@ -15,8 +14,12 @@ jest.mock('../../../../hooks/tokens/useAddToken', () => ({
   useAddToken: jest.fn(),
 }));
 
-jest.mock('../../../../hooks/pay/useDefaultPaySelectedSection', () => ({
-  useDefaultPaySelectedSection: jest.fn(),
+// `useTransactionPayPostQuote` reads the current confirmation via
+// `useConfirmContext`, which throws without a `ConfirmContextProvider`.
+// The hook itself is exercised in its own unit tests; mock it out here so
+// `PerpsWithdrawInfo` can render under the lighter `renderWithProvider`.
+jest.mock('../../../../hooks/pay/useTransactionPayPostQuote', () => ({
+  useTransactionPayPostQuote: jest.fn(),
 }));
 
 jest.mock('../../../../hooks/pay/usePerpsWithdrawDefaultToken', () => ({
@@ -44,9 +47,6 @@ jest.mock('../../../perps-confirmations/perps-withdraw-balance', () => ({
 
 const useAddTokenMock = jest.mocked(useAddToken);
 const customAmountInfoMock = jest.mocked(CustomAmountInfo);
-const useDefaultPaySelectedSectionMock = jest.mocked(
-  useDefaultPaySelectedSection,
-);
 const usePerpsWithdrawDefaultTokenMock = jest.mocked(
   usePerpsWithdrawDefaultToken,
 );
@@ -61,18 +61,11 @@ describe('PerpsWithdrawInfo', () => {
   beforeEach(() => {
     useAddTokenMock.mockReset();
     customAmountInfoMock.mockClear();
-    useDefaultPaySelectedSectionMock.mockClear();
     usePerpsWithdrawDefaultTokenMock.mockReturnValue(DEFAULT_PREFERRED_TOKEN);
     usePerpsLiveAccountMock.mockReturnValue({
       account: null,
       isInitialLoading: false,
     });
-  });
-
-  it('applies the default pay selected section', () => {
-    renderWithProvider(<PerpsWithdrawInfo />, configureStore(mockState));
-
-    expect(useDefaultPaySelectedSectionMock).toHaveBeenCalled();
   });
 
   it('registers Arbitrum USDC via useAddToken', () => {

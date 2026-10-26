@@ -3,21 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import {
   AvatarFavicon,
   AvatarFaviconSize,
+} from '@metamask/design-system-react';
+import {
+  AlignItems,
+  BackgroundColor,
+  Display,
+  IconColor,
+  JustifyContent,
+  TextAlign,
+  TextVariant,
+} from '../../../helpers/constants/design-system';
+import {
+  Box,
   ButtonIcon,
   ButtonIconSize,
-  IconColor,
   Icon,
   IconName,
   IconSize,
   Text,
-  TextAlign,
-  TextVariant,
-  Box,
-} from '@metamask/design-system-react';
-import {
-  BackgroundColor,
-  TextVariant as LegacyTextVariant,
-} from '../../../helpers/constants/design-system';
+} from '../../component-library';
 import { Header } from '../pages/page';
 import { getURLHost } from '../../../helpers/utils/util';
 import { useI18nContext } from '../../../hooks/useI18nContext';
@@ -36,7 +40,7 @@ export const PermissionsHeader = ({
   return (
     <Header
       textProps={{
-        variant: LegacyTextVariant.headingSm,
+        variant: TextVariant.headingSm,
       }}
       backgroundColor={BackgroundColor.backgroundDefault}
       startAccessory={
@@ -44,13 +48,20 @@ export const PermissionsHeader = ({
           size={ButtonIconSize.Md}
           ariaLabel={t('back')}
           iconName={IconName.ArrowLeft}
-          iconProps={{ className: IconColor.IconDefault }}
+          className="connections-header__start-accessory"
+          color={IconColor.iconDefault}
           onClick={() => navigate(PREVIOUS_ROUTE)}
           data-testid="back-button"
         />
       }
     >
-      <Box className="flex items-center justify-center gap-2">
+      <Box
+        display={Display.Flex}
+        alignItems={AlignItems.center}
+        gap={2}
+        justifyContent={JustifyContent.center}
+        className="connections-header__title"
+      >
         {connectedSubjectsMetadata?.iconUrl ? (
           <AvatarFavicon
             name={connectedSubjectsMetadata.name}
@@ -61,11 +72,12 @@ export const PermissionsHeader = ({
           <Icon
             name={IconName.Global}
             size={IconSize.Sm}
-            color={IconColor.IconDefault}
+            color={IconColor.iconDefault}
           />
         )}
         <Text
-          variant={TextVariant.HeadingSm}
+          as="span"
+          variant={TextVariant.headingSm}
           textAlign={TextAlign.Center}
           ellipsis
         >

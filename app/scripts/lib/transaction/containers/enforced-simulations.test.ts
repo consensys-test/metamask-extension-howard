@@ -44,11 +44,6 @@ const TX_PARAMS_MOCK: TransactionParams = {
 const DELEGATION_ADDRESS_MOCK =
   '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B' as Hex;
 
-// Expected `NativeBalanceChangeEnforcer` terms for a zero-tolerance decrease:
-// `0x01` (enforceDecrease) + recipient (from) + 32 zero bytes (amount = 0).
-const NO_NATIVE_DECREASE_TERMS_MOCK =
-  `0x01${remove0x(TX_PARAMS_MOCK.from as Hex)}${'00'.repeat(32)}`.toLowerCase() as Hex;
-
 const TRANSACTION_META_MOCK: TransactionMeta = {
   chainId: CHAIN_ID_MOCK,
   delegationAddress: DELEGATION_ADDRESS_MOCK,
@@ -310,56 +305,30 @@ describe('Enforced Simulations Utils', () => {
       );
     });
 
-    it('adds a no-decrease native caveat when simulationData has no native balance change', async () => {
+    it('throws when no caveats can be generated', async () => {
       const transactionMeta = cloneDeep(TRANSACTION_META_MOCK);
       transactionMeta.simulationData = {
         tokenBalanceChanges: [],
       };
 
-      const { updateTransaction } = await enforceSimulations({
-        ...options,
-        transactionMeta,
-      });
-
-      const newTransaction = cloneDeep(TRANSACTION_META_MOCK);
-      updateTransaction?.(newTransaction);
-
-      expect(newTransaction.txParams.data).toStrictEqual(
-        expect.stringContaining(
-          remove0x(
-            DELEGATOR_CONTRACTS['1.3.0']['1'].NativeBalanceChangeEnforcer,
-          ).toLowerCase(),
-        ),
-      );
-
-      expect(newTransaction.txParams.data).toStrictEqual(
-        expect.stringContaining(remove0x(NO_NATIVE_DECREASE_TERMS_MOCK)),
-      );
+      await expect(
+        enforceSimulations({
+          ...options,
+          transactionMeta,
+        }),
+      ).rejects.toThrow('No caveats generated for enforced simulations');
     });
 
-    it('adds a no-decrease native caveat when simulation data is missing', async () => {
+    it('throws when simulation data is missing', async () => {
       const transactionMeta = cloneDeep(TRANSACTION_META_MOCK);
       transactionMeta.simulationData = undefined;
 
-      const { updateTransaction } = await enforceSimulations({
-        ...options,
-        transactionMeta,
-      });
-
-      const newTransaction = cloneDeep(TRANSACTION_META_MOCK);
-      updateTransaction?.(newTransaction);
-
-      expect(newTransaction.txParams.data).toStrictEqual(
-        expect.stringContaining(
-          remove0x(
-            DELEGATOR_CONTRACTS['1.3.0']['1'].NativeBalanceChangeEnforcer,
-          ).toLowerCase(),
-        ),
-      );
-
-      expect(newTransaction.txParams.data).toStrictEqual(
-        expect.stringContaining(remove0x(NO_NATIVE_DECREASE_TERMS_MOCK)),
-      );
+      await expect(
+        enforceSimulations({
+          ...options,
+          transactionMeta,
+        }),
+      ).rejects.toThrow('No caveats generated for enforced simulations');
     });
 
     describe('applies slippage', () => {

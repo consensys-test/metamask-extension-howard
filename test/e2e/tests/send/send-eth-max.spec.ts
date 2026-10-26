@@ -96,10 +96,7 @@ describe('Send ETH - Max Amount', function () {
         const transactionConfirmation = new TransactionConfirmation(driver);
         await transactionConfirmation.checkGasFeeFiat('$0.75');
 
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'disappear',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
         await validateTransaction(driver, '-24.99945808');
       },
     );
@@ -146,10 +143,7 @@ describe('Send ETH - Max Amount', function () {
           await transactionConfirmation.checkSendAmountConversion('$42,494.90');
 
           // confirms the transaction
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'disappear',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
           await validateTransaction(driver, '-24.997');
         },
@@ -193,10 +187,7 @@ describe('Send ETH - Max Amount', function () {
           await transactionConfirmation.checkSendAmountConversion('$42,499.27');
 
           // confirms the transaction
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'disappear',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
           await validateTransaction(driver, '-24.9996');
         },
@@ -270,10 +261,7 @@ describe('Send ETH - Max Amount', function () {
         await transactionConfirmation.checkSendAmountConversion('$42,498.19');
 
         // confirms the transaction
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'disappear',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
         await validateTransaction(driver, '-24.9989');
       },
     );
@@ -311,10 +299,7 @@ describe('Send ETH - Max Amount', function () {
         await sendPage.pressContinueButton();
 
         await transactionConfirmation.checkPageIsLoaded();
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'disappear',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
         await validateTransaction(driver, '-10');
       },

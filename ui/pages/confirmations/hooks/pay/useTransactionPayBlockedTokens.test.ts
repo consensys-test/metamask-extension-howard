@@ -46,22 +46,4 @@ describe('useTransactionPayBlockedTokens', () => {
       TransactionType.moneyAccountDeposit,
     );
   });
-
-  it('resolves money-account type from nested batch transactions', () => {
-    mockUseTransactionMetadataRequestOptional.mockReturnValue({
-      type: TransactionType.batch,
-      nestedTransactions: [
-        { type: TransactionType.tokenMethodApprove },
-        { type: TransactionType.moneyAccountDeposit },
-      ],
-    } as never);
-    mockSelectBlockedPayTokens.mockReturnValue({ chainIds: [], tokens: [] });
-
-    renderHook(() => useTransactionPayBlockedTokens());
-
-    expect(mockSelectBlockedPayTokens).toHaveBeenCalledWith(
-      {},
-      TransactionType.moneyAccountDeposit,
-    );
-  });
 });

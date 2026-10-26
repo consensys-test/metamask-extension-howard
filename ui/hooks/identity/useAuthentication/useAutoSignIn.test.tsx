@@ -1,8 +1,5 @@
 import { act } from '@testing-library/react';
 import { renderHookWithProviderTyped } from '../../../../test/lib/render-helpers-navigate';
-import { FirstTimeFlowType } from '../../../../shared/constants/onboarding';
-import * as Environment from '../../../../shared/lib/environment';
-import { UPDATE_METAMASK_STATE } from '../../../store/actionConstants';
 import * as actions from '../../../store/actions';
 import { MetamaskIdentityProvider } from '../../../contexts/identity';
 import { useAutoSignIn } from './useAutoSignIn';
@@ -13,9 +10,6 @@ type ArrangeMocksMetamaskStateOverrides = {
   isSignedIn: boolean;
   completedOnboarding: boolean;
   needsProfilePairing: boolean;
-  needsSocialPairing?: boolean;
-  firstTimeFlowType?: FirstTimeFlowType;
-  isBasicFunctionalityConsolidatedEnabled?: boolean;
 };
 
 const arrangeMockState = (
@@ -26,17 +20,10 @@ const arrangeMockState = (
     metadata: { id: string };
   }[] = [],
 ) => {
-  const { isBasicFunctionalityConsolidatedEnabled, ...metamaskOverrides } =
-    stateOverrides;
-
   return {
     metamask: {
-      ...metamaskOverrides,
+      ...stateOverrides,
       keyrings,
-      preferences: {
-        isBasicFunctionalityConsolidatedEnabled:
-          isBasicFunctionalityConsolidatedEnabled ?? false,
-      },
     },
   };
 };
@@ -53,14 +40,7 @@ const arrangeMocks = () => {
   };
 };
 
-type CombinatorialOverrideKey =
-  | 'isUnlocked'
-  | 'useExternalServices'
-  | 'isSignedIn'
-  | 'completedOnboarding'
-  | 'needsProfilePairing';
-
-const prerequisitesStateKeys: CombinatorialOverrideKey[] = [
+const prerequisitesStateKeys = [
   'isUnlocked',
   'useExternalServices',
   'isSignedIn',
@@ -72,13 +52,15 @@ const shouldAutoSignInTestCases: ArrangeMocksMetamaskStateOverrides[] = [];
 const shouldNotAutoSignInTestCases: ArrangeMocksMetamaskStateOverrides[] = [];
 
 // We generate all possible combinations of the prerequisites here
-const generateCombinations = (keys: CombinatorialOverrideKey[]) => {
+const generateCombinations = (keys: string[]) => {
   const result: ArrangeMocksMetamaskStateOverrides[] = [];
   const total = 2 ** keys.length;
   for (let i = 0; i < total; i++) {
     const state = {} as ArrangeMocksMetamaskStateOverrides;
     keys.forEach((key, index) => {
-      state[key] = Boolean(Math.floor(i / 2 ** index) % 2);
+      state[key as keyof ArrangeMocksMetamaskStateOverrides] = Boolean(
+        Math.floor(i / 2 ** index) % 2,
+      );
     });
     result.push(state);
   }
@@ -209,148 +191,5 @@ describe('useAutoSignIn', () => {
     // Initial mount baselines the keyring count via `useRef`; no dispatch
     // should fire until the count actually changes between renders.
     expect(mockRequestProfilePairing).not.toHaveBeenCalled();
-  });
-
-  describe('social identifier pairing', () => {
-    beforeEach(() => {
-      jest
-        .spyOn(Environment, 'getIsSeedlessOnboardingFeatureEnabled')
-        .mockReturnValue(true);
-    });
-
-    afterEach(() => {
-      jest.restoreAllMocks();
-    });
-
-    const socialPairingReadyState = {
-      isUnlocked: true,
-      useExternalServices: true,
-      completedOnboarding: true,
-      isSignedIn: true,
-      needsProfilePairing: false,
-    };
-
-    it('forces sign-in for a social-login user when pairing is needed and consolidation is on', async () => {
-      const state = arrangeMockState({
-        ...socialPairingReadyState,
-        needsSocialPairing: true,
-        firstTimeFlowType: FirstTimeFlowType.socialCreate,
-        isBasicFunctionalityConsolidatedEnabled: true,
-      });
-      const { mockPerformSignInAction } = arrangeMocks();
-      const hook = renderHookWithProviderTyped(
-        () => useAutoSignIn(),
-        state,
-        undefined,
-        MetamaskIdentityProvider,
-      );
-
-      await act(async () => {
-        await hook.result.current.autoSignIn();
-      });
-
-      expect(mockPerformSignInAction).toHaveBeenCalled();
-    });
-
-    it('does not force sign-in for an SRP user when pairing is needed and consolidation is on', async () => {
-      const state = arrangeMockState({
-        ...socialPairingReadyState,
-        needsSocialPairing: true,
-        firstTimeFlowType: FirstTimeFlowType.create,
-        isBasicFunctionalityConsolidatedEnabled: true,
-      });
-      const { mockPerformSignInAction } = arrangeMocks();
-      const hook = renderHookWithProviderTyped(
-        () => useAutoSignIn(),
-        state,
-        undefined,
-        MetamaskIdentityProvider,
-      );
-
-      await act(async () => {
-        await hook.result.current.autoSignIn();
-      });
-
-      expect(mockPerformSignInAction).not.toHaveBeenCalled();
-    });
-
-    it('does not force sign-in for a social-login user when consolidation is off', async () => {
-      const state = arrangeMockState({
-        ...socialPairingReadyState,
-        needsSocialPairing: true,
-        firstTimeFlowType: FirstTimeFlowType.socialCreate,
-        isBasicFunctionalityConsolidatedEnabled: false,
-      });
-      const { mockPerformSignInAction } = arrangeMocks();
-      const hook = renderHookWithProviderTyped(
-        () => useAutoSignIn(),
-        state,
-        undefined,
-        MetamaskIdentityProvider,
-      );
-
-      await act(async () => {
-        await hook.result.current.autoSignIn();
-      });
-
-      expect(mockPerformSignInAction).not.toHaveBeenCalled();
-    });
-
-    it('does not force sign-in for a social-login user when pairing is not needed', async () => {
-      const state = arrangeMockState({
-        ...socialPairingReadyState,
-        needsSocialPairing: false,
-        firstTimeFlowType: FirstTimeFlowType.socialCreate,
-        isBasicFunctionalityConsolidatedEnabled: true,
-      });
-      const { mockPerformSignInAction } = arrangeMocks();
-      const hook = renderHookWithProviderTyped(
-        () => useAutoSignIn(),
-        state,
-        undefined,
-        MetamaskIdentityProvider,
-      );
-
-      await act(async () => {
-        await hook.result.current.autoSignIn();
-      });
-
-      expect(mockPerformSignInAction).not.toHaveBeenCalled();
-    });
-
-    it('forces sign-in when consolidation flips on for a social-login user that still needs pairing', async () => {
-      const state = arrangeMockState({
-        ...socialPairingReadyState,
-        needsSocialPairing: true,
-        firstTimeFlowType: FirstTimeFlowType.socialCreate,
-        isBasicFunctionalityConsolidatedEnabled: false,
-      });
-      const { mockPerformSignInAction } = arrangeMocks();
-      const hook = renderHookWithProviderTyped(
-        () => useAutoSignIn(),
-        state,
-        undefined,
-        MetamaskIdentityProvider,
-      );
-
-      await act(async () => {
-        await hook.result.current.autoSignIn();
-      });
-      expect(mockPerformSignInAction).not.toHaveBeenCalled();
-
-      await act(async () => {
-        hook.store.dispatch({
-          type: UPDATE_METAMASK_STATE,
-          value: {
-            preferences: {
-              isBasicFunctionalityConsolidatedEnabled: true,
-            },
-          },
-        });
-        await hook.result.current.autoSignIn();
-      });
-
-      expect(mockPerformSignInAction).toHaveBeenCalled();
-    });
   });
 });

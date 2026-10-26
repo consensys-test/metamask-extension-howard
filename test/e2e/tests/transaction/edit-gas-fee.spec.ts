@@ -63,10 +63,7 @@ describe('Editing Confirm Transaction', function () {
         await transactionConfirmation.checkInlineAlertIsDisplayed();
 
         // confirms the transaction
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'disappear',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
         // check transaction in activity tab
         await activityTab.goToActivityList();
@@ -110,10 +107,7 @@ describe('Editing Confirm Transaction', function () {
         await transactionConfirmation.checkGasFeeFiat('$0.30');
 
         // confirms the transaction
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'disappear',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
         await activityTab.goToActivityList();
         await activityTab.checkWaitForTransactionStatus('confirmed');
@@ -165,7 +159,7 @@ describe('Editing Confirm Transaction', function () {
         await transactionConfirmation.checkGasFeeFiat('$3.15');
 
         // confirms the transaction
-        await transactionConfirmation.clickFooterButton({ button: 'confirm' });
+        await transactionConfirmation.clickFooterConfirmButton();
 
         // transaction should correct values in activity tab
         await driver.switchToWindowWithTitle(

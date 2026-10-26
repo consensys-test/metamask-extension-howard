@@ -187,9 +187,6 @@ describe.each([
                         ).reference;
                         const validToChainId =
                           toChainId ?? validFromToken.chainId;
-                        const isNativeAsset =
-                          typeof validFromToken.assetId === 'string' &&
-                          isNativeAddress(validFromToken.assetId);
 
                         // Mock selectors and utils
                         jest
@@ -263,9 +260,13 @@ describe.each([
                           !stxEnabled
                         ) {
                           expect(result.current).toStrictEqual({
-                            gasIncluded: isNativeAsset,
+                            gasIncluded: false,
                             gasIncluded7702: false,
-                            nativeGasIncluded: isNativeAsset ? true : undefined,
+                            nativeGasIncluded: isNativeAddress(
+                              validFromToken.assetId,
+                            )
+                              ? true
+                              : undefined,
                           });
                         } else {
                           expect(result.current).toMatchSnapshot();

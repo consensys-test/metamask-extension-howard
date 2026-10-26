@@ -30,7 +30,7 @@ import {
   BadgeStatusStatus,
   IconSize,
 } from '@metamask/design-system-react';
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 
 const meta: Meta = {

@@ -616,7 +616,7 @@ describe('LedgerAdapter', () => {
 
       expect(mockOptions.onDeviceEvent).toHaveBeenCalledWith(
         expect.objectContaining({
-          event: DeviceEvent.ConnectionFailed,
+          event: DeviceEvent.Disconnected,
           error: expect.any(Error),
         }),
       );

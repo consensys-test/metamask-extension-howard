@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CaipAccountId } from '@metamask/utils';
 import type { Funding } from '@metamask/perps-controller';
 import {
@@ -181,6 +174,9 @@ export function usePerpsTransactionHistory({
     fetchGenerationRef.current += 1;
     const generation = fetchGenerationRef.current;
     try {
+      setIsLoading(true);
+      setError(null);
+
       const [fillsResult, ordersResult, funding] = await Promise.all([
         coalesceBackgroundRequest<OrderFill[]>(coalesceKeys.fills, () =>
           submitRequestToBackground<OrderFill[]>('perpsGetOrderFills', [
@@ -269,8 +265,6 @@ export function usePerpsTransactionHistory({
     // Pull-to-refresh must bypass the short-TTL coalesce cache. Drop the three
     // keys fetchAllTransactions consumes (refetchUserHistory invalidates its
     // own key internally).
-    setIsLoading(true);
-    setError(null);
     invalidateCoalescedRequest(coalesceKeys.fills);
     invalidateCoalescedRequest(coalesceKeys.orders);
     invalidateCoalescedRequest(coalesceKeys.funding);
@@ -279,9 +273,7 @@ export function usePerpsTransactionHistory({
     await fetchAllTransactions();
   }, [fetchAllTransactions, refetchUserHistory, coalesceKeys]);
 
-  const scopeFingerprint = `${perpsScopeKey}:${accountId ?? ''}:${startTime ?? ''}:${endTime ?? ''}:${forceFreshOnMount ? '1' : '0'}`;
-
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (skipInitialFetch) {
       return;
     }
@@ -290,31 +282,27 @@ export function usePerpsTransactionHistory({
     // that stays mounted across a scope transition never renders the previous
     // session's transactions. The fingerprint gate keeps unrelated re-renders
     // from triggering redundant fetches.
+    const scopeFingerprint = `${perpsScopeKey}:${accountId ?? ''}:${startTime ?? ''}:${endTime ?? ''}:${forceFreshOnMount ? '1' : '0'}`;
     if (lastFetchedScopeRef.current === scopeFingerprint) {
       return;
     }
     lastFetchedScopeRef.current = scopeFingerprint;
-    fetchGenerationRef.current += 1;
-    setIsLoading(true);
-    setError(null);
-    setTransactions([]);
     // Activity surfaces that open on user intent (e.g. PerpsActivityPage)
     // must force a fresh fetch so they never surface a stale snapshot held
     // by a sibling consumer inside the TTL window. Passive previews (e.g.
     // Recent Activity on the perps home) still share the cached snapshot.
-    // Defer so nested fetch helpers' synchronous loading resets are not in
-    // the effect body (react-hooks/set-state-in-effect).
-    queueMicrotask(() => {
-      if (forceFreshOnMount) {
-        refetch();
-      } else {
-        initialFetch();
-      }
-    });
+    if (forceFreshOnMount) {
+      refetch();
+    } else {
+      initialFetch();
+    }
   }, [
     skipInitialFetch,
     forceFreshOnMount,
-    scopeFingerprint,
+    perpsScopeKey,
+    accountId,
+    startTime,
+    endTime,
     initialFetch,
     refetch,
   ]);

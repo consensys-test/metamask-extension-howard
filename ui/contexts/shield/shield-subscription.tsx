@@ -76,7 +76,7 @@ export const useShieldSubscriptionContext = () => {
  */
 export const ShieldSubscriptionProvider = ({
   children,
-}: React.PropsWithChildren) => {
+}: React.PropsWithChildren<unknown>) => {
   const dispatch = useDispatch();
   const isBasicFunctionalityEnabled = Boolean(
     useSelector(getUseExternalServices),

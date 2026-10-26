@@ -271,7 +271,11 @@ describe('Shield Subscription Tests', function () {
           {
             fixtures: createShieldFixtureCard().build(),
             title: this.test?.fullTitle(),
-            testSpecificMock: (server: Mockttp) => {
+            testSpecificMock: async (server: Mockttp) => {
+              await mockAccountsApiV2SupportedNetworks(server);
+              await mockAccountsApiV5MultiaccountBalances(server);
+              await mockTokensV2SupportedNetworks(server);
+              await mockTokensV3Assets(server);
               const shieldMockttpService = new ShieldMockttpService();
               return shieldMockttpService.setup(server, {
                 mockNotEligible: true,

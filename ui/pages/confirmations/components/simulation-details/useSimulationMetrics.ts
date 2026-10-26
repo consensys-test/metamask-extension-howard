@@ -4,7 +4,7 @@ import {
   SimulationData,
   SimulationErrorCode,
 } from '@metamask/transaction-controller';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NameType } from '@metamask/name-controller';
 import { useTransactionEventFragment } from '../../hooks/useTransactionEventFragment';
 import {
@@ -158,7 +158,7 @@ function useIncompleteAssetEvent(
   },
 ) {
   const { trackEvent, createEventBuilder } = useAnalytics();
-  const processedAssetsRef = useRef<string[]>([]);
+  const [processedAssets, setProcessedAssets] = useState<string[]>([]);
 
   useEffect(() => {
     const assetsToTrack: {
@@ -175,7 +175,7 @@ function useIncompleteAssetEvent(
         (change.asset.address && !change.fiatAmount) ||
         getPetnameType(change, displayName) === PetnameType.Unknown;
 
-      if (!isIncomplete || processedAssetsRef.current.includes(assetAddress)) {
+      if (!isIncomplete || processedAssets.includes(assetAddress)) {
         continue;
       }
 
@@ -206,11 +206,17 @@ function useIncompleteAssetEvent(
       );
     }
 
-    processedAssetsRef.current = [
-      ...processedAssetsRef.current,
+    setProcessedAssets((currentProcessed) => [
+      ...currentProcessed,
       ...assetsToTrack.map(({ assetAddress }) => assetAddress),
-    ];
-  }, [balanceChanges, createEventBuilder, displayNamesByAddress, trackEvent]);
+    ]);
+  }, [
+    balanceChanges,
+    createEventBuilder,
+    displayNamesByAddress,
+    processedAssets,
+    trackEvent,
+  ]);
 }
 
 /** Placeholder used in metrics when asset has no contract address (e.g. native). */

@@ -95,12 +95,8 @@ function mapSourceParamToDiscovery(source: string | null): string | undefined {
   }
 }
 
-function getSourceFromSearch(search?: string): string | null {
-  return new URLSearchParams(search ?? '').get('source');
-}
-
 function isDeeplinkSearch(search?: string): boolean {
-  return getSourceFromSearch(search) === 'deeplink';
+  return new URLSearchParams(search ?? '').get('source') === 'deeplink';
 }
 
 /**
@@ -145,14 +141,14 @@ function mapUtmToProperties(
 }
 
 /**
- * Read UTM + source from the CURRENT hash query at call time. Used by
+ * Read UTM + deeplink source from the CURRENT hash query at call time. Used by
  * `usePerpsEventTracking` to stamp the entry PERPS_SCREEN_VIEWED synchronously
  * at emit time — react-router applies the destination `search` one render after
  * the hash is already correct, so the fire-once entry emit would otherwise miss
  * UTM. Returns `{}` when the hash carries no attribution, so later in-app
  * navigations fall back to the provider's sticky store.
  *
- * @returns PERPS_EVENT_PROPERTY-keyed UTM (plus source if present) from the hash.
+ * @returns PERPS_EVENT_PROPERTY-keyed UTM (plus `source=deeplink`) from the hash.
  */
 export function readScreenViewedHashAttribution(): Record<string, Json> {
   const search = getHashSearch();
@@ -160,11 +156,8 @@ export function readScreenViewedHashAttribution(): Record<string, Json> {
     return {};
   }
   const merged = mapUtmToProperties(parseUtmAttribution(search) ?? {});
-  const urlSource = getSourceFromSearch(search);
-  if (urlSource) {
-    // Map deeplink to its canonical value, pass others through as-is.
-    merged[PERPS_EVENT_PROPERTY.SOURCE] =
-      urlSource === 'deeplink' ? PERPS_EVENT_VALUE.SOURCE.DEEPLINK : urlSource;
+  if (isDeeplinkSearch(search)) {
+    merged[PERPS_EVENT_PROPERTY.SOURCE] = PERPS_EVENT_VALUE.SOURCE.DEEPLINK;
   }
   return merged;
 }
@@ -236,14 +229,14 @@ function computeFlowAttributionFromSearch(
   if (!search) {
     return {};
   }
-  const source = getSourceFromSearch(search);
+  const source = new URLSearchParams(search).get('source');
   const discoverySource = mapSourceParamToDiscovery(source);
   if (!discoverySource) {
     return {};
   }
   return {
     discoverySource,
-    ...(isDeeplinkSearch(search)
+    ...(source === 'deeplink'
       ? { entryPoint: PERPS_EVENT_VALUE.SOURCE.DEEPLINK }
       : {}),
   };
@@ -313,11 +306,11 @@ export function PerpsAttributionProvider({
       ]).catch(captureException);
     }
 
-    const source = getSourceFromSearch(search);
+    const source = new URLSearchParams(search).get('source');
     // Sticky within THIS instance: a deeplink entry stays flagged for the life
     // of this provider even after in-app navigation stops carrying
     // source=deeplink. Not persisted to the session store — source is per-entry.
-    if (isDeeplinkSearch(search)) {
+    if (source === 'deeplink') {
       setIsDeeplinkEntry(true);
     }
     const discoverySource = mapSourceParamToDiscovery(source);
@@ -325,54 +318,18 @@ export function PerpsAttributionProvider({
       setFlowAttributionState((prev) => ({
         ...prev,
         discoverySource,
-        ...(isDeeplinkSearch(search)
+        ...(source === 'deeplink'
           ? { entryPoint: PERPS_EVENT_VALUE.SOURCE.DEEPLINK }
           : {}),
       }));
     }
   }, []);
 
-  const [prevLocationSearch, setPrevLocationSearch] = useState(locationSearch);
-
-  // Sync React state from locationSearch during render; session/background
-  // persistence stays in the effect below (and in the public sync helper).
-  if (locationSearch !== prevLocationSearch) {
-    setPrevLocationSearch(locationSearch);
-    if (locationSearch) {
-      const utmContext = parseUtmAttribution(locationSearch);
-      if (utmContext) {
-        setUtmAttribution((prev) => ({ ...prev, ...utmContext }));
-      }
-
-      if (isDeeplinkSearch(locationSearch)) {
-        setIsDeeplinkEntry(true);
-      }
-      const nextFlowAttribution =
-        computeFlowAttributionFromSearch(locationSearch);
-      if (nextFlowAttribution.discoverySource) {
-        setFlowAttributionState((prev) => ({
-          ...prev,
-          ...nextFlowAttribution,
-        }));
-      }
-    }
-  }
-
   useEffect(() => {
-    if (!locationSearch) {
-      return;
+    if (locationSearch) {
+      syncUtmAttributionFromSearch(locationSearch);
     }
-
-    const utmContext = parseUtmAttribution(locationSearch);
-    if (!utmContext) {
-      return;
-    }
-
-    const mergedSessionUtm = rememberSessionUtm(utmContext);
-    submitRequestToBackground('perpsSetAttributionContext', [
-      mergedSessionUtm,
-    ]).catch(captureException);
-  }, [locationSearch]);
+  }, [locationSearch, syncUtmAttributionFromSearch]);
 
   // A fresh UI session that carries no UTM anywhere must not inherit the
   // previous session's campaign from the background singleton: replace the
@@ -395,8 +352,8 @@ export function PerpsAttributionProvider({
     );
   }, [locationSearch]);
 
-  // UTM (keyed by PERPS_EVENT_PROPERTY) plus source override, merged into every
-  // client PERPS_SCREEN_VIEWED event.
+  // UTM (keyed by PERPS_EVENT_PROPERTY) plus a deeplink source override, merged
+  // into every client PERPS_SCREEN_VIEWED event.
   const screenViewedAttribution = useMemo<Record<string, Json>>(() => {
     // Derive UTM from the CURRENT locationSearch at render time and union it
     // over the session-sticky store. The screen-view event can fire (fire-once)
@@ -414,13 +371,6 @@ export function PerpsAttributionProvider({
     // Sticky flag OR the current search — same render-time synchronicity.
     if (isDeeplinkEntry || isDeeplinkSearch(locationSearch)) {
       merged[PERPS_EVENT_PROPERTY.SOURCE] = PERPS_EVENT_VALUE.SOURCE.DEEPLINK;
-    } else {
-      // Include non-deeplink sources from URL (e.g. hyperliquid_deposit_prompt)
-      // so they override the component's default source in PERPS_SCREEN_VIEWED.
-      const urlSource = getSourceFromSearch(locationSearch);
-      if (urlSource) {
-        merged[PERPS_EVENT_PROPERTY.SOURCE] = urlSource;
-      }
     }
     return merged;
   }, [utmAttribution, isDeeplinkEntry, locationSearch]);

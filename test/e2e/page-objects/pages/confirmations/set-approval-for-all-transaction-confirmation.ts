@@ -3,20 +3,6 @@ import { Driver } from '../../../webdriver/driver';
 import { RawLocator } from '../../common';
 import TransactionConfirmation from './transaction-confirmation';
 
-/**
- * SetApprovalForAll (and revoke) confirmation on the redesigned confirm
- * screen.
- *
- * Screen: `#/confirmation` for setApprovalForAll transaction types.
- * Owns: set-approval-for-all / revoke titles and approve-transaction
- * subtitle checks.
- * Boundaries: inherits gas and shared transaction helpers from
- * `TransactionConfirmation`. ERC-20 spending-cap approvals are
- * `ERC20ApproveTransactionConfirmation`.
- * Related: `TransactionConfirmation`, `ERC20ApproveTransactionConfirmation`.
- *
- * @see ui/pages/confirmations/components/confirm/info/set-approval-for-all-info/set-approval-for-all-info.tsx
- */
 class SetApprovalForAllTransactionConfirmation extends TransactionConfirmation {
   private revokeSetApprovalForAllTitleElement: RawLocator;
 
@@ -30,15 +16,15 @@ class SetApprovalForAllTransactionConfirmation extends TransactionConfirmation {
     this.driver = driver;
 
     this.setApprovalForAllTitleElement = {
-      testId: 'confirm-title-text',
+      css: 'h2',
       text: tEn('setApprovalForAllRedesignedTitle'),
     };
     this.setApprovalForAllSubHeadingElement = {
-      testId: 'confirm-title-description',
+      css: 'p',
       text: tEn('confirmTitleDescApproveTransaction'),
     };
     this.revokeSetApprovalForAllTitleElement = {
-      testId: 'confirm-title-text',
+      css: 'h2',
       text: tEn('confirmTitleSetApprovalForAllRevokeTransaction'),
     };
   }

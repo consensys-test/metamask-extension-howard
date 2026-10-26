@@ -17,6 +17,7 @@ jest.mock('../../../../selectors/assets', () => ({
 }));
 
 jest.mock('../../../../selectors', () => ({
+  getIsDefaultAddressEnabled: () => false,
   getShowDefaultAddressPreference: () => false,
 }));
 

@@ -130,7 +130,6 @@ export const BalanceEmptyState = ({
           color={TextColor.TextDefault}
           fontWeight={FontWeight.Bold}
           textAlign={TextAlign.Center}
-          className="transition-[font-size] duration-200"
         >
           {t('fundYourWallet')}
         </Text>

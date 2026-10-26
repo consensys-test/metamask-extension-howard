@@ -74,8 +74,6 @@ function getTitleConfig(item: ActivityListItem | undefined) {
     case 'claim':
     case 'claimMusdBonus':
     case 'deposit':
-    case 'moneyAccountDeposit':
-    case 'moneyAccountWithdraw':
     case 'nftBuy':
     case 'nftMint':
     case 'nftSell':
