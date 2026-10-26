@@ -233,9 +233,9 @@ async function finalizeSignatureRequest(driver: Driver, action: string) {
   await confirmation.clickScrollToBottomButton();
 
   if (action === 'Confirm') {
-    await confirmation.clickFooterButton({ button: 'confirm' });
+    await confirmation.clickFooterConfirmButton();
   } else if (action === 'Reject') {
-    await confirmation.clickFooterButton({ button: 'cancel' });
+    await confirmation.clickFooterCancelButton();
   } else {
     throw new Error(`Unsupported action: ${action}`);
   }

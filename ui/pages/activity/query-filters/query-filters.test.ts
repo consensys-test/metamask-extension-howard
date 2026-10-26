@@ -6,6 +6,7 @@ import { isExcludedTransactionHash } from './excluded-transaction-hash';
 import { isIncomingNativeAssetTransfer } from './incoming-native-asset-transfer';
 import { isIncomingTokenTransfer } from './incoming-token-transfer';
 import { isSpamTransaction } from './spam-transactions';
+import { isTopLevelAccountTransaction } from './top-level-account-transaction';
 import { useQueryFilters } from './useQueryFilters';
 import { isZeroValueSelfSend } from './zero-value-self-send';
 
@@ -51,6 +52,15 @@ describe('query filters', () => {
         transaction({
           transactionProtocol: 'SPAM_TOKEN',
         }),
+      ),
+    ).toBe(true);
+  });
+
+  it('matches top-level account transactions', () => {
+    expect(
+      isTopLevelAccountTransaction(
+        transaction({ from: otherAddress, to: subjectAddress.toUpperCase() }),
+        subjectAddress,
       ),
     ).toBe(true);
   });

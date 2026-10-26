@@ -20,10 +20,6 @@ export type MetaData = {
    * The kind of storage being used.
    */
   storageKind?: 'data' | 'split';
-  /**
-   * Transient flag used during split-state gradual rollout migration.
-   */
-  platformSplitStateGradualRolloutAttempted?: boolean;
 };
 
 /**
@@ -63,8 +59,6 @@ export type MetaMaskStorageStructure = {
  */
 export type BaseStore = {
   setKeyValues: (pairs: Map<string, unknown>) => Promise<void>;
-
-  getBytesInUseByKey?: (keys: string[]) => Promise<Map<string, number>>;
 
   set: (state: Required<MetaMaskStorageStructure>) => Promise<void>;
 

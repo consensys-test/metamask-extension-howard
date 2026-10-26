@@ -64,10 +64,7 @@ describe('Send ETH', function () {
           await sendPage.fillAmount('1');
           await sendPage.pressContinueButton();
 
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'disappear',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
           await homePage.goToActivityList();
           await activityTab.checkTransactionActivityByText('Sent');
@@ -110,9 +107,7 @@ describe('Send ETH', function () {
             new TokenTransferTransactionConfirmation(driver);
           await tokenTransferConfirmation.checkDappInitiatedHeadingTitle();
           await tokenTransferConfirmation.clickScrollToBottomButton();
-          await tokenTransferConfirmation.clickFooterButton({
-            button: 'confirm',
-          });
+          await tokenTransferConfirmation.clickFooterConfirmButton();
 
           await driver.switchToWindowWithTitle(
             WINDOW_TITLES.ExtensionInFullScreenView,
@@ -160,10 +155,7 @@ describe('Send ETH', function () {
             amount: '1',
           });
 
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'disappear',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
           await homePage.goToActivityList();
           await activityTab.checkTransactionActivityByText('Sent');
           await activityTab.checkCompletedTxNumberDisplayedInActivity(1);

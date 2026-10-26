@@ -129,8 +129,7 @@ export default function CurrencyInput({
   };
 
   const timeoutRef = useRef(null);
-
-  // Align input to upstream value when deps change.
+  // align input to upstream value
   useEffect(() => {
     const decimalizedHexValue = new Numeric(hexValue, 16)
       .toBase(10)
@@ -154,17 +153,6 @@ export default function CurrencyInput({
     setTokenDecimalValue(newTokenDecimalValue);
     setFiatDecimalValue(newFiatDecimalValue);
 
-    // tokenDecimalValue does not need to be in here, since this side effect is only for upstream updates
-  }, [
-    hexValue,
-    asset?.address,
-    processNewDecimalValue,
-    isTokenPrimary,
-    assetDecimals,
-    isDisabled,
-  ]);
-
-  useEffect(() => {
     // timeout intentionally not cleared after render so this always runs
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -173,14 +161,15 @@ export default function CurrencyInput({
       () => inputRef.current?.updateIsOverflowing?.(),
       500,
     );
+
+    // tokenDecimalValue does not need to be in here, since this side effect is only for upstream updates
   }, [
     hexValue,
     asset?.address,
+    processNewDecimalValue,
     isTokenPrimary,
     assetDecimals,
     isDisabled,
-    tokenDecimalValue,
-    fiatDecimalValue,
   ]);
 
   const renderSwapButton = () => {

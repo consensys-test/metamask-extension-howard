@@ -4,10 +4,8 @@ import { isNonEvmChainId } from '@metamask/bridge-controller';
 import {
   type CaipChainId,
   type Hex,
-  isCaipAssetType,
   parseCaipAssetType,
 } from '@metamask/utils';
-import { isNativeCaipAssetId } from '#shared/lib/asset-utils';
 import {
   calculateFiatFromMarketRates,
   getHumanReadableTokenAmount,
@@ -120,20 +118,20 @@ function fiatFromCurrencyOrMarketRates(
   humanAmount: string,
   quantity: number,
 ): number | undefined {
-  const { assetId } = token;
-
-  if (!assetId || !isCaipAssetType(assetId)) {
+  if (!token.assetId) {
     return undefined;
   }
 
   try {
-    const { chain } = parseCaipAssetType(assetId);
+    const { chain, assetNamespace } = parseCaipAssetType(
+      token.assetId as `${string}:${string}/${string}:${string}`,
+    );
 
     // Non-EVM natives only (slip44). Symbol match is unsafe for SPL/etc.
     // tokens that reuse native tickers.
     if (
       chain.namespace !== 'eip155' &&
-      isNativeCaipAssetId(assetId) &&
+      assetNamespace === 'slip44' &&
       token.symbol
     ) {
       const rate = getPositiveRate(

@@ -4,9 +4,9 @@ import FixtureBuilderV2 from '../../fixtures/fixture-builder-v2';
 import { withFixtures } from '../../helpers';
 import { login } from '../../page-objects/flows/login.flow';
 import { installSnapSimpleKeyring } from '../../page-objects/flows/snap-simple-keyring.flow';
-import AccountListPage from '../../page-objects/pages/accounts/list-page';
-import HeaderNavbar from '../../page-objects/pages/home/header-navbar';
-import SnapSimpleKeyringPage from '../../page-objects/pages/snaps/simple-keyring-page';
+import AccountListPage from '../../page-objects/pages/account-list-page';
+import HeaderNavbar from '../../page-objects/pages/header-navbar';
+import SnapSimpleKeyringPage from '../../page-objects/pages/snap-simple-keyring-page';
 import { Driver } from '../../webdriver/driver';
 import {
   DAPP_PATH,
@@ -15,11 +15,7 @@ import {
   WINDOW_TITLES,
 } from '../../constants';
 import { mockSnapSimpleKeyringAndSite } from '../account/snap-keyring-site-mocks';
-import {
-  getMockAssetsPrice,
-  MOCK_ETH_CONVERSION_RATE,
-  mockPriceApi,
-} from '../tokens/utils/mocks';
+import { MOCK_ETH_CONVERSION_RATE, mockPriceApi } from '../tokens/utils/mocks';
 
 const MUSD_ADDRESS = '0xacA92E438df0B2401fF60dA7E4337B687a2435DA';
 
@@ -31,7 +27,7 @@ async function mockEthMainnetAndMusd(mockServer: Mockttp) {
       .always()
       .thenJson(200, {
         fullSupport: [],
-        partialSupport: [],
+        partialSupport: { balances: [] },
       }),
     await mockServer
       .forGet(/https:\/\/tokens\.api\.cx\.metamask\.io\/v3\/assets/u)
@@ -111,15 +107,16 @@ describe('Multichain Accounts - Multichain accounts list page', function (this: 
         await accountListPage.checkWalletDisplayedInAccountListMenu('Ledger');
 
         // Ensure that accounts within the wallets are displayed
-        // The balance is not loaded for a non-selected account (which was never
-        // selected before), so nothing is rendered rather than a misleading $0.00
-        await accountListPage.checkMultichainAccountBalanceNotDisplayed({
+        // The balance is not loaded for a non-selected account (which was never selected before)
+        await accountListPage.checkMultichainAccountBalanceDisplayed({
           wallet: 'Wallet 1',
           account: 'Account 1',
+          balance: '$0.00',
         });
-        await accountListPage.checkMultichainAccountBalanceNotDisplayed({
+        await accountListPage.checkMultichainAccountBalanceDisplayed({
           wallet: 'Ledger',
           account: 'Ledger 1',
+          balance: '$0.00',
         });
         await accountListPage.checkMultichainAccountNameDisplayed('Account 1');
         await accountListPage.checkMultichainAccountNameDisplayed('Ledger 1');
@@ -135,8 +132,14 @@ describe('Multichain Accounts - Multichain accounts list page', function (this: 
           .withKeyringControllerMultiSRP()
           .withEnabledNetworks({ eip155: { '0x1': true } })
           .withSnapsPrivacyWarningAlreadyShown()
-          .withAssetsController({
-            assetsPrice: getMockAssetsPrice(MOCK_ETH_CONVERSION_RATE),
+          .withCurrencyController({
+            currencyRates: {
+              ETH: {
+                conversionDate: Date.now(),
+                conversionRate: MOCK_ETH_CONVERSION_RATE,
+                usdConversionRate: MOCK_ETH_CONVERSION_RATE,
+              },
+            },
           })
           .build(),
         title: this.test?.fullTitle(),
@@ -177,9 +180,10 @@ describe('Multichain Accounts - Multichain accounts list page', function (this: 
           account: 'Account 1',
           balance: '$85,025.00',
         });
-        await accountListPage.checkMultichainAccountBalanceNotDisplayed({
+        await accountListPage.checkMultichainAccountBalanceDisplayed({
           wallet: 'MetaMask Simple Snap Keyring',
           account: 'Snap Account 1',
+          balance: '$0.00',
         });
         await accountListPage.checkMultichainAccountNameDisplayed('Account 1');
         await accountListPage.checkMultichainAccountNameDisplayed(

@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { Box, BoxAlignItems, Checkbox } from '@metamask/design-system-react';
+import { Box, BoxAlignItems } from '@metamask/design-system-react';
 import { I18nContext } from '../../../contexts/i18n';
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   ButtonPrimary,
   ButtonSize,
   ButtonVariant,
+  Checkbox,
   IconName,
   IconSize,
   Modal,
@@ -1228,9 +1229,10 @@ export default function TermsOfUsePopup({ onClose, onAccept }) {
         >
           <Checkbox
             id="terms-of-use__checkbox"
-            className="terms-of-use__checkbox items-start"
+            className="terms-of-use__checkbox"
             data-testid="terms-of-use-checkbox"
-            isSelected={isTermsOfUseChecked}
+            isChecked={isTermsOfUseChecked}
+            alignItems={AlignItems.flexStart}
             onChange={toggle}
             label={t('termsOfUseAgreeText')}
           />

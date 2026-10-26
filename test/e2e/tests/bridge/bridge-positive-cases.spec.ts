@@ -9,23 +9,22 @@ import HomePage from '../../page-objects/pages/home/homepage';
 import BridgeQuotePage from '../../page-objects/pages/bridge/quote-page';
 import SelectNetworkModal from '../../page-objects/pages/networks/select-network-modal';
 import NetworkFilter from '../../page-objects/pages/networks/network-filter';
-import TokenOverviewPage from '../../page-objects/pages/asset/token-overview-page';
+import TokenOverviewPage from '../../page-objects/pages/token-overview-page';
+import BottomNavBar from '../../page-objects/pages/bottom-nav-bar-page';
 import { BOTTOM_NAV_AB_TEST_KEY } from '../../../../shared/lib/ab-testing/configs/bottom-nav-bar';
 import { BRIDGE_FEATURE_FLAGS_WITH_SSE_ENABLED } from './constants';
 import {
   checkQuoteRequestsAreNotMadeAfterTimestamp,
   getBridgeFixtures,
-  getExpectedQuoteTotalCosts,
 } from './bridge-test-utils';
-import MOCK_BRIDGE_ETH_TO_ETH_ROBINHOOD from './mocks/bridge-quotes-eth-robinhood.json';
 
 /**
  * Returns bridge fixtures layered with the bottom nav AB test treatment flags:
  * - `RemoteFeatureFlagController.remoteFeatureFlags` with treatment variant
  * - `manifestFlags.remoteFeatureFlags` with treatment variant
  *
- * This means the bottom nav bar is shown on routes that use the main layout.
- * Swaps is outside that layout, so its back button remains available.
+ * This means the bottom nav bar is shown. When bottom nav bar is shown,
+ * the back button is removed on Swap/Bridge pages so tests must accommodate for this.
  * @param options
  */
 function getBridgeFixturesWithBottomNavTreatment(
@@ -99,6 +98,20 @@ describe('Bridge tests', function (this: Suite) {
           expectedDestAmount: '1,642',
           expectedActivityAmount: '+1,642.0043',
         });
+        await bridgeTransaction({
+          driver,
+          quote: {
+            amount: '1',
+            tokenFrom: 'ETH',
+            tokenTo: 'ETH',
+            fromChain: 'Ethereum',
+            toChain: 'Linea',
+          },
+          expectedTransactionsCount: 4,
+          expectedDestAmount: '0.991',
+          expectedActivityAmount: '+0.9912',
+        });
+
         await homePage.goToTokensTab();
         await homePage.goToActivityList();
 
@@ -112,27 +125,9 @@ describe('Bridge tests', function (this: Suite) {
             toChain: 'Linea',
             unapproved: true,
           },
-          expectedTransactionsCount: 5,
+          expectedTransactionsCount: 6,
           expectedDestAmount: '9.9',
           expectedActivityAmount: '+9.8996',
-        });
-
-        await bridgeTransaction({
-          driver,
-          quote: {
-            amount: '1',
-            tokenFrom: 'ETH',
-            tokenTo: 'ETH',
-            fromChain: 'Ethereum',
-            toChain: 'Robinhood',
-          },
-          expectedTransactionsCount: 6,
-          expectedDestAmount: '0.991',
-          expectedActivityAmount: '+0.9911',
-          submitDelay: 1000,
-          expectedTotalCost: getExpectedQuoteTotalCosts(
-            MOCK_BRIDGE_ETH_TO_ETH_ROBINHOOD,
-          ),
         });
       },
     );
@@ -384,9 +379,9 @@ describe('Bridge tests', function (this: Suite) {
         const selectNetworkModal = new SelectNetworkModal(driver);
         const networkFilter = new NetworkFilter(driver);
 
-        const homePage = new HomePage(driver);
-        await homePage.checkPageIsLoaded();
-        await homePage.startSwapFlow();
+        const bottomNav = new BottomNavBar(driver);
+        await bottomNav.checkPageIsLoaded();
+        await bottomNav.clickSwaps();
 
         const bridgePage = new BridgeQuotePage(driver);
         await bridgePage.checkPageIsLoaded();
@@ -399,8 +394,8 @@ describe('Bridge tests', function (this: Suite) {
         });
         const finalQuoteRequestTimestamp = Date.now();
 
-        // Navigate back via the Swaps page back button.
-        await bridgePage.goBack();
+        // Navigate back via bottom nav (back button is hidden in treatment)
+        await bottomNav.clickHome();
         await checkQuoteRequestsAreNotMadeAfterTimestamp(
           driver,
           finalQuoteRequestTimestamp,
@@ -426,12 +421,12 @@ describe('Bridge tests', function (this: Suite) {
       async ({ driver }) => {
         await login(driver, { expectedBalance: '$225,730.11' });
 
-        const homePage = new HomePage(driver);
-        await homePage.checkPageIsLoaded();
+        const bottomNav = new BottomNavBar(driver);
+        await bottomNav.checkPageIsLoaded();
         const bridgePage = new BridgeQuotePage(driver);
         const tokenOverviewPage = new TokenOverviewPage(driver);
 
-        await homePage.startSwapFlow();
+        await bottomNav.clickSwaps();
         await bridgePage.checkPageIsLoaded();
         await bridgePage.searchForAssetAndSelect('DAI');
         console.log('Selected source asset DAI');
@@ -455,11 +450,12 @@ describe('Bridge tests', function (this: Suite) {
         await bridgePage.checkAssetsAreSelected('DAI', 'USDC');
 
         console.log(
-          'Checking that selected assets are reset after reopening Swap page',
+          'Checking that selected assets are reset after reopening Swap page via bottom nav',
         );
-        // Navigate home via the Swaps page back button, then reopen Swaps.
-        await bridgePage.goBack();
-        await homePage.startSwapFlow();
+        // Navigate home via bottom nav (back button is hidden in treatment)
+        await bottomNav.clickHome();
+        // Navigate back to bridge via bottom nav swaps tab
+        await bottomNav.clickSwaps();
         await bridgePage.checkAssetsAreSelected('ETH', 'mUSD');
       },
     );

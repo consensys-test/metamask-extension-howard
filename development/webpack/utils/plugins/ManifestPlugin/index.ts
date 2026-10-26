@@ -76,12 +76,6 @@ function emitJsonAsset(
   });
 }
 
-function webAccessibleResourcePaths(manifest: Manifest) {
-  return (manifest.web_accessible_resources ?? []).flatMap((entry) =>
-    typeof entry === 'string' ? [entry] : entry.resources,
-  );
-}
-
 function addToSetMap<TKey, TValue>(
   map: Map<TKey, Set<TValue>>,
   key: TKey,
@@ -118,8 +112,6 @@ export class ManifestPlugin<Z extends boolean> {
     BACKGROUND_CLIENT_ENTRY_NAME,
   ]);
 
-  private isolatedHtmlEntries: Set<string> = new Set();
-
   private bundleSizeCategoriesByEntrypoint: Map<
     string,
     Set<BundleSizeCategory>
@@ -142,25 +134,6 @@ export class ManifestPlugin<Z extends boolean> {
   canBeChunked = ({ name }: { name?: string | null }): boolean => {
     return !name || !this.selfContainedScripts.has(name);
   };
-
-  isIsolatedHtmlEntry = (name?: string | null) =>
-    Boolean(name && this.isolatedHtmlEntries.has(name));
-
-  getIsolatedHtmlEntryNames = () => [...this.isolatedHtmlEntries];
-
-  private isWebAccessibleHtml(filename: string) {
-    for (const manifest of this.manifests.values()) {
-      for (const resource of webAccessibleResourcePaths(manifest)) {
-        if (
-          /\.html?$/iu.test(resource) &&
-          (resource === filename || path.basename(resource) === filename)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
 
   constructor(options: ManifestPluginOptions<Z>) {
     validate(schema, options, { name: NAME });
@@ -734,17 +707,6 @@ export class ManifestPlugin<Z extends boolean> {
     );
     addToSetMap(this.bundleSizeCategoriesByHtmlResource, filePath, category);
     entries[parsedFileName] = { import: [filePath], ...opts };
-    if (this.isWebAccessibleHtml(filename)) {
-      this.isolatedHtmlEntries.add(parsedFileName);
-
-      // `cashtag-widget.html` is the web-accessible HTML entry, but HtmlBundler
-      // names its imported frame script `frame`. Both entries must be isolated so
-      // Webpack does not split the iframe bundle.
-      if (parsedFileName === 'cashtag-widget') {
-        this.selfContainedScripts.add('frame');
-        this.isolatedHtmlEntries.add('frame');
-      }
-    }
   };
 
   private collectEntrypoints(
@@ -752,7 +714,6 @@ export class ManifestPlugin<Z extends boolean> {
     entries: Record<string, EntryDescriptionNormalized>,
   ): void {
     this.resetBundleSizeEntrypointMetadata();
-    this.isolatedHtmlEntries.clear();
 
     for (const manifest of this.manifests.values()) {
       // collect content_scripts (MV2 + MV3)

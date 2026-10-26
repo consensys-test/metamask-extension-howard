@@ -1,13 +1,13 @@
 import React, { useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { Box, IconName } from '@metamask/design-system-react';
+import { Box } from '@metamask/design-system-react';
 import { MenuItem } from '../../ui/menu';
 import { getPortfolioUrl } from '../../../helpers/utils/portfolio';
 import { useAnalytics } from '../../../hooks/useAnalytics';
 import {
   getDataCollectionForMarketing,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
 } from '../../../selectors';
 import { useI18nContext } from '../../../hooks/useI18nContext';
@@ -15,6 +15,7 @@ import {
   MetaMetricsEventCategory,
   MetaMetricsEventName,
 } from '../../../../shared/constants/metametrics';
+import { IconName } from '../../component-library';
 
 export const DiscoverMenuItem = ({
   closeMenu,
@@ -24,9 +25,11 @@ export const DiscoverMenuItem = ({
   metricsLocation: string;
 }) => {
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
-  const isMetaMetricsEnabled = consentDecisionMade && isOptedIn;
+  const isMetaMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
   const { trackEvent, createEventBuilder } = useAnalytics();
   const t = useI18nContext();
@@ -62,7 +65,7 @@ export const DiscoverMenuItem = ({
 
   return (
     <MenuItem
-      iconName={IconName.Export}
+      iconNameLegacy={IconName.Export}
       onClick={() => handlePortfolioOnClick()}
       data-testid="portfolio-menu-item"
     >

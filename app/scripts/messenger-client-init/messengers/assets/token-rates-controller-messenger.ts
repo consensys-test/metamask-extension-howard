@@ -4,7 +4,6 @@ import {
   type MessengerEvents,
 } from '@metamask/messenger';
 import { TokenRatesControllerMessenger } from '@metamask/assets-controllers';
-import { RemoteFeatureFlagControllerGetStateAction } from '@metamask/remote-feature-flag-controller';
 import {
   PreferencesControllerGetStateAction,
   PreferencesControllerStateChangeEvent,
@@ -40,9 +39,7 @@ export function getTokenRatesControllerMessenger(
   return controllerMessenger;
 }
 
-type AllowedInitializationActions =
-  | PreferencesControllerGetStateAction
-  | RemoteFeatureFlagControllerGetStateAction;
+type AllowedInitializationActions = PreferencesControllerGetStateAction;
 
 type AllowedInitializationEvents = PreferencesControllerStateChangeEvent;
 
@@ -75,10 +72,7 @@ export function getTokenRatesControllerInitMessenger(
   });
   messenger.delegate({
     messenger: controllerInitMessenger,
-    actions: [
-      'PreferencesController:getState',
-      'RemoteFeatureFlagController:getState',
-    ],
+    actions: ['PreferencesController:getState'],
     events: ['PreferencesController:stateChange'],
   });
   return controllerInitMessenger;

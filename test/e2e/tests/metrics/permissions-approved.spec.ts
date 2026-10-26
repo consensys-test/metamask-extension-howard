@@ -54,7 +54,7 @@ describe('Permissions Approved Event', function (this: Suite) {
       {
         dappOptions: { numberOfTestDapps: 1 },
         fixtures: new FixtureBuilderV2()
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,

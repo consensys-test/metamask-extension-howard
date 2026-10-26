@@ -21,7 +21,7 @@ import {
   getMetaMetricsDataDeletionTimestamp,
   getMetaMetricsDataDeletionStatus,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
   getShowDataDeletionErrorModal,
   getShowDeleteMetaMetricsDataModal,
@@ -78,9 +78,11 @@ const DeleteMetaMetricsDataButton: DeleteMetaMetricsDataButtonComponent =
       const showDataDeletionErrorModal = useSelector(
         getShowDataDeletionErrorModal,
       );
-      const consentDecisionMade = useSelector(getConsentDecisionMade);
+      const completedMetaMetricsOnboarding = useSelector(
+        getCompletedMetaMetricsOnboarding,
+      );
       const isOptedIn = useSelector(getOptedIn);
-      const isMetaMetricsEnabled = consentDecisionMade && isOptedIn;
+      const isMetaMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
       let dataDeletionButtonDisabled = !isMetaMetricsEnabled;
       if (!dataDeletionButtonDisabled && metaMetricsDataDeletionStatus) {
         dataDeletionButtonDisabled =

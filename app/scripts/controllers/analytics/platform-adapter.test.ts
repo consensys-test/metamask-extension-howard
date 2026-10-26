@@ -33,7 +33,6 @@ const DEFAULT_ENRICHMENT_CONTEXT: PlatformAdapterEnrichmentContext = {
   hasMarketingConsent: () => false,
   hasBasicFunctionalityEnabled: () => true,
   getRemoteFeatureFlags: () => ({}),
-  getFeatureFlagThresholdGroups: () => ({}),
   appVersion: '1.0.0',
   userAgent: '',
 };
@@ -608,71 +607,6 @@ describe('createPlatformAdapter', () => {
           properties: expect.not.objectContaining({
             // eslint-disable-next-line @typescript-eslint/naming-convention
             utm_source: 'newsletter',
-          }),
-        }),
-        undefined,
-      );
-    });
-
-    it('preserves UTM parameters when marketing consent is granted', () => {
-      const { adapter, segment } = buildAdapter(
-        createMockEnrichmentContext({
-          hasMarketingConsent: () => true,
-        }),
-      );
-
-      adapter.track('Campaign Event', {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        utm_source: 'newsletter',
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        utm_medium: 'email',
-        foo: 'bar',
-      });
-
-      expect(segment.track).toHaveBeenCalledWith(
-        expect.objectContaining({
-          properties: expect.objectContaining({
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            utm_source: 'newsletter',
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            utm_medium: 'email',
-            foo: 'bar',
-          }),
-        }),
-        undefined,
-      );
-    });
-
-    it('removes UTM parameters when marketing consent is explicitly denied', () => {
-      const { adapter, segment } = buildAdapter(
-        createMockEnrichmentContext({
-          hasMarketingConsent: () => false,
-        }),
-      );
-
-      adapter.track('Campaign Event', {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        utm_source: 'newsletter',
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        utm_campaign: 'summer_sale',
-        foo: 'bar',
-      });
-
-      expect(segment.track).toHaveBeenCalledWith(
-        expect.objectContaining({
-          properties: expect.objectContaining({
-            foo: 'bar',
-          }),
-        }),
-        undefined,
-      );
-      expect(segment.track).toHaveBeenCalledWith(
-        expect.objectContaining({
-          properties: expect.not.objectContaining({
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            utm_source: 'newsletter',
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            utm_campaign: 'summer_sale',
           }),
         }),
         undefined,

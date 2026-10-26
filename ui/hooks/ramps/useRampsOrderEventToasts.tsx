@@ -126,6 +126,7 @@ export function useRampsOrderEventToasts(): void {
   const previousStatusById = useRef<Map<string, RampsOrderStatus>>(new Map());
   const trackedAccountAddress = useRef(selectedAccountAddress);
   const t = useI18nContext();
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (trackedAccountAddress.current !== selectedAccountAddress) {
@@ -135,6 +136,7 @@ export function useRampsOrderEventToasts(): void {
       }
       trackedAccountAddress.current = selectedAccountAddress;
       previousStatusById.current = new Map();
+      initialized.current = false;
     }
 
     const previous = previousStatusById.current;
@@ -148,9 +150,8 @@ export function useRampsOrderEventToasts(): void {
       next.set(orderCode, order.status);
 
       const previousStatus = previous.get(orderCode);
-      // A newly observed order is baseline state, not a status transition.
-      // This includes orders asynchronously hydrated from Profile Sync.
-      if (previousStatus === undefined) {
+      // Seed existing statuses on mount / account switch without toasting them.
+      if (!initialized.current) {
         continue;
       }
 
@@ -170,6 +171,7 @@ export function useRampsOrderEventToasts(): void {
     }
 
     previousStatusById.current = next;
+    initialized.current = true;
   }, [orders, selectedAccountAddress, t]);
 }
 
@@ -181,7 +183,7 @@ function handleOrderStatusChange({
 }: {
   order: RampsOrder;
   orderCode: string;
-  previousStatus: RampsOrderStatus;
+  previousStatus: RampsOrderStatus | undefined;
   t: ReturnType<typeof useI18nContext>;
 }) {
   if (previousStatus === order.status) {
@@ -202,7 +204,8 @@ function handleOrderStatusChange({
 
   const becameInProgress =
     IN_PROGRESS.has(order.status) &&
-    previousStatus === RampsOrderStatus.Precreated;
+    (previousStatus === undefined ||
+      previousStatus === RampsOrderStatus.Precreated);
 
   if (becameInProgress && shouldShowPendingToast(orderCode)) {
     toast.loading(getToastContent(copy.pendingTitle, copy.pendingDescription), {

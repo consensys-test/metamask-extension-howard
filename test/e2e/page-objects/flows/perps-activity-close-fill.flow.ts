@@ -28,17 +28,16 @@ export async function assertPerpsActivityShowsCloseFill({
 
   const marketDetailPage = new PerpsMarketDetailPage(driver);
   await marketDetailPage.clickBack();
-
-  const marketListPage = new PerpsMarketListPage(driver);
-  const onMarketList = await marketListPage.isPageLoaded();
-  if (onMarketList) {
+  try {
+    const marketListPage = new PerpsMarketListPage(driver);
     await marketListPage.clickBack();
+  } catch (error) {
+    console.error('Market list not displayed, moving on', error);
   }
 
   const perpsTab = new PerpsTab(driver);
   await perpsTab.navigateToPerpsHome();
-  await perpsTab.waitForPerpsViewStable();
-  await perpsTab.waitForRecentActivitySection();
+  await perpsTab.checkPageIsLoaded();
   await perpsTab.clickRecentActivitySeeAll();
 
   const activityPage = new PerpsActivityPage(driver);

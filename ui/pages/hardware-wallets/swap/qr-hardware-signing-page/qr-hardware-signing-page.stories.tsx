@@ -1,5 +1,5 @@
 import React from 'react';
-import { Meta, StoryObj } from '@storybook/react-webpack5';
+import { Meta, StoryObj } from '@storybook/react';
 import { QrHardwareSigningPage } from '.';
 import { QrHardwareSigningPhase } from './qr-hardware-signing-page.types';
 

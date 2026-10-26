@@ -3,20 +3,11 @@ import log from 'loglevel';
 import { isEmpty } from 'lodash';
 import { RuntimeObject, hasProperty, isObject } from '@metamask/utils';
 import { captureException, captureMessage } from '../sentry';
-import {
-  INACCESSIBLE_DATABASE_ERROR,
-  MISSING_VAULT_ERROR,
-  isBrowserShuttingDownError,
-} from '../../constants/errors';
-import { StateCorruptionErrorType } from '../../constants/critical-error';
+import { MISSING_VAULT_ERROR } from '../../constants/errors';
 import { getManifestFlags } from '../manifestFlags';
+import { VaultCorruptionType } from '../../constants/state-corruption';
 import { StorageWriteErrorType } from '../../constants/app-state';
-import { getPersistenceWriteTelemetrySampleRate } from '../sentry-remote-rates';
 import { IndexedDBStore } from './indexeddb-store';
-import {
-  BACKUP_INDEXED_DB_NAME,
-  BACKUP_INDEXED_DB_VERSION,
-} from './indexeddb-storage-constants';
 import type {
   MetaMaskStateType,
   MetaMaskStorageStructure,
@@ -30,6 +21,7 @@ export type StorageKind = 'data' | 'split';
 export const backedUpStateKeys = [
   'KeyringController',
   'AppMetadataController',
+  'MetaMetricsController',
   'AnalyticsController',
 ] as const;
 
@@ -48,7 +40,7 @@ export type Backup = {
 
 export type VaultCorruptionDetectedEvent = {
   backup: Backup;
-  corruptionType: StateCorruptionErrorType;
+  corruptionType: VaultCorruptionType;
 };
 
 export type SplitStateMigrationSucceededEvent = {
@@ -72,40 +64,15 @@ export type WriteRetryRecoveredEvent = {
   retryDelayMs: number;
 };
 
-export type SplitStateWriteEvent = {
-  /**
-   * Per-controller size measurements. Exact storage bytes when
-   * {@link sizeMeasurementSource} is `storage_get_bytes_in_use`; otherwise
-   * estimates from `JSON.stringify(value).length`.
-   */
-  bytesByController: Map<string, number>;
-  coalescedUpdates: number;
-  idleStatus: 'active' | 'idle' | 'unknown';
-  measurementDurationMs: number;
-  sampleRate: number;
-  sizeMeasurementSource:
-    | 'storage_get_bytes_in_use'
-    | 'json_string_length_estimate';
-  /**
-   * Sum of {@link bytesByController} values.
-   */
-  totalBytes: number;
-  writeDurationMs: number;
-};
-
 export type PersistenceManagerEventMap = {
   vaultCorruptionDetected: [VaultCorruptionDetectedEvent];
   splitStateMigrationSucceeded: [SplitStateMigrationSucceededEvent];
   splitStateMigrationFailed: [SplitStateMigrationFailedEvent];
-  splitStateWrite: [SplitStateWriteEvent];
   writeRetryRecovered: [WriteRetryRecoveredEvent];
 };
 
 export type PersistenceManagerOptions = {
-  getIsIdle?: () => boolean | undefined;
-  getPersistenceWriteSampleRate?: () => number;
   localStore: BaseStore;
-  random?: () => number;
 };
 
 type WriteRetryOptions = {
@@ -140,22 +107,6 @@ function delay(ms: number, signal?: AbortSignal): Promise<boolean> {
 }
 
 /**
- * Checks whether IndexedDB mutations are blocked, as can happen for Firefox
- * extensions in private browsing mode.
- *
- * @param error - The error thrown by IndexedDB.
- * @returns Whether the error represents blocked IndexedDB mutations.
- */
-export function isIndexedDBMutationBlockedError(error: unknown): boolean {
-  return (
-    error instanceof DOMException &&
-    error.name === 'InvalidStateError' &&
-    error.message ===
-      'A mutation operation was attempted on a database that did not allow mutations.'
-  );
-}
-
-/**
  * This Error represents an error that occurs during persistence operations.
  * It includes a backup of the state at the time of the error and optionally
  * a reference to the original error that caused the persistence failure.
@@ -168,7 +119,7 @@ export class PersistenceError extends Error {
    * - InaccessibleDatabase: The storage system threw an error (e.g., Firefox's "An unexpected error occurred")
    * - MissingVaultInDatabase: The database was accessible but the vault was missing
    */
-  corruptionType: StateCorruptionErrorType;
+  corruptionType: VaultCorruptionType;
 
   /**
    * The original error that caused the persistence failure, if any.
@@ -179,16 +130,16 @@ export class PersistenceError extends Error {
 
   constructor(
     message: string,
-    corruptionType: StateCorruptionErrorType,
     backup: object | null,
+    corruptionType: VaultCorruptionType,
     cause?: Error,
   ) {
     super(message);
     this.name = 'PersistenceError';
-    this.corruptionType = corruptionType;
     // closure around `backup` to prevent it from being serialized with the
     // error in debug logs, error reporting, etc.
     this.getBackup = () => backup;
+    this.corruptionType = corruptionType;
     this.cause = cause;
   }
 }
@@ -336,23 +287,9 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
    */
   #errorTypeBeforeCallbackRegistered: StorageWriteErrorType | null = null;
 
-  #getIsIdle: () => boolean | undefined;
-
-  #getPersistenceWriteSampleRate: () => number;
-
-  #random: () => number;
-
-  constructor({
-    getIsIdle = () => undefined,
-    getPersistenceWriteSampleRate = getPersistenceWriteTelemetrySampleRate,
-    localStore,
-    random = Math.random,
-  }: PersistenceManagerOptions) {
+  constructor({ localStore }: PersistenceManagerOptions) {
     super();
-    this.#getIsIdle = getIsIdle;
     this.#localStore = localStore;
-    this.#getPersistenceWriteSampleRate = getPersistenceWriteSampleRate;
-    this.#random = random;
   }
 
   /**
@@ -488,20 +425,21 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
 
   async #openBackupDatabase(): Promise<void> {
     try {
-      // The backup is the recovery path for a corrupted vault, so its writes
-      // request strict durability: they must reach disk before resolving, even
-      // if the browser or the machine goes down immediately afterwards. The
-      // cost is negligible here because the write is skipped unless the
-      // serialized backup actually changed.
-      const db = new IndexedDBStore({ strictDurability: true });
-      await db.open(BACKUP_INDEXED_DB_NAME, BACKUP_INDEXED_DB_VERSION);
+      const db = new IndexedDBStore();
+      await db.open('metamask-backup', 1);
       this.#backupDb = db;
     } catch (error) {
       // `indexedDB` can't be used by addons in FF in some instances of
       // private browsing mode due to this bug:
       // https://bugzilla.mozilla.org/show_bug.cgi?id=1982707. In these
       // cases we just won't have a backup vault.
-      if (isIndexedDBMutationBlockedError(error)) {
+      if (
+        isObject(error) &&
+        error instanceof DOMException &&
+        error.name === 'InvalidStateError' &&
+        error.message ===
+          'A mutation operation was attempted on a database that did not allow mutations.'
+      ) {
         // Custom fingerprint prevents Sentry's deduplication from dropping
         // this event when other persistence errors with the same underlying
         // error message (e.g., "An unexpected error occurred") are reported.
@@ -547,8 +485,6 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
   #currentLockAbortController: void | AbortController = undefined;
 
   #pendingPairs = new Map<string, unknown>();
-
-  #pendingUpdateCount = 0;
 
   #hasSimulatedStorageSetFailure = false;
 
@@ -726,21 +662,6 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
 
           return [true, undefined];
         } catch (err) {
-          // A write that failed only because the browser is closing is not a
-          // storage problem, so none of the failure handling below applies.
-          // Sentry is handled globally by `ignoreErrors`; returning early here
-          // is about the two effects that outlive this call - it must not latch
-          // `#dataPersistenceFailing`, which would suppress the report of a
-          // later real failure, and it must not run `#notifySetFailed`, which
-          // persists a storage-error flag that would warn the user in their
-          // next session. Both are unlikely to be reached with the browser
-          // going away, so this is precautionary.
-          if (isBrowserShuttingDownError(err)) {
-            log.info(
-              'MetaMask - storage write failed because the browser is shutting down',
-            );
-            return [false, err];
-          }
           if (!this.#dataPersistenceFailing) {
             this.#dataPersistenceFailing = true;
             // Use different tags to differentiate storage.local vs IndexedDB backup failures.
@@ -780,83 +701,6 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
       );
     }
     this.#pendingPairs.set(key, value);
-    this.#pendingUpdateCount += 1;
-  }
-
-  async #recordSplitStateWrite(
-    pairs: Map<string, unknown>,
-    coalescedUpdates: number,
-    writeDurationMs: number,
-  ): Promise<void> {
-    const sampleRate = this.#getPersistenceWriteSampleRate();
-    if (sampleRate <= 0 || this.#random() >= sampleRate) {
-      return;
-    }
-
-    const measurementStartedAt = performance.now();
-    const controllerKeys = [...pairs.keys()].filter(
-      (key) => key !== 'data' && key !== 'manifest' && key !== 'meta',
-    );
-
-    if (controllerKeys.length === 0) {
-      return;
-    }
-
-    let bytesByController: Map<string, number> | undefined;
-    let sizeMeasurementSource: SplitStateWriteEvent['sizeMeasurementSource'] =
-      'json_string_length_estimate';
-    let totalBytes = 0;
-
-    try {
-      const storageBytes =
-        await this.#localStore.getBytesInUseByKey?.(controllerKeys);
-      if (storageBytes && storageBytes.size > 0) {
-        bytesByController = storageBytes;
-        sizeMeasurementSource = 'storage_get_bytes_in_use';
-        totalBytes = [...bytesByController.values()].reduce(
-          (total, bytes) => total + bytes,
-          0,
-        );
-      }
-    } catch {
-      // Fall back to a synchronous estimate when exact storage bytes are
-      // unavailable or fail. Telemetry must not fail a successful write.
-    }
-
-    if (!bytesByController) {
-      bytesByController = new Map();
-      totalBytes = 0;
-      for (const key of controllerKeys) {
-        const value = pairs.get(key);
-        // Cheap size estimate for telemetry: `JSON.stringify` string length
-        // (UTF-16 code units), not UTF-8 byte length via `TextEncoder`.
-        const serializedValue = JSON.stringify(value);
-        const serializedLength =
-          serializedValue === undefined ? 0 : serializedValue.length;
-        bytesByController.set(key, serializedLength);
-        totalBytes += serializedLength;
-      }
-      sizeMeasurementSource = 'json_string_length_estimate';
-    }
-
-    const isIdle = this.#getIsIdle();
-    let idleStatus: SplitStateWriteEvent['idleStatus'] = 'unknown';
-    if (isIdle === true) {
-      idleStatus = 'idle';
-    } else if (isIdle === false) {
-      idleStatus = 'active';
-    }
-
-    this.emit('splitStateWrite', {
-      bytesByController,
-      coalescedUpdates,
-      idleStatus,
-      measurementDurationMs: performance.now() - measurementStartedAt,
-      sampleRate,
-      sizeMeasurementSource,
-      totalBytes,
-      writeDurationMs,
-    });
   }
 
   async persist(): Promise<[boolean, Error | undefined]> {
@@ -898,20 +742,15 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
         let backupFailed = false;
         try {
           const clone = structuredClone(this.#pendingPairs);
-          const coalescedUpdates = this.#pendingUpdateCount;
           // reset the pendingPairs
           this.#pendingPairs.clear();
-          this.#pendingUpdateCount = 0;
-          let writeDurationMs = 0;
           try {
             // save the pairs (includes test simulation check)
-            const writeStartedAt = performance.now();
             await this.#retryWrite(
               () => this.#setKeyValuesInLocalStore(clone),
               'persist-retry-recovered',
               { supersedable: true },
             );
-            writeDurationMs = performance.now() - writeStartedAt;
           } catch (err) {
             // merge the clone with the pending pairs again
             for (const [key, value] of clone.entries()) {
@@ -922,19 +761,7 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
                 this.#pendingPairs.set(key, value);
               }
             }
-            this.#pendingUpdateCount += coalescedUpdates;
             throw err;
-          }
-
-          try {
-            // Telemetry must not treat a successful write as a failure.
-            await this.#recordSplitStateWrite(
-              clone,
-              coalescedUpdates,
-              writeDurationMs,
-            );
-          } catch {
-            // Ignore measurement/reporting failures after a successful write.
           }
 
           const partialState = Object.create(null);
@@ -978,21 +805,6 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
 
           return [true, undefined];
         } catch (err) {
-          // A write that failed only because the browser is closing is not a
-          // storage problem, so none of the failure handling below applies.
-          // Sentry is handled globally by `ignoreErrors`; returning early here
-          // is about the two effects that outlive this call - it must not latch
-          // `#dataPersistenceFailing`, which would suppress the report of a
-          // later real failure, and it must not run `#notifySetFailed`, which
-          // persists a storage-error flag that would warn the user in their
-          // next session. Both are unlikely to be reached with the browser
-          // going away, so this is precautionary.
-          if (isBrowserShuttingDownError(err)) {
-            log.info(
-              'MetaMask - storage write failed because the browser is shutting down',
-            );
-            return [false, err];
-          }
           if (!this.#dataPersistenceFailing) {
             this.#dataPersistenceFailing = true;
             // Use different tags to differentiate storage.local vs IndexedDB backup failures.
@@ -1067,17 +879,6 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
               fingerprint: ['persistence-error', 'get-failed'],
             });
           }
-
-          // A read that failed only because the browser is closing says nothing
-          // about the state of the data, so it must not trigger vault recovery:
-          // emitting `vaultCorruptionDetected` and throwing `MISSING_VAULT_ERROR`
-          // would both be false positives. Re-throw the original error here, as
-          // we would for any other read failure below, so callers abort the same
-          // way. We still reported it above; whether that event is kept is
-          // decided by `ignoreErrors` in `setupSentry.js`, not here.
-          if (isBrowserShuttingDownError(localStoreError)) {
-            throw localStoreError;
-          }
         }
 
         if (validateVault) {
@@ -1108,11 +909,11 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
               log.info('Backup vault found in IndexedDB, triggering recovery');
 
               // Track vault corruption detected event directly to Segment.
-              // We do this here (before throwing) because AnalyticsController
+              // We do this here (before throwing) because MetaMetricsController
               // is not initialized yet, so we use the backup state for consent/ID.
               const corruptionType = localStoreError
-                ? StateCorruptionErrorType.InaccessibleDatabase
-                : StateCorruptionErrorType.MissingVaultInDatabase;
+                ? VaultCorruptionType.InaccessibleDatabase
+                : VaultCorruptionType.MissingVaultInDatabase;
               this.emit('vaultCorruptionDetected', {
                 backup,
                 corruptionType,
@@ -1122,11 +923,9 @@ export class PersistenceManager extends EventEmitter<PersistenceManagerEventMap>
               // background+UI are responsible for determining what happens now).
               // Include the original error as cause for debugging purposes.
               throw new PersistenceError(
-                localStoreError
-                  ? INACCESSIBLE_DATABASE_ERROR
-                  : MISSING_VAULT_ERROR,
-                corruptionType,
+                MISSING_VAULT_ERROR,
                 backup,
+                corruptionType,
                 localStoreError,
               );
             } else if (localStoreError) {

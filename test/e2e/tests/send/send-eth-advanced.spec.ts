@@ -68,10 +68,7 @@ describe('Send ETH - Advanced', function () {
             recipientAddress: contractAddress,
             amount: '1',
           });
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'disappear',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndWaitToDisappear();
 
           // Verify balance is displayed correctly (format: "X.XX ETH")
           await homePage.checkBalanceIsDisplayed();
@@ -127,10 +124,7 @@ describe('Send ETH - Advanced', function () {
           await transactionConfirmation.checkGasFee('0.0021');
           await transactionConfirmation.checkGasFeeFiat('$3.57');
 
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'windowClose',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
           await driver.switchToWindowWithTitle(
             WINDOW_TITLES.ExtensionInFullScreenView,
           );
@@ -185,10 +179,7 @@ describe('Send ETH - Advanced', function () {
           await transactionConfirmation.checkGasFee('0.045');
           await transactionConfirmation.checkGasFeeFiat('$76.59');
 
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-            waitUntil: 'windowClose',
-          });
+          await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
           await driver.switchToWindowWithTitle(
             WINDOW_TITLES.ExtensionInFullScreenView,
           );

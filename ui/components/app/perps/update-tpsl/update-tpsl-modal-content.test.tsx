@@ -62,16 +62,12 @@ jest.mock('../../../../hooks/perps/usePerpsEligibility', () => ({
   usePerpsEligibility: () => mockUsePerpsEligibility(),
 }));
 
-const mockUsePerpsOrderFees = jest.fn();
 jest.mock('../../../../hooks/perps/usePerpsOrderFees', () => ({
-  usePerpsOrderFees: (options: Record<string, unknown>) => {
-    mockUsePerpsOrderFees(options);
-    return {
-      feeRate: 0.00145,
-      isLoading: false,
-      hasError: false,
-    };
-  },
+  usePerpsOrderFees: () => ({
+    feeRate: 0.00145,
+    isLoading: false,
+    hasError: false,
+  }),
 }));
 
 jest.mock('../perps-toast', () => ({
@@ -177,21 +173,6 @@ describe('UpdateTPSLModalContent', () => {
   });
 
   describe('rendering', () => {
-    it('quotes both triggers using the largest batch notional', () => {
-      renderWithProvider(
-        <UpdateTPSLModalContent {...defaultProps} />,
-        mockStore,
-      );
-      expect(mockUsePerpsOrderFees).toHaveBeenCalledWith({
-        symbol: 'ETH',
-        orderType: 'market',
-        amount: '8000',
-      });
-      expect(mockUsePerpsOrderFees).not.toHaveBeenCalledWith(
-        expect.objectContaining({ amount: '6500' }),
-      );
-    });
-
     it('renders Take Profit and Stop Loss sections', () => {
       renderTpslModalContent();
 

@@ -52,14 +52,7 @@ describe('Token List', function () {
         title: (this as Context).test?.fullTitle(),
         testSpecificMock: async (mockServer: Mockttp) => [
           ...(await mockTokenMetadataApis(mockServer, [
-            {
-              address: tokenAddress,
-              symbol,
-              name: symbol,
-              decimals: 18,
-              chainId: 1,
-              balance: '1',
-            },
+            { address: tokenAddress, symbol, name: symbol, decimals: 18 },
           ])),
           await mockEmptyPrices(mockServer),
           await mockEmptyHistoricalPrices(mockServer, tokenAddress, chainId),
@@ -102,14 +95,7 @@ describe('Token List', function () {
         ethConversionInUsd,
         testSpecificMock: async (mockServer: Mockttp) => [
           ...(await mockTokenMetadataApis(mockServer, [
-            {
-              address: tokenAddress,
-              symbol,
-              name: symbol,
-              decimals: 18,
-              chainId: 1,
-              balance: '1',
-            },
+            { address: tokenAddress, symbol, name: symbol, decimals: 18 },
           ])),
           await mockSpotPrices(mockServer, {
             'eip155:1/slip44:60': marketDataNative,

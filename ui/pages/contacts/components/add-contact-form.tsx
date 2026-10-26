@@ -74,7 +74,7 @@ import {
 } from '../../../../shared/constants/metametrics';
 import { ContactNetworks } from './contact-networks';
 
-export function AddContactForm({ onSuccess }: AddContactFormProps) {
+export function AddContactForm({ onCancel, onSuccess }: AddContactFormProps) {
   const t = useI18nContext();
   const dispatch = useDispatch();
   const { trackEvent, createEventBuilder } = useAnalytics();
@@ -137,26 +137,21 @@ export function AddContactForm({ onSuccess }: AddContactFormProps) {
   }, [selectedChainId, enteredDomainName, input, dispatch]);
 
   useEffect(() => {
-    if (qrCodeData?.type !== 'address' || !qrCodeData?.values?.address) {
-      return;
-    }
-
-    const scannedAddress = qrCodeData.values.address.toLowerCase();
-    const addresses = [
-      ...(domainResolutions?.map(
-        (r: { resolvedAddress: string }) => r.resolvedAddress,
-      ) ?? []),
-      selectedAddress,
-    ]
-      .filter(Boolean)
-      .map((addr: string) => addr.toLowerCase());
-
-    if (!addresses.includes(scannedAddress)) {
-      queueMicrotask(() => {
+    if (qrCodeData?.type === 'address' && qrCodeData?.values?.address) {
+      const scannedAddress = qrCodeData.values.address.toLowerCase();
+      const addresses = [
+        ...(domainResolutions?.map(
+          (r: { resolvedAddress: string }) => r.resolvedAddress,
+        ) ?? []),
+        selectedAddress,
+      ]
+        .filter(Boolean)
+        .map((addr: string) => addr.toLowerCase());
+      if (!addresses.includes(scannedAddress)) {
         setInput(scannedAddress);
         validate(scannedAddress);
-      });
-      dispatch(qrCodeDetected(null as never));
+        dispatch(qrCodeDetected(null as never));
+      }
     }
   }, [qrCodeData, domainResolutions, selectedAddress, validate, dispatch]);
 
@@ -367,7 +362,7 @@ export function AddContactForm({ onSuccess }: AddContactFormProps) {
             size={SelectButtonSize.Lg}
             isBlock
             backgroundColor={BackgroundColor.backgroundMuted}
-            borderColor={BorderColor.borderMuted}
+            borderColor={BorderColor.borderDefault}
             borderRadius={BorderRadius.XL}
             startAccessory={
               <AvatarNetwork
@@ -398,13 +393,28 @@ export function AddContactForm({ onSuccess }: AddContactFormProps) {
         )}
       </Box>
 
-      <Box padding={4} paddingBottom={6} className="bg-background-default">
+      <Box
+        flexDirection={BoxFlexDirection.Row}
+        gap={4}
+        padding={4}
+        paddingBottom={6}
+        className="bg-background-default"
+      >
+        <Button
+          variant={ButtonVariant.Secondary}
+          size={ButtonSize.Lg}
+          onClick={onCancel}
+          className="flex-1 rounded-xl"
+          data-testid="page-container-footer-cancel"
+        >
+          {t('cancel')}
+        </Button>
         <Button
           variant={ButtonVariant.Primary}
           size={ButtonSize.Lg}
           isDisabled={isSaveDisabled}
           onClick={handleSubmit}
-          isFullWidth
+          className="flex-1 rounded-xl"
           data-testid="page-container-footer-next"
         >
           {t('save')}

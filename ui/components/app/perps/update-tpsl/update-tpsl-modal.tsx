@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
   ModalContent,
@@ -71,13 +71,11 @@ export const UpdateTPSLModal = ({
     [],
   );
 
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
+  useEffect(() => {
     if (!isOpen) {
       setSubmitState(null);
     }
-  }
+  }, [isOpen]);
 
   return (
     <Modal

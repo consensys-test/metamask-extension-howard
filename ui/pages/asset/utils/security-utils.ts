@@ -1,7 +1,7 @@
 import { IconColor, IconName, TextColor } from '@metamask/design-system-react';
-import type { TokenTrustConfig } from '#shared/lib/token-search/types';
 import {
   getSecurityTrustBadgeConfig,
+  type SecurityTrustInlineBadgeConfig,
   type SecurityTrustTranslate,
 } from '../../../components/app/security-trust';
 import type {
@@ -21,7 +21,7 @@ export type ResultTypeConfig = {
   icon?: IconName;
   iconColor?: IconColor;
   alertSeverity?: SecurityAlertSeverity;
-  badge?: TokenTrustConfig | null;
+  badge?: SecurityTrustInlineBadgeConfig | null;
   sheetTitle?: string;
   getSheetDescription?: (tokenSymbol: string | undefined) => string;
 };
@@ -260,7 +260,7 @@ export const getNegativeFeatureLabels = (
   },
   IMPERSONATOR_LOW_CONFIDENCE: {
     label: t('securityTrustFeatureImpersonatorLowConfidence'),
-    type: 'Info',
+    type: 'Warning',
   },
   IS_MINTABLE: {
     label: t('securityTrustFeatureIsMintable'),

@@ -5,7 +5,6 @@ import { useSelector } from 'react-redux';
 import {
   BITCOIN_WALLET_SNAP_ID,
   SOLANA_WALLET_SNAP_ID,
-  STELLAR_WALLET_SNAP_ID,
   TRON_WALLET_SNAP_ID,
 } from '../../../../../../shared/lib/accounts';
 import LoadingScreen from '../../../../../components/ui/loading-screen';
@@ -23,8 +22,7 @@ export const Loader = () => {
       (approval) =>
         approval.origin === SOLANA_WALLET_SNAP_ID ||
         approval.origin === BITCOIN_WALLET_SNAP_ID ||
-        approval.origin === TRON_WALLET_SNAP_ID ||
-        approval.origin === STELLAR_WALLET_SNAP_ID,
+        approval.origin === TRON_WALLET_SNAP_ID,
     );
     if (pendingSend) {
       navigate(`${CONFIRMATION_V_NEXT_ROUTE}/${pendingSend.id}`, {

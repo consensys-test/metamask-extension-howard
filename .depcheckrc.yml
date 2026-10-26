@@ -121,7 +121,6 @@ ignores:
   - '@metamask/bitcoin-wallet-snap'
   - '@metamask/solana-wallet-snap'
   - '@metamask/tron-wallet-snap'
-  - '@metamask/stellar-wallet-snap'
   - '@metamask/institutional-wallet-snap'
   - '@metamask/gator-permissions-snap'
   - '@metamask/permissions-kernel-snap'

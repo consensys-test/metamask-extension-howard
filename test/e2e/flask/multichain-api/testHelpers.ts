@@ -12,7 +12,7 @@ import {
   METAMASK_INPAGE,
 } from '../../../../app/scripts/constants/stream';
 import ConnectAccountConfirmation from '../../page-objects/pages/confirmations/connect-account-confirmation';
-import EditConnectedAccountsPage from '../../page-objects/pages/permission/edit-connected-accounts-page';
+import EditConnectedAccountsModal from '../../page-objects/pages/dialog/edit-connected-accounts-modal';
 
 export type FixtureCallbackArgs = { driver: Driver; extensionId: string };
 
@@ -70,9 +70,9 @@ export const addAccountInWalletAndAuthorize = async (
   await connectAccountConfirmation.checkPageIsLoaded();
   await connectAccountConfirmation.openEditAccountsModal();
 
-  const editConnectedAccountsPage = new EditConnectedAccountsPage(driver);
-  await editConnectedAccountsPage.checkPageIsLoaded();
-  await editConnectedAccountsPage.addNewAccount();
+  const editConnectedAccountsModal = new EditConnectedAccountsModal(driver);
+  await editConnectedAccountsModal.checkPageIsLoaded();
+  await editConnectedAccountsModal.addNewAccount();
 
   await connectAccountConfirmation.checkPageIsLoaded();
   await connectAccountConfirmation.confirmConnect();

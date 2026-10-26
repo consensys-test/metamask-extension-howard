@@ -71,21 +71,11 @@ describe('NFT full image', () => {
   });
 
   it('should match snapshot', async () => {
-    const rafSpy = jest
-      .spyOn(window, 'requestAnimationFrame')
-      .mockImplementation((callback) => {
-        callback();
-        return 0;
-      });
-
     const { container } = renderWithProvider(<NftFullImage />, mockStore);
 
     await waitFor(() => {
-      expect(container.querySelector('.fade-in.visible')).toBeTruthy();
+      expect(container).toMatchSnapshot();
     });
-    expect(container).toMatchSnapshot();
-
-    rafSpy.mockRestore();
   });
 
   it('should show the first image if an NFT has an array of images', async () => {

@@ -18,7 +18,6 @@ import {
   TextColor,
   TextVariant,
 } from '@metamask/design-system-react';
-import { AccountTypeLabel } from '../account-type-label/account-type-label';
 import { shortenAddress } from '../../../helpers/utils/util';
 import { getImageForChainId } from '../../../selectors/multichain';
 import { convertCaipToHexChainId } from '../../../../shared/lib/network.utils';
@@ -32,7 +31,7 @@ export type CopyParams = {
   /**
    * Callback function to execute when the copy action is triggered
    */
-  callback: () => Promise<boolean>;
+  callback: () => void;
 };
 
 type QrParams = {
@@ -57,10 +56,6 @@ type MultichainAddressRowProps = {
    */
   networkName: string;
   /**
-   * Account type used to show a Bitcoin address label beside the network name
-   */
-  accountType?: string;
-  /**
    * Address string to display (will be truncated)
    */
   address: string;
@@ -81,7 +76,6 @@ type MultichainAddressRowProps = {
 export const MultichainAddressRow = ({
   chainId,
   networkName,
-  accountType,
   address,
   copyActionParams,
   qrActionParams,
@@ -103,17 +97,8 @@ export const MultichainAddressRow = ({
   const timeoutRef = useRef<number | null>(null);
 
   // Update `subText` when the address prop changes
-  const prevAddressRef = useRef<typeof address | undefined>(undefined);
   useEffect(() => {
-    if (prevAddressRef.current === undefined) {
-      prevAddressRef.current = address;
-      return;
-    }
-    if (address === prevAddressRef.current) {
-      return;
-    }
-    prevAddressRef.current = address;
-    queueMicrotask(() => setSubText(truncatedAddress));
+    setSubText(truncatedAddress);
   }, [address, truncatedAddress]);
 
   // Cleanup timeout when component unmounts
@@ -127,19 +112,16 @@ export const MultichainAddressRow = ({
   }, []);
 
   // Handle "Copy" button click events
-  const handleCopyClick = async () => {
+  const handleCopyClick = () => {
     // Clear existing timeout if clicking multiple times in rapid succession
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Trigger copy callback and update UI state
-    const copied = await copyActionParams.callback();
-    if (!copied) {
-      return;
-    }
-
     setAddressCopied(true);
+
+    // Trigger copy callback and update UI state
+    copyActionParams.callback();
     setSubText(copyActionParams.message);
     setCopyIcon(IconName.CopySuccess);
 
@@ -189,24 +171,16 @@ export const MultichainAddressRow = ({
         alignItems={BoxAlignItems.Start}
         className="min-w-0 flex-1"
       >
-        <Box
-          flexDirection={BoxFlexDirection.Row}
-          alignItems={BoxAlignItems.Center}
-          gap={1}
-          className="min-w-0 w-full"
+        <Text
+          variant={TextVariant.BodyMd}
+          fontWeight={FontWeight.Medium}
+          color={TextColor.TextDefault}
+          data-testid="multichain-address-row-network-name"
+          ellipsis
+          className="w-full"
         >
-          <Text
-            variant={TextVariant.BodyMd}
-            fontWeight={FontWeight.Medium}
-            color={TextColor.TextDefault}
-            data-testid="multichain-address-row-network-name"
-            ellipsis
-            className="min-w-0"
-          >
-            {networkName}
-          </Text>
-          <AccountTypeLabel accountType={accountType} />
-        </Box>
+          {networkName}
+        </Text>
         <Text
           variant={TextVariant.BodySm}
           color={

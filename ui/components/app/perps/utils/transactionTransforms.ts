@@ -133,7 +133,6 @@ export function aggregateFillsByTimestamp(fills: OrderFill[]): OrderFill[] {
     // Sum sizes, PnLs, and fees
     let totalSize = new BigNumber(0);
     let totalPnl = new BigNumber(0);
-    const hasKnownPnl = groupedFills.every((fill) => fill.pnl !== undefined);
     let totalFee = new BigNumber(0);
     let totalNotional = new BigNumber(0); // For VWAP calculation: sum of (size * price)
 
@@ -145,12 +144,11 @@ export function aggregateFillsByTimestamp(fills: OrderFill[]): OrderFill[] {
     for (const fill of groupedFills) {
       const size = new BigNumber(fill.size);
       const price = new BigNumber(fill.price);
+      const pnl = new BigNumber(fill.pnl || '0');
       const fee = new BigNumber(fill.fee || '0');
 
       totalSize = totalSize.plus(size);
-      if (fill.pnl !== undefined) {
-        totalPnl = totalPnl.plus(fill.pnl);
-      }
+      totalPnl = totalPnl.plus(pnl);
       totalFee = totalFee.plus(fee);
       totalNotional = totalNotional.plus(size.times(price));
 
@@ -182,7 +180,7 @@ export function aggregateFillsByTimestamp(fills: OrderFill[]): OrderFill[] {
       side: firstFill.side,
       size: totalSize.toString(),
       price: vwapPrice.toString(),
-      pnl: hasKnownPnl ? totalPnl.toString() : undefined,
+      pnl: totalPnl.toString(),
       direction: firstFill.direction,
       fee: totalFee.toString(),
       feeToken: firstFill.feeToken,
@@ -265,7 +263,6 @@ export function transformFillsToTransactions(
     }
 
     let amountBN = new BigNumber(0);
-    let hasKnownAmount = true;
     let displayAmount = '';
     let fillSize = size;
     if (isFlipped) {
@@ -282,16 +279,12 @@ export function transformFillsToTransactions(
       isPositive = false; // Fee is always a cost
     } else if (isClosed || isSell || isFlipped || isAutoDeleveraging) {
       // For closing positions: show PnL minus fee
-      hasKnownAmount = fill.pnl !== undefined;
-      if (fill.pnl !== undefined) {
-        amountBN = new BigNumber(fill.pnl).minus(fill.fee || 0);
-      }
+      const pnlValue = new BigNumber(fill.pnl || 0);
+      const feeValue = new BigNumber(fill.fee || 0);
+      amountBN = pnlValue.minus(feeValue);
       const netPnL = amountBN.toNumber();
       // For display, show + for positive, - for negative, nothing for 0
-      if (!hasKnownAmount) {
-        displayAmount = t ? t('unknown') : 'Unknown';
-        isPositive = false;
-      } else if (netPnL > 0) {
+      if (netPnL > 0) {
         displayAmount = `+$${Math.abs(netPnL).toFixed(2)}`;
         isPositive = true;
       } else if (netPnL < 0) {
@@ -375,9 +368,7 @@ export function transformFillsToTransactions(
         // this is the amount that is displayed in the transaction view for what has been spent/gained
         // it may be the fee spent or the pnl depending on the case
         amount: displayAmount,
-        amountNumber: hasKnownAmount
-          ? parseFloat(amountBN.toFixed(2))
-          : undefined,
+        amountNumber: parseFloat(amountBN.toFixed(2)),
         isPositive,
         size: fillSize,
         entryPrice: price,
@@ -469,7 +460,6 @@ export function transformOrdersToTransactions(
       timestamp,
       symbol,
       order: {
-        orderId,
         text: statusText,
         statusType: orderStatusType,
         type: orderTypeSlug.includes('limit') ? 'limit' : 'market',

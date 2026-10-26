@@ -1,6 +1,5 @@
 import { SnapId } from '@metamask/snaps-sdk';
 import { isFlask } from '../build-types';
-import { getBooleanFlag } from '../environment';
 
 /**
  * Whether to force local Snaps to be treated as preinstalled Snaps.
@@ -9,7 +8,7 @@ import { getBooleanFlag } from '../environment';
  * are normally reserved for preinstalled Snaps.
  */
 const FORCE_PREINSTALLED_SNAPS =
-  isFlask() && getBooleanFlag(process.env.FORCE_PREINSTALLED_SNAPS);
+  isFlask() && process.env.FORCE_PREINSTALLED_SNAPS === 'true';
 
 export const PREINSTALLED_SNAPS = [
   'npm:@metamask/message-signing-snap',
@@ -20,7 +19,6 @@ export const PREINSTALLED_SNAPS = [
   'npm:@metamask/bitcoin-wallet-snap',
   'npm:@metamask/solana-wallet-snap',
   'npm:@metamask/tron-wallet-snap',
-  'npm:@metamask/stellar-wallet-snap',
   'npm:@metamask/permissions-kernel-snap',
   'npm:@metamask/gator-permissions-snap',
 ];

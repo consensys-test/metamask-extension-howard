@@ -1,5 +1,2 @@
-export { TokenIcon } from '../../../../components/app/token-icon';
-export type {
-  TokenIconProps,
-  TokenIconSize,
-} from '../../../../components/app/token-icon';
+export { TokenIcon } from './token-icon';
+export type { TokenIconProps } from './token-icon';

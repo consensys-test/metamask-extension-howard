@@ -1,18 +1,5 @@
 import { Driver } from '../../../webdriver/driver';
 
-/**
- * Settings → Backup and sync: account / contact sync toggles.
- *
- * Screen: `#/settings/backup-and-sync`, reached from
- * `SettingsPage.goToBackupAndSyncSettings`.
- * Owns: page load checks and toggling backup-and-sync, account sync, and
- * contact sync.
- * Boundaries: toggle surface only. QR sync / add-wallet flows belong to
- * `SyncAccountsSettingsPage`; contact CRUD belongs to `ContactsSettings`.
- * Related: `SettingsPage`, `SyncAccountsSettingsPage`, `ContactsSettings`.
- *
- * @see ui/pages/settings/backup-and-sync-tab/backup-and-sync-tab.tsx
- */
 class BackupAndSyncSettings {
   private readonly accountSyncToggle =
     '[data-testid="account-syncing-toggle-container"]';
@@ -25,13 +12,6 @@ class BackupAndSyncSettings {
 
   private readonly driver: Driver;
 
-  private readonly rampsSyncToggle =
-    '[data-testid="ramps-syncing-toggle-container"]';
-
-  private readonly settingsPage = {
-    testId: 'parent-selector-settings-page',
-  };
-
   constructor(driver: Driver) {
     this.driver = driver;
   }
@@ -42,8 +22,6 @@ class BackupAndSyncSettings {
         this.accountSyncToggle,
         this.backupAndSyncToggle,
         this.contactSyncToggle,
-        this.settingsPage,
-        this.rampsSyncToggle,
       ]);
     } catch (e) {
       console.log(
@@ -68,11 +46,6 @@ class BackupAndSyncSettings {
   async toggleContactSync(): Promise<void> {
     console.log('Toggling contact sync setting');
     await this.driver.clickElement(this.contactSyncToggle);
-  }
-
-  async toggleRampsSync(): Promise<void> {
-    console.log('Toggling ramps order sync setting');
-    await this.driver.clickElement(this.rampsSyncToggle);
   }
 }
 

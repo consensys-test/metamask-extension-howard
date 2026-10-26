@@ -1,8 +1,4 @@
 import { Messenger } from '@metamask/messenger';
-import type {
-  AuthenticationControllerState,
-  AuthenticationControllerStateChangeEvent,
-} from '@metamask/profile-sync-controller/auth';
 import {
   type RemoteFeatureFlagControllerEnableAction,
   type RemoteFeatureFlagControllerDisableAction,
@@ -24,30 +20,10 @@ type RemoteFeatureFlagToggleActions =
   | RemoteFeatureFlagControllerDisableAction
   | RemoteFeatureFlagControllerUpdateRemoteFeatureFlagsAction;
 
-type RemoteFeatureFlagToggleEvents =
-  | PreferencesControllerStateChangeEvent
-  | OnboardingControllerStateChangeEvent
-  | AuthenticationControllerStateChangeEvent;
-
 type RemoteFeatureFlagToggleParentMessenger = RootMessenger<
   RemoteFeatureFlagToggleActions,
-  RemoteFeatureFlagToggleEvents
+  PreferencesControllerStateChangeEvent | OnboardingControllerStateChangeEvent
 >;
-
-/**
- * Read the canonical profile id used for threshold flag segmentation.
- *
- * @param srpSessionData - Persisted SRP session map from AuthenticationController.
- * @returns The first session's canonical profile id, or an empty string.
- */
-function getCanonicalProfileId(
-  srpSessionData: AuthenticationControllerState['srpSessionData'],
-): string {
-  return (
-    Object.entries(srpSessionData ?? {})?.[0]?.[1]?.profile
-      ?.canonicalProfileId ?? ''
-  );
-}
 
 /**
  * Wire the extension-side enable/disable orchestration for the wallet-owned
@@ -57,10 +33,8 @@ function getCanonicalProfileId(
  * `disabled` value; this keeps it in sync as the user completes onboarding or
  * toggles the external-services preference, and refreshes the flags whenever
  * the controller is (re-)enabled. Flags are only fetched once onboarding is
- * complete and external services are enabled. When a canonical profile id
- * becomes available (or changes), flags are force-refreshed so threshold
- * segmentation can reprocess against that id. The controller is driven
- * entirely over the messenger, so no controller instance needs to be passed in.
+ * complete and external services are enabled. The controller is driven entirely
+ * over the messenger, so no controller instance needs to be passed in.
  *
  * @param options - Options bag.
  * @param options.messenger - The root messenger to delegate from; a namespaced
@@ -68,25 +42,21 @@ function getCanonicalProfileId(
  * `RemoteFeatureFlagController` enable/disable/update actions.
  * @param options.preferencesState - The initial `PreferencesController` state.
  * @param options.onboardingState - The initial `OnboardingController` state.
- * @param options.authenticationState - The initial `AuthenticationController`
- * state, used to seed the canonical-profile-id comparison so a returning
- * signed-in user does not trigger a redundant force refresh.
  */
 export function setupRemoteFeatureFlagToggle({
   messenger,
   preferencesState,
   onboardingState,
-  authenticationState,
 }: {
   messenger: RemoteFeatureFlagToggleParentMessenger;
   preferencesState: Pick<PreferencesControllerState, 'useExternalServices'>;
   onboardingState: Pick<OnboardingControllerState, 'completedOnboarding'>;
-  authenticationState: Pick<AuthenticationControllerState, 'srpSessionData'>;
 }): void {
   const toggleMessenger = new Messenger<
     'RemoteFeatureFlagToggle',
     RemoteFeatureFlagToggleActions,
-    RemoteFeatureFlagToggleEvents,
+    | PreferencesControllerStateChangeEvent
+    | OnboardingControllerStateChangeEvent,
     RemoteFeatureFlagToggleParentMessenger
   >({
     namespace: 'RemoteFeatureFlagToggle',
@@ -102,7 +72,6 @@ export function setupRemoteFeatureFlagToggle({
     events: [
       'PreferencesController:stateChange',
       'OnboardingController:stateChange',
-      'AuthenticationController:stateChange',
     ],
   });
 
@@ -146,24 +115,5 @@ export function setupRemoteFeatureFlagToggle({
       }
       return true;
     }, onboardingState),
-  );
-
-  // Force-refresh flags when a canonical profile id first becomes available
-  // or later changes. `force: true` bypasses the fetch cache so threshold
-  // flags reprocess against the new id; a no-op if the controller is disabled.
-  toggleMessenger.subscribe(
-    'AuthenticationController:stateChange',
-    previousValueComparator((prevState, currState) => {
-      const prev = getCanonicalProfileId(prevState.srpSessionData);
-      const curr = getCanonicalProfileId(currState.srpSessionData);
-      if (curr !== prev) {
-        toggleMessenger
-          .call('RemoteFeatureFlagController:updateRemoteFeatureFlags', true)
-          .catch((error) => {
-            console.error('Failed to update remote feature flags:', error);
-          });
-      }
-      return true;
-    }, authenticationState),
   );
 }

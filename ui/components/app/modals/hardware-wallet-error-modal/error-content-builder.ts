@@ -105,12 +105,16 @@ export function buildErrorContent(
     // Locked device errors
     case ErrorCode.AuthenticationDeviceLocked:
       return {
-        variant: HardwareWalletErrorContentVariant.Description,
+        variant: HardwareWalletErrorContentVariant.Recovery,
         icon: IconName.Lock,
         iconColor: IconColor.IconDefault,
         title: t('hardwareWalletErrorTitleDeviceLocked', [t(walletType)]),
         showRepairLink,
-        description: t('hardwareWalletErrorDeviceLockedDescription'),
+        recoveryInstructions: addRecoveryInstruction(
+          [t('hardwareWalletErrorRecoveryUnlock1', [t(walletType)])],
+          walletType === HardwareWalletType.Ledger,
+          t('hardwareWalletErrorRecoveryUnlock2'),
+        ),
       };
 
     // Device state - Wrong app
@@ -131,20 +135,6 @@ export function buildErrorContent(
           t('hardwareWalletErrorTitleBlindSignNotSupportedInstruction1'),
           t('hardwareWalletErrorTitleBlindSignNotSupportedInstruction2'),
         ],
-      };
-
-    // Ledger can only sign EIP-712 typed data V4.
-    // Retrying cannot succeed: the dApp requested an unsupported signature type.
-    case ErrorCode.DeviceStateOnlyV4Supported:
-      return {
-        variant: HardwareWalletErrorContentVariant.Description,
-        icon: IconName.Danger,
-        iconColor: IconColor.WarningDefault,
-        title: t('hardwareWalletErrorTitleUnsupportedSignature'),
-        showRepairLink,
-        description: t('hardwareWalletErrorOnlyV4SupportedDescription', [
-          t(walletType),
-        ]),
       };
 
     // Device state - Disconnected/Connection issues

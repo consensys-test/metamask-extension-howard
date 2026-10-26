@@ -45,7 +45,6 @@ import {
 } from '../../../../hooks/perps';
 import { usePerpsAttribution } from '../../../../hooks/perps/usePerpsAttribution';
 import { usePerpsOrderFees } from '../../../../hooks/perps/usePerpsOrderFees';
-import { getPerpsNotionalUsd } from '../../../../hooks/perps/perps-fee-utils';
 import { MetaMetricsEventName } from '../../../../../shared/constants/metametrics';
 import { submitRequestToBackground } from '../../../../store/background-connection';
 import { getPerpsStreamManager } from '../../../../providers/perps';
@@ -129,6 +128,10 @@ export const UpdateTPSLModalContent = ({
   const { gate } = useSelectedAccountComplianceGate();
   const { replacePerpsToastByKey } = usePerpsToast();
   const { privacyMode } = useSelector(getPreferences);
+  const { feeRate: closingFeeRate } = usePerpsOrderFees({
+    symbol: position.symbol,
+    orderType: 'market',
+  });
   const [isGeoBlockModalOpen, setIsGeoBlockModalOpen] = useState(false);
 
   const [editingTpPrice, setEditingTpPrice] = useState(
@@ -259,18 +262,6 @@ export const UpdateTPSLModalContent = ({
     () => Number.parseFloat(position.size.replaceAll(',', '')) || 0,
     [position.size],
   );
-
-  // TradingService applies one fee resolution to the entire TP/SL batch.
-  const { feeRate: closingFeeRate } = usePerpsOrderFees({
-    symbol: position.symbol,
-    orderType: 'market',
-    amount: String(
-      getPerpsNotionalUsd({
-        size: signedSize,
-        price: [editingTpPrice, editingSlPrice],
-      }),
-    ),
-  });
 
   const estimatedPnlAtTp = useMemo(() => {
     if (closingFeeRate === undefined) {

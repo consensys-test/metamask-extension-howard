@@ -113,7 +113,6 @@ describe('Confirm Recovery Phrase Component', () => {
       replace: true,
     });
   });
-
   it('should have 3 recovery phrase inputs', () => {
     const { queryAllByTestId } = renderWithProvider(
       <ConfirmRecoveryPhrase {...props} />,
@@ -125,7 +124,7 @@ describe('Confirm Recovery Phrase Component', () => {
     );
   });
 
-  it('does not show the confirm modal when words are still missing', () => {
+  it('should not enable confirm recovery phrase with two missing words', () => {
     const { queryByTestId, queryAllByTestId } = renderWithProvider(
       <ConfirmRecoveryPhrase {...props} />,
       mockStore,
@@ -135,14 +134,74 @@ describe('Confirm Recovery Phrase Component', () => {
       /recovery-phrase-quiz-unanswered-/u,
     );
 
-    fireEvent.click(recoveryPhraseInputs[0]);
-    fireEvent.click(recoveryPhraseInputs[1]);
+    const wrongInputEvent = {
+      target: {
+        value: 'wrong',
+      },
+    };
 
-    expect(queryByTestId('confirm-srp-modal')).not.toBeInTheDocument();
-    expect(queryByTestId('recovery-phrase-confirm')).not.toBeInTheDocument();
+    fireEvent.change(recoveryPhraseInputs[0], wrongInputEvent);
+
+    const confirmRecoveryPhraseButton = queryByTestId(
+      'recovery-phrase-confirm',
+    );
+    expect(confirmRecoveryPhraseButton).toBeDisabled();
   });
 
-  it('shows the success modal automatically after selecting all quiz words', () => {
+  it('should not enable confirm recovery phrase with one missing words', () => {
+    const { queryByTestId, queryAllByTestId } = renderWithProvider(
+      <ConfirmRecoveryPhrase {...props} />,
+      mockStore,
+    );
+
+    const recoveryPhraseInputs = queryAllByTestId(
+      /recovery-phrase-quiz-unanswered-/u,
+    );
+
+    const wrongInputEvent = {
+      target: {
+        value: 'wrong',
+      },
+    };
+
+    fireEvent.change(recoveryPhraseInputs[0], wrongInputEvent);
+    fireEvent.change(recoveryPhraseInputs[1], wrongInputEvent);
+
+    const confirmRecoveryPhraseButton = queryByTestId(
+      'recovery-phrase-confirm',
+    );
+
+    expect(confirmRecoveryPhraseButton).toBeDisabled();
+  });
+
+  it('should not enable confirm recovery phrase with wrong word inputs', () => {
+    const { queryByTestId, queryAllByTestId } = renderWithProvider(
+      <ConfirmRecoveryPhrase {...props} />,
+      mockStore,
+    );
+
+    const recoveryPhraseInputs = queryAllByTestId(
+      /recovery-phrase-quiz-unanswered-/u,
+    );
+
+    const wrongInputEvent = {
+      target: {
+        value: 'wrong',
+      },
+    };
+
+    fireEvent.change(recoveryPhraseInputs[0], wrongInputEvent);
+    fireEvent.change(recoveryPhraseInputs[1], wrongInputEvent);
+    fireEvent.change(recoveryPhraseInputs[2], wrongInputEvent);
+
+    const confirmRecoveryPhraseButton = queryByTestId(
+      'recovery-phrase-confirm',
+    );
+
+    expect(confirmRecoveryPhraseButton).toBeDisabled();
+  });
+
+  it('should enable confirm recovery phrase with correct word inputs', () => {
     const { queryByTestId, queryAllByTestId, getByText } = renderWithProvider(
       <ConfirmRecoveryPhrase {...props} />,
       mockStore,
@@ -152,10 +211,20 @@ describe('Confirm Recovery Phrase Component', () => {
       /recovery-phrase-quiz-unanswered-/u,
     );
 
+    // click and answer the srp quiz
     clickAndAnswerSrpQuiz(quizUnansweredChips);
 
-    expect(queryByTestId('confirm-srp-modal')).toBeInTheDocument();
-    expect(queryByTestId('recovery-phrase-confirm')).not.toBeInTheDocument();
+    // assert the unanswered chips are not in the document
+    const quizAnsweredChips = queryAllByTestId(
+      /recovery-phrase-quiz-answered-/u,
+    );
+    expect(quizAnsweredChips).toHaveLength(3);
+
+    const confirmRecoveryPhraseButton = queryByTestId(
+      'recovery-phrase-confirm',
+    );
+    expect(confirmRecoveryPhraseButton).not.toBeDisabled();
+    fireEvent.click(confirmRecoveryPhraseButton as HTMLElement);
 
     const gotItButton = getByText(messages.gotIt.message);
     expect(gotItButton).toBeInTheDocument();
@@ -172,7 +241,7 @@ describe('Confirm Recovery Phrase Component', () => {
       .spyOn(BrowserRuntimeUtils, 'getBrowserName')
       .mockReturnValue(PLATFORM_FIREFOX);
 
-    const { queryAllByTestId, getByText } = renderWithProvider(
+    const { queryByTestId, queryAllByTestId, getByText } = renderWithProvider(
       <ConfirmRecoveryPhrase {...props} />,
       mockStore,
     );
@@ -181,8 +250,19 @@ describe('Confirm Recovery Phrase Component', () => {
       /recovery-phrase-quiz-unanswered-/u,
     );
 
+    // click and answer the srp quiz
     clickAndAnswerSrpQuiz(quizUnansweredChips);
 
+    const quizAnsweredChips = queryAllByTestId(
+      /recovery-phrase-quiz-answered-/u,
+    );
+    expect(quizAnsweredChips).toHaveLength(3);
+
+    const confirmRecoveryPhraseButton = queryByTestId(
+      'recovery-phrase-confirm',
+    );
+
+    fireEvent.click(confirmRecoveryPhraseButton as HTMLElement);
     fireEvent.click(getByText(messages.gotIt.message));
 
     expect(setSeedPhraseBackedUp).toHaveBeenCalledWith(true);

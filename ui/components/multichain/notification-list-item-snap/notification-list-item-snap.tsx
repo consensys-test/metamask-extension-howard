@@ -1,12 +1,6 @@
 import React from 'react';
 
-import {
-  Icon,
-  IconColor,
-  IconName,
-  IconSize,
-} from '@metamask/design-system-react';
-import { Box, Text } from '../../component-library';
+import { Box, Icon, IconName, Text, IconSize } from '../../component-library';
 import {
   AlignItems,
   BlockSize,
@@ -15,6 +9,7 @@ import {
   FlexDirection,
   FontWeight,
   JustifyContent,
+  IconColor,
   TextColor,
   TextVariant,
   TextAlign,
@@ -104,7 +99,7 @@ export const NotificationListItemSnap = ({
           >
             <Icon
               name={IconName.FullCircle}
-              color={IconColor.PrimaryDefault}
+              color={IconColor.primaryDefault}
               className="notification-list-item__unread-dot__dot"
               data-testid="unread-dot"
             />

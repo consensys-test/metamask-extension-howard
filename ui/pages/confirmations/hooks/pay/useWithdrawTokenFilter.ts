@@ -36,14 +36,8 @@ export function usePostQuoteWithdrawTokenFilter(): WithdrawTokenFilterResult {
     selectPayQuoteConfig(state, postQuoteWithdrawTransactionType),
   );
   const allowlist = config.tokens;
-  // `tokens: {}` is truthy — require at least one chain with addresses so an
-  // empty default allowlist does not block preferred-token auto-select forever.
-  const hasAllowlistEntries = Boolean(
-    allowlist &&
-    Object.values(allowlist).some((addresses) => addresses?.length > 0),
-  );
   const isFilterApplied =
-    isPostQuoteWithdraw && config.enabled === true && hasAllowlistEntries;
+    isPostQuoteWithdraw && config.enabled === true && Boolean(allowlist);
 
   const tokenFilter = useMemo(() => {
     if (!isFilterApplied || !allowlist) {

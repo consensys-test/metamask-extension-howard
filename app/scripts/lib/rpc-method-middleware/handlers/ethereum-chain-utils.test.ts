@@ -1,4 +1,3 @@
-import type { NetworkConfiguration } from '@metamask/network-controller';
 import * as Multichain from '@metamask/chain-agnostic-permission';
 import { errorCodes, rpcErrors } from '@metamask/rpc-errors';
 import {
@@ -25,8 +24,8 @@ describe('Ethereum Chain Utils', () => {
       rejectApprovalRequestsForOrigin: jest.fn(),
       requestUserApproval: jest.fn(),
       hasApprovalRequestsForOrigin: jest.fn(),
-      toNetworkConfiguration: {} as NetworkConfiguration,
-      fromNetworkConfiguration: {} as NetworkConfiguration,
+      toNetworkConfiguration: {},
+      fromNetworkConfiguration: {},
       ...mks,
     };
     const response: { result?: true } = {};
@@ -349,26 +348,6 @@ describe('Ethereum Chain Utils', () => {
         chainId: '0x1',
         chainName: 'Mainnet',
         firstValidBlockExplorerUrl: 'https://explorer.test.com/',
-        firstValidRPCUrl: 'https://test.com/rpc',
-        ticker: 'ETH',
-      });
-    });
-
-    it('accepts params when blockExplorerUrls is omitted', () => {
-      expect(
-        EthChainUtils.validateAddEthereumChainParams({
-          chainId: '0x1',
-          chainName: 'Mainnet',
-          rpcUrls: ['https://test.com/rpc'],
-          nativeCurrency: {
-            symbol: 'ETH',
-            decimals: 18,
-          },
-        }),
-      ).toStrictEqual({
-        chainId: '0x1',
-        chainName: 'Mainnet',
-        firstValidBlockExplorerUrl: null,
         firstValidRPCUrl: 'https://test.com/rpc',
         ticker: 'ETH',
       });

@@ -172,11 +172,10 @@ describe('HardwareWalletStateManager', () => {
           wrapper: createWrapper(store),
         });
 
-        result.current.refs.connectingPromiseRef.current =
-          Promise.resolve(null);
+        result.current.refs.connectingPromiseRef.current = Promise.resolve();
         result.current.refs.ensureDeviceReadyPromiseRef.current.set(
           'key',
-          Promise.resolve(null),
+          Promise.resolve(true),
         );
         result.current.refs.currentConnectionIdRef.current = 1;
         result.current.refs.isConnectingRef.current = true;
@@ -261,8 +260,8 @@ describe('HardwareWalletStateManager', () => {
       });
     });
 
-    describe('wallet type ref synchronization', () => {
-      it('syncs walletTypeRef with current wallet type after mount', () => {
+    describe('ref synchronization during render', () => {
+      it('syncs walletTypeRef with current wallet type on initial render', () => {
         const store = mockStore(createMockState(KeyringTypes.ledger));
 
         const { result } = renderHook(() => useHardwareWalletStateManager(), {

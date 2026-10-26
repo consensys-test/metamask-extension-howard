@@ -135,15 +135,10 @@ describe('Send flow', function (this: Suite) {
         const confirmation = new SnapTransactionConfirmation(driver);
         await confirmation.checkPageIsLoaded();
         await confirmation.checkAccountIsDisplayed('Account 1');
-        await confirmation.clickFooterButton({ button: 'confirm' });
+        await confirmation.clickFooterConfirmButton();
 
         const activityTab = new ActivityTab(driver);
-        // 2 confirmed txs: the send + the initial funding airdrop from the
-        // local solana-test-validator (requestAirdrop in the seeder).
-        await activityTab.checkTxAction({
-          action: 'Sent SOL',
-          confirmedTx: 2,
-        });
+        await activityTab.checkTxAction({ action: 'Sent SOL' });
         await activityTab.checkTxAmountInActivity('-0.1 SOL', 1);
         await activityTab.checkNoFailedTransactions();
       },
@@ -183,7 +178,7 @@ describe('Send flow', function (this: Suite) {
         await confirmation.checkPageIsLoaded();
         await confirmation.checkAccountIsDisplayed('Account 1');
         await confirmation.checkSecurityAlertsErrorIsDisplayed();
-        await confirmation.clickFooterButton({ button: 'confirm' });
+        await confirmation.clickFooterConfirmButton();
         const activityTab = new ActivityTab(driver);
         await activityTab.checkFailedTxNumberDisplayedInActivity();
         await activityTab.checkTxAction({

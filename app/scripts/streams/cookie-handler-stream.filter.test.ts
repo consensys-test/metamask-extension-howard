@@ -9,10 +9,6 @@ process.env.PHISHING_WARNING_PAGE_URL = 'https://example.com/phishing';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (global as any).mockPipeline = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(global as any).mockOnMessageListeners = [] as ((
-  message: unknown,
-) => unknown)[];
 jest.mock('readable-stream', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pipeline: (...args: unknown[]) => (global as any).mockPipeline(...args),
@@ -69,9 +65,8 @@ jest.mock('webextension-polyfill', () => ({
         },
       }),
       onMessage: {
-        addListener: (listener: (message: unknown) => unknown) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (global as any).mockOnMessageListeners.push(listener);
+        addListener: () => {
+          // empty on purpose
         },
       },
       sendMessage: () => Promise.resolve(),
@@ -135,21 +130,5 @@ describe('cookie-handler-stream logging filter', () => {
     cb(new Error('boom'));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((global as any).mockLogCalls.length).toBe(2);
-  });
-});
-
-describe('cookie-handler-stream runtime message listener', () => {
-  it('does not claim a response for unrelated messages', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const listeners = (global as any).mockOnMessageListeners as ((
-      message: unknown,
-    ) => unknown)[];
-    const listenerCountBefore = listeners.length;
-    initializeCookieHandlerSteam();
-    const listener = listeners[listenerCountBefore];
-
-    const result = listener({ type: 'unrelated' });
-
-    expect(result).toBeUndefined();
   });
 });

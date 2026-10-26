@@ -182,7 +182,7 @@ describe('compareFiatBalanceWithPriority', () => {
       });
       const assetB = createMockAsset({
         name: 'Asset B',
-        chainId: CHAIN_IDS.MAINNET,
+        chainId: CHAIN_IDS.LINEA_MAINNET,
       });
 
       const result = compareFiatBalanceWithPriority(assetA, assetB);
@@ -198,7 +198,7 @@ describe('compareFiatBalanceWithPriority', () => {
       });
       const assetB = createMockAsset({
         name: 'Asset B',
-        chainId: CHAIN_IDS.MAINNET,
+        chainId: CHAIN_IDS.LINEA_MAINNET,
         fiatBalance: 0,
       });
 

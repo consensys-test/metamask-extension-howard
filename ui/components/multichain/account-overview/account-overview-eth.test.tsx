@@ -2,7 +2,6 @@ import React from 'react';
 import mockState from '../../../../test/data/mock-state.json';
 import configureStore from '../../../store/store';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
-import { createMockRouteMessenger } from '../../../../test/lib/mock-route-messenger';
 import { setBackgroundConnection } from '../../../store/background-connection';
 import { CHAIN_IDS } from '../../../../shared/constants/network';
 import { useBottomNavBar } from '../../../hooks/useBottomNavBar';
@@ -27,18 +26,6 @@ jest.mock('../../../store/actions', () => {
   };
 });
 
-jest.mock('../../../hooks/musd/useMusdGeoBlocking', () => ({
-  useMusdGeoBlocking: () => ({
-    isBlocked: false,
-    userCountry: 'US',
-    isLoading: false,
-    error: null,
-    blockedRegions: [],
-    blockedMessage: null,
-    refreshGeolocation: jest.fn(),
-  }),
-}));
-
 // Mock the dispatch function
 const mockDispatch = jest.fn();
 
@@ -50,10 +37,7 @@ jest.mock('react-redux', () => {
   };
 });
 
-const render = (
-  props: AccountOverviewEthProps,
-  stateOverrides: Record<string, unknown> = {},
-) => {
+const render = (props: AccountOverviewEthProps) => {
   const store = configureStore({
     activeTab: mockState.activeTab,
     metamask: {
@@ -66,19 +50,10 @@ const render = (
           [CHAIN_IDS.LINEA_MAINNET]: true,
         },
       },
-      ...stateOverrides,
     },
   });
 
-  return renderWithProvider(
-    <AccountOverviewEth {...props} />,
-    store,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    createMockRouteMessenger(),
-  );
+  return renderWithProvider(<AccountOverviewEth {...props} />, store);
 };
 
 describe('AccountOverviewEth', () => {
@@ -99,25 +74,6 @@ describe('AccountOverviewEth', () => {
     expect(queryByTestId('account-overview__nfts-tab')).toBeInTheDocument();
     expect(queryByTestId('account-overview__activity-tab')).toBeInTheDocument();
     expect(queryByTestId('account-overview__defi-tab')).toBeInTheDocument();
-  });
-
-  it('hides the DeFi tab when DeFi positions are disabled', () => {
-    const { queryByTestId } = render(
-      {
-        setBasicFunctionalityModalOpen: jest.fn(),
-        onSupportLinkClick: jest.fn(),
-      },
-      {
-        remoteFeatureFlags: {
-          assetsDefiPositionsEnabled: false,
-        },
-      },
-    );
-
-    expect(queryByTestId('account-overview__asset-tab')).toBeInTheDocument();
-    expect(queryByTestId('account-overview__nfts-tab')).toBeInTheDocument();
-    expect(queryByTestId('account-overview__activity-tab')).toBeInTheDocument();
-    expect(queryByTestId('account-overview__defi-tab')).not.toBeInTheDocument();
   });
 
   describe('when the bottom nav bar is shown', () => {

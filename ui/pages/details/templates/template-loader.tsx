@@ -4,7 +4,6 @@ import { ApprovalDetails } from './approval-details';
 import { BridgeDetails } from './bridge-details/bridge-details';
 import { ConvertDetails } from './convert-details';
 import { DefaultDetails } from './default-details';
-import { MoneyAccountDetails } from './money-account-details';
 import { NftDetails } from './nft-details';
 import { PerpsDepositDetails } from './perps-deposit-details';
 import { PerpsDetails } from './perps-details';
@@ -44,9 +43,6 @@ export function TemplateLoader({ item }: Props) {
     case 'revokeSpendingCap':
     case 'increaseSpendingCap':
       return <ApprovalDetails item={item} />;
-    case 'moneyAccountDeposit':
-    case 'moneyAccountWithdraw':
-      return <MoneyAccountDetails item={item} />;
     case 'perpsAddFunds':
       return <PerpsDepositDetails item={item} />;
     case 'perpsWithdraw':

@@ -970,10 +970,7 @@ describe('NameDetails', () => {
       );
 
       expect(
-        getByText(messages.alertReasonAddressTrustSignalMalicious.message),
-      ).toBeInTheDocument();
-      expect(
-        getByText(messages.alertMessageAddressTrustSignalMalicious.message),
+        getByText(messages.nameModalTitleMalicious.message),
       ).toBeInTheDocument();
     });
 
@@ -996,10 +993,7 @@ describe('NameDetails', () => {
       );
 
       expect(
-        getByText(messages.alertReasonAddressTrustSignalWarning.message),
-      ).toBeInTheDocument();
-      expect(
-        getByText(messages.alertMessageAddressTrustSignal.message),
+        getByText(messages.nameModalTitleWarning.message),
       ).toBeInTheDocument();
     });
 

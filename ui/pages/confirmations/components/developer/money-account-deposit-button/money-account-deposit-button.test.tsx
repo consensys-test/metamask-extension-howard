@@ -1,78 +1,66 @@
-import { fireEvent, screen } from '@testing-library/react';
 import React from 'react';
-import configureMockStore from 'redux-mock-store';
-import mockState from '../../../../../../test/data/mock-state.json';
-import { renderWithProvider } from '../../../../../../test/lib/render-helpers-navigate';
-import { useMoneyAccountDeposit } from '../../../../../hooks/money/useMoneyAccountDeposit';
-import { useMoneyAccountInfo } from '../../../../../hooks/money/useMoneyAccountInfo';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { TransactionType } from '@metamask/transaction-controller';
+import {
+  MUSD_CONVERSION_DEFAULT_CHAIN_ID,
+  MUSD_TOKEN,
+  MUSD_TOKEN_ADDRESS,
+} from '../../../constants/musd';
+import { useDeveloperTransferTransaction } from '../utils';
 import { MoneyAccountDepositButton } from './money-account-deposit-button';
 
-const render = () =>
-  renderWithProvider(
-    <MoneyAccountDepositButton />,
-    configureMockStore()(mockState),
-  );
-
-jest.mock('../../../../../hooks/money/useMoneyAccountDeposit', () => ({
-  useMoneyAccountDeposit: jest.fn(),
+jest.mock('../utils', () => ({
+  useDeveloperTransferTransaction: jest.fn(),
 }));
 
-jest.mock('../../../../../hooks/money/useMoneyAccountInfo', () => ({
-  useMoneyAccountInfo: jest.fn(),
-}));
-
-const useMoneyAccountDepositMock = jest.mocked(useMoneyAccountDeposit);
-const useMoneyAccountInfoMock = jest.mocked(useMoneyAccountInfo);
+const useDeveloperTransferTransactionMock = jest.mocked(
+  useDeveloperTransferTransaction,
+);
 
 describe('MoneyAccountDepositButton', () => {
-  const initiateDepositMock = jest.fn();
+  const handleTriggerMock = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    initiateDepositMock.mockResolvedValue(undefined);
-    useMoneyAccountDepositMock.mockReturnValue({
-      initiateDeposit: initiateDepositMock,
+    useDeveloperTransferTransactionMock.mockReturnValue({
       isLoading: false,
+      handleTrigger: handleTriggerMock,
     });
-    useMoneyAccountInfoMock.mockReturnValue({
-      isMoneyAccountFeatureEnabled: true,
-      hasMoneyAccount: true,
-      primaryMoneyAccount: { address: '0xd5fe' },
-    } as unknown as ReturnType<typeof useMoneyAccountInfo>);
   });
 
-  it('initiates the deposit on click', () => {
-    render();
+  it('configures the transfer hook for a mUSD money account deposit', () => {
+    render(<MoneyAccountDepositButton />);
+
+    expect(useDeveloperTransferTransactionMock).toHaveBeenCalledWith({
+      chainId: MUSD_CONVERSION_DEFAULT_CHAIN_ID,
+      tokenAddress: MUSD_TOKEN_ADDRESS,
+      decimals: MUSD_TOKEN.decimals,
+      type: TransactionType.moneyAccountDeposit,
+      errorMessage: 'Failed to create money account deposit transaction',
+    });
+  });
+
+  it('renders the developer button and triggers the transaction on click', () => {
+    render(<MoneyAccountDepositButton />);
 
     const button = screen.getByRole('button', {
       name: 'Money Account Deposit',
     });
+    expect(button).toBeInTheDocument();
     expect(button).not.toBeDisabled();
 
     fireEvent.click(button);
-    expect(initiateDepositMock).toHaveBeenCalledTimes(1);
+    expect(handleTriggerMock).toHaveBeenCalledTimes(1);
   });
 
-  it('renders nothing at all when the money account is unavailable', () => {
-    useMoneyAccountInfoMock.mockReturnValue({
-      isMoneyAccountFeatureEnabled: false,
-      hasMoneyAccount: false,
-      primaryMoneyAccount: undefined,
-    } as unknown as ReturnType<typeof useMoneyAccountInfo>);
-
-    const { container } = render();
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('disables the button while initiating', () => {
-    useMoneyAccountDepositMock.mockReturnValue({
-      initiateDeposit: initiateDepositMock,
+  it('disables the button while loading', () => {
+    useDeveloperTransferTransactionMock.mockReturnValue({
       isLoading: true,
+      handleTrigger: handleTriggerMock,
     });
 
-    render();
+    render(<MoneyAccountDepositButton />);
 
     expect(
       screen.getByRole('button', { name: 'Money Account Deposit' }),

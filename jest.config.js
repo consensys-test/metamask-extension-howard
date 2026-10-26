@@ -1,5 +1,4 @@
 const consoleReporterRules = require('./test/jest/console-reporter-rules-unit');
-const { ESM_DEPENDENCIES_TO_TRANSPILE } = require('./test/jest/constants');
 
 module.exports = {
   collectCoverageFrom: [
@@ -16,8 +15,6 @@ module.exports = {
   coveragePathIgnorePatterns: ['.stories.*', '.snap$'],
   coverageReporters: ['html', 'json'],
   moduleNameMapper: {
-    // Stylesheets are imported as text via css-loader; Jest cannot parse them.
-    '\\.css$': '<rootDir>/test/mocks/style.ts',
     // Mock lightweight-charts since it requires browser/canvas APIs not available in Jest
     '^lightweight-charts$': '<rootDir>/test/mocks/lightweight-charts.js',
     // Stub @metamask/perps-controller so every test suite can resolve it without
@@ -111,9 +108,6 @@ module.exports = {
       },
     ],
   },
-  transformIgnorePatterns: [
-    `/node_modules/(?!(${ESM_DEPENDENCIES_TO_TRANSPILE.join('|')})/)`,
-  ],
   workerIdleMemoryLimit: '500MB',
   // Ensure console output is buffered (not streamed) so reporters can access testResult.console
   // Without this, Jest uses verbose mode for single-file runs which bypasses buffering

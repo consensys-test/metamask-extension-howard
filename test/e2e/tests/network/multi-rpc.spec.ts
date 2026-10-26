@@ -21,11 +21,8 @@ import {
   importSRPOnboardingFlow,
   handleSidepanelPostOnboarding,
 } from '../../page-objects/flows/onboarding.flow';
-import HeaderNavbar from '../../page-objects/pages/home/header-navbar';
+import HeaderNavbar from '../../page-objects/pages/header-navbar';
 import { DEFAULT_LOCAL_NODE_ETH_BALANCE_DEC } from '../../constants';
-import { getMockAssetsPrice } from '../tokens/utils/mocks';
-
-const MOCK_ETH_PRICE = 1700;
 
 describe('MultiRpc:', function (this: Suite) {
   it('should migrate to multi rpc', async function () {
@@ -49,7 +46,7 @@ describe('MultiRpc:', function (this: Suite) {
             json: {
               'eip155:1/slip44:60': {
                 id: 'ethereum',
-                price: MOCK_ETH_PRICE,
+                price: 1700,
                 marketCap: 382623505141,
                 pricePercentChange1d: 0,
               },
@@ -134,9 +131,6 @@ describe('MultiRpc:', function (this: Suite) {
               '0x1': true,
             },
           })
-          .withAssetsController({
-            assetsPrice: getMockAssetsPrice(MOCK_ETH_PRICE),
-          })
           .build(),
         title: this.test?.fullTitle(),
         testSpecificMock: mockRPCURLAndChainId,
@@ -194,7 +188,7 @@ describe('MultiRpc:', function (this: Suite) {
             json: {
               'eip155:1/slip44:60': {
                 id: 'ethereum',
-                price: MOCK_ETH_PRICE,
+                price: 1700,
                 marketCap: 382623505141,
                 pricePercentChange1d: 0,
               },
@@ -331,7 +325,7 @@ describe('MultiRpc:', function (this: Suite) {
             json: {
               'eip155:1/slip44:60': {
                 id: 'ethereum',
-                price: MOCK_ETH_PRICE,
+                price: 1700,
                 marketCap: 382623505141,
                 pricePercentChange1d: 0,
               },
@@ -455,7 +449,7 @@ describe('MultiRpc:', function (this: Suite) {
             json: {
               'eip155:1/slip44:60': {
                 id: 'ethereum',
-                price: MOCK_ETH_PRICE,
+                price: 1700,
                 marketCap: 382623505141,
                 pricePercentChange1d: 0,
               },
@@ -520,9 +514,6 @@ describe('MultiRpc:', function (this: Suite) {
               },
             },
             selectedNetworkClientId: 'networkConfigurationId',
-          })
-          .withAssetsController({
-            assetsPrice: getMockAssetsPrice(MOCK_ETH_PRICE),
           })
           .build(),
         title: this.test?.fullTitle(),

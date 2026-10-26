@@ -35,7 +35,7 @@ export function useFirstTimeInteractionSendAlert(): SendAlert | null {
   const { state: trustSignalState } = useTrustSignal(
     resolvedAddress || '',
     NameType.ETHEREUM_ADDRESS,
-    chainId as Hex | undefined,
+    chainId,
   );
 
   const isInternalAccount = internalAccounts.some(

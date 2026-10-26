@@ -31,19 +31,13 @@ export function getIsNotificationEnabledByDefaultFeatureFlag(
   state: NotificationAppState,
 ) {
   const { assetsEnableNotificationsByDefaultV2 } = getRemoteFeatureFlags(state);
-
-  // The value is a boolean when resolved from the remote config, or a
-  // `{ value }` object when provided by a flag override or test mock. Handle
-  // both so `{ value: false }` is not misread as truthy.
-  if (
+  const result =
+    assetsEnableNotificationsByDefaultV2 &&
     typeof assetsEnableNotificationsByDefaultV2 === 'object' &&
-    assetsEnableNotificationsByDefaultV2 !== null &&
-    'value' in assetsEnableNotificationsByDefaultV2
-  ) {
-    return Boolean(assetsEnableNotificationsByDefaultV2.value);
-  }
+    'value' in assetsEnableNotificationsByDefaultV2 &&
+    Boolean(assetsEnableNotificationsByDefaultV2.value);
 
-  return Boolean(assetsEnableNotificationsByDefaultV2);
+  return Boolean(result);
 }
 
 /**

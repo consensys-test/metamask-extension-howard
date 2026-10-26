@@ -23,25 +23,20 @@ import { useIsPaidByMetaMask } from '../../../hooks/pay/useIsPaidByMetaMask';
 import { useMusdConversionTokens } from '../../../../../hooks/musd';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { BridgeFeeRow } from '../../rows/bridge-fee-row/bridge-fee-row';
+import { ClaimableBonusRow } from '../../rows/claimable-bonus-row/claimable-bonus-row';
 import { TotalRow } from '../../rows/total-row/total-row';
 import { PayWithRow } from '../../rows/pay-with-row/pay-with-row';
 import { useMusdConversionQuoteTrace } from '../../../hooks/musd/useMusdConversionQuoteTrace';
 import { MusdOverrideContent } from './musd-override-content';
 
-const MusdBottomContent = ({ hasAmount }: { hasAmount: boolean }) => {
+const MusdBottomContent = () => {
   const t = useI18nContext();
   const quotes = useTransactionPayQuotes();
   const isQuotesLoading = useIsTransactionPayLoading();
   const { hideResults } = useTransactionCustomAmountAlerts();
   const isPaidByMetaMask = useIsPaidByMetaMask();
 
-  // The fee, bonus and total rows describe a conversion that has not been
-  // specified yet while the amount is empty or zero, so they stay hidden until
-  // the user enters an amount. Gating on `hasAmount` also clears them
-  // immediately when the amount is reset, rather than leaving the previous
-  // quote's numbers on screen.
-  const isResultReady =
-    hasAmount && (isQuotesLoading || Boolean(quotes?.length));
+  const isResultReady = isQuotesLoading || Boolean(quotes?.length);
   const showResults = isResultReady && !hideResults;
 
   return (
@@ -53,6 +48,7 @@ const MusdBottomContent = ({ hasAmount }: { hasAmount: boolean }) => {
             variant={ConfirmInfoRowSize.Small}
             tooltipDescription={t('musdConversionFeeTooltipDescription')}
           />
+          <ClaimableBonusRow rowVariant={ConfirmInfoRowSize.Small} />
           {!isPaidByMetaMask && <TotalRow variant={ConfirmInfoRowSize.Small} />}
         </>
       )}
@@ -138,10 +134,7 @@ export const MusdConversionInfo = () => {
     [],
   );
 
-  const renderBottomContent = useCallback(
-    (hasAmount: boolean) => <MusdBottomContent hasAmount={hasAmount} />,
-    [],
-  );
+  const renderBottomContent = useCallback(() => <MusdBottomContent />, []);
 
   return (
     <CustomAmountInfo

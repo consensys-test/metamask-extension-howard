@@ -193,28 +193,11 @@ export class QrSyncController extends BaseController<
       QR_SYNC_PHASES.REVIEWING_SYNC_OFFER,
     ]);
 
-    let exportData: QrSyncReadyData;
-    try {
-      if (selectedAccountGroupIds.length === 0) {
-        throw new Error(QrSyncErrorMessages.NO_ACCOUNT_GROUPS_SELECTED);
-      }
-
-      let snapshot = await this.messenger.call(
-        'AccountTreeController:exportState',
-        { includeSecrets: true, password },
-      );
-
-      const selectedPayloadIds = new Set(
-        selectedAccountGroupIds.map((groupId) => snapshot.toPayloadId(groupId)),
-      );
-      snapshot = snapshot.filterAllGroups((payloadGroup) =>
-        selectedPayloadIds.has(payloadGroup.id),
-      );
-      exportData = snapshot.serialize();
-    } catch (error) {
-      this.#reportToSentry('Failed to export account tree for QR sync', error);
-      throw error;
-    }
+    const exportData = (await this.messenger.call(
+      'QrSyncDataService:buildWalletExportEntries',
+      password,
+      selectedAccountGroupIds,
+    )) as QrSyncReadyData;
 
     const deadline = Date.now() + QR_SYNC_TIMEOUT_MS.SYNC_COMPLETION_TIMEOUT;
 
@@ -854,9 +837,7 @@ export class QrSyncController extends BaseController<
       this.#reportToSentry(
         `QR sync failed to send message (${message.type})`,
         error,
-        {
-          code: QrSyncErrorCodes.SYNC_FAILED,
-        },
+        { code: QrSyncErrorCodes.SYNC_FAILED },
       );
       throw new Error(QrSyncErrorMessages.SYNC_FAILED_TO_SEND_MESSAGE);
     }

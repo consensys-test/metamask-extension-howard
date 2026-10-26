@@ -1,3 +1,4 @@
+// @ts-expect-error suppress CommonJS vs ECMAScript error
 import { onINP, onFCP, onLCP, onCLS } from 'web-vitals/attribution';
 import {
   initINPObserver,

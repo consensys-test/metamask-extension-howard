@@ -44,8 +44,6 @@ describe('RampsServiceInit', () => {
       environment: 'staging',
       context: 'extension',
       fetch: expect.any(Function),
-      clientProduct: 'metamask-extension',
-      clientVersion: process.env.METAMASK_VERSION,
     });
   });
 

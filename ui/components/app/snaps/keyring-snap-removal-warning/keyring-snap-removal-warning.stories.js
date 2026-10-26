@@ -1,14 +1,5 @@
 import React from 'react';
-import { useArgs } from 'storybook/preview-api';
-import { Button } from '../../../component-library';
 import KeyringSnapRemovalWarning from './keyring-snap-removal-warning';
-
-const mockSnap = {
-  id: 'mock-snap-id',
-  manifest: {
-    proposedName: 'ABC Snap',
-  },
-};
 
 export default {
   title: 'Components/App/Snaps/KeyringSnapRemovalWarning',
@@ -17,51 +8,36 @@ export default {
     onCancel: {
       action: 'onCancel',
     },
-    onClose: {
-      action: 'onClose',
-    },
     onSubmit: {
       action: 'onSubmit',
     },
-    onBack: {
-      action: 'onBack',
+    snapName: {
+      control: 'text',
+    },
+    snapUrl: {
+      control: 'text',
     },
     isOpen: {
       control: 'boolean',
     },
     keyringAccounts: {
-      control: 'object',
+      control: 'array',
     },
   },
   args: {
-    snap: mockSnap,
-    isOpen: false,
+    snapName: 'ABC Snap',
+    snapUrl: 'mock-url',
+    isOpen: true,
     keyringAccounts: [
       {
         address: '0xec1adf982415d2ef5ec55899b9bfb8bc0f29251b',
+
         name: 'Test Account 2',
       },
     ],
   },
 };
 
-export const DefaultStory = (args) => {
-  const [{ isOpen }, updateArgs] = useArgs();
-  const handleClose = () => updateArgs({ isOpen: false });
-
-  return (
-    <>
-      <Button onClick={() => updateArgs({ isOpen: true })}>Open</Button>
-      <KeyringSnapRemovalWarning
-        {...args}
-        isOpen={isOpen}
-        onCancel={handleClose}
-        onClose={handleClose}
-        onBack={handleClose}
-        onSubmit={handleClose}
-      />
-    </>
-  );
-};
+export const DefaultStory = (args) => <KeyringSnapRemovalWarning {...args} />;
 
 DefaultStory.storyName = 'Default';

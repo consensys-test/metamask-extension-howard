@@ -6,7 +6,6 @@ import {
   ChainId,
   formatChainIdToCaip,
   getNativeAssetForChainId,
-  QuoteMetadataMigrationPhase,
 } from '@metamask/bridge-controller';
 import { toChecksumHexAddress } from '@metamask/controller-utils';
 import type { CaipChainId, CaipAssetType } from '@metamask/utils';
@@ -72,9 +71,6 @@ export const BRIDGE_ONLY_CHAINS: CaipChainId[] = [MultichainNetworks.BITCOIN];
 export type AllowedBridgeChainIds =
   | (typeof ALLOWED_BRIDGE_CHAIN_IDS)[number]
   | (typeof ALLOWED_BRIDGE_CHAIN_IDS_IN_CAIP)[number];
-
-export const BRIDGE_QUOTE_RESPONSE_MIGRATION_PHASE =
-  QuoteMetadataMigrationPhase.V2WithV1Fallback;
 
 /**
  * Resolves the Bridge API base URL to use based on the current MetaMask
@@ -188,7 +184,16 @@ type BridgeChainTokenMap = Partial<
 >;
 
 // We usually use the native asset as "from" token. In some chains we want to override that.
-export const BRIDGE_CHAINID_TO_DEFAULT_FROM_TOKEN: BridgeChainTokenMap = {};
+export const BRIDGE_CHAINID_TO_DEFAULT_FROM_TOKEN: BridgeChainTokenMap = {
+  [toEvmCaipChainId(CHAIN_IDS.ARC)]: {
+    // USDC on Arc
+    address: '0x3600000000000000000000000000000000000000',
+    symbol: 'USDC',
+    decimals: 6,
+    name: 'USDC',
+    assetId: `${toEvmCaipChainId(CHAIN_IDS.ARC)}/erc20:${toChecksumHexAddress('0x3600000000000000000000000000000000000000')}`,
+  },
+};
 
 // This is actually for defining a default "toToken" when opening Bridge view
 export const BRIDGE_CHAINID_COMMON_TOKEN_PAIR: BridgeChainTokenMap = {
@@ -306,12 +311,12 @@ export const BRIDGE_CHAINID_COMMON_TOKEN_PAIR: BridgeChainTokenMap = {
     assetId: `${toEvmCaipChainId(CHAIN_IDS.ARC)}/erc20:${toChecksumHexAddress('0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1')}`,
   },
   [toEvmCaipChainId(CHAIN_IDS.ROBINHOOD_CHAIN)]: {
-    // ETH -> USDG on Robinhood
-    address: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
-    symbol: 'USDG',
-    decimals: 6,
-    name: 'Global Dollar',
-    assetId: `${toEvmCaipChainId(CHAIN_IDS.ROBINHOOD_CHAIN)}/erc20:${toChecksumHexAddress('0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168')}`,
+    // ETH -> USDe on Robinhood
+    address: '0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34',
+    symbol: 'USDe',
+    decimals: 18,
+    name: 'USDe',
+    assetId: `${toEvmCaipChainId(CHAIN_IDS.ROBINHOOD_CHAIN)}/erc20:${toChecksumHexAddress('0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34')}`,
   },
   [MultichainNetworks.SOLANA]: {
     // SOL -> USDC on Solana
@@ -339,3 +344,8 @@ export const BRIDGE_CHAINID_COMMON_TOKEN_PAIR: BridgeChainTokenMap = {
     assetId: `${MultichainNetworks.STELLAR}/asset:USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`,
   },
 } as const;
+
+export const BRIDGE_ASSET_PICKER_HIDDEN_ASSETS = new Set([
+  // Arc blockchain: Two USDC - one native, one ERC20. Hidding native for convenience.
+  'eip155:5042/erc20:0x0000000000000000000000000000000000000000',
+]);

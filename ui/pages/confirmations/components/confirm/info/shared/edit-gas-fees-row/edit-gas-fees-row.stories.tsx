@@ -4,7 +4,6 @@ import { getMockConfirmStateForTransaction } from '../../../../../../../../test/
 import configureStore from '../../../../../../../store/store';
 import { ConfirmContextProvider } from '../../../../../context/confirm';
 import { DappSwapContextProvider } from '../../../../../context/dapp-swap';
-import { GasFeeModalContextProvider } from '../../../../../context/gas-fee-modal';
 import { EditGasFeesRow } from './edit-gas-fees-row';
 import { genUnapprovedContractInteractionConfirmation } from '../../../../../../../../test/data/confirmations/contract-interaction';
 import { GAS_FEE_TOKEN_MOCK } from '../../../../../../../../test/data/confirmations/gas';
@@ -39,9 +38,7 @@ const Story = {
     (story: any, { args }) => (
       <Provider store={getStore(args ?? {})}>
         <ConfirmContextProvider>
-          <DappSwapContextProvider>
-            <GasFeeModalContextProvider>{story()}</GasFeeModalContextProvider>
-          </DappSwapContextProvider>
+          <DappSwapContextProvider>{story()}</DappSwapContextProvider>
         </ConfirmContextProvider>
       </Provider>
     ),

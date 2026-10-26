@@ -1,14 +1,10 @@
-# On every push to a release branch (release/x.y.z format), this workflow rebuilds the matching
-# changelog branch, re-runs the auto-changelog script, and either updates or recreates the changelog PR.
-#
-# Note: GitHub Actions branch filters are glob-based (not regex), so we approximate SemVer by requiring
-# three dot-separated segments that each start with a digit.
+# Fork-only fixture workflow. Runs the candidate github-tools action on every release branch push.
 name: Update Release Changelog PR
 
 on:
   push:
     branches:
-      - 'release/[0-9]+.[0-9]+.[0-9]+'
+      - 'release/*'
 
 concurrency:
   group: update-release-changelog-${{ github.ref }}
@@ -23,10 +19,11 @@ jobs:
       pull-requests: write
     steps:
       - name: Update Release Changelog
-        uses: MetaMask/github-tools/.github/actions/update-release-changelog@v1
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@c4d7e154afc5a4e7a24660b0f283bf2b32c8b1aa
+        env:
+          AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
         with:
           release-branch: ${{ github.ref_name }}
-          repository-url: ${{ github.server_url }}/${{ github.repository }}
+          repository-url: https://github.com/MetaMask/metamask-extension
           platform: extension
-          previous-version-ref: 'null'
           github-token: ${{ secrets.PR_TOKEN }}

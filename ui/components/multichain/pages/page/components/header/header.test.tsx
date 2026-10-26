@@ -1,7 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 
-import { enLocale as messages } from '../../../../../../../test/lib/i18n-helpers';
+import { ButtonIcon, IconName } from '../../../../../component-library';
 import { Header } from '.';
 
 const HEADER_TEXT = 'Connections';
@@ -13,37 +13,31 @@ describe('Header', () => {
   });
 
   it('renders the startAccessory when provided', () => {
-    render(
+    const { container } = render(
       <Header
         startAccessory={
-          <button aria-label={messages.back.message} type="button" />
+          <ButtonIcon iconName={IconName.ArrowLeft} ariaLabel="Back" />
         }
       >
         {HEADER_TEXT}
       </Header>,
     );
 
-    expect(
-      screen.getByRole('button', { name: messages.back.message }),
-    ).toBeInTheDocument();
+    expect(container.querySelector('.mm-button-icon')).toBeInTheDocument();
   });
 
   it('renders the endAccessory when provided', () => {
     const headerText = 'Connections';
 
-    render(
+    const { container } = render(
       <Header
-        endAccessory={
-          <button aria-label={messages.back.message} type="button" />
-        }
+        endAccessory={<ButtonIcon iconName={IconName.Close} ariaLabel="Back" />}
       >
         {headerText}
       </Header>,
     );
 
-    expect(
-      screen.getByRole('button', { name: messages.back.message }),
-    ).toBeInTheDocument();
+    expect(container.querySelector('.mm-button-icon')).toBeInTheDocument();
   });
 
   it('renders the startAccessory and endAccessory when provided', () => {
@@ -52,16 +46,16 @@ describe('Header', () => {
     const { container } = render(
       <Header
         startAccessory={
-          <button aria-label={messages.back.message} type="button" />
+          <ButtonIcon iconName={IconName.ArrowLeft} ariaLabel="Back" />
         }
         endAccessory={
-          <button aria-label={messages.close.message} type="button" />
+          <ButtonIcon iconName={IconName.Close} ariaLabel="Close" />
         }
       >
         {headerText}
       </Header>,
     );
 
-    expect(container.querySelectorAll('button')).toHaveLength(2);
+    expect(container.querySelectorAll('.mm-button-icon')).toHaveLength(2);
   });
 });

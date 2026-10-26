@@ -55,8 +55,7 @@ export const Toast = ({
   startAdornment: React.ReactNode | React.ReactNode[];
   /** Plain string or rich content (e.g. inline `TextButton` via `t(key, [nodes])`). */
   text: React.ReactNode;
-  /** Plain string or rich content (e.g. inline link via `t(key, [nodes])`). */
-  description?: React.ReactNode;
+  description?: string;
   descriptionVariant?: TextVariant;
   actionText?: string;
   onActionClick?: () => void;
@@ -148,7 +147,7 @@ export const Toast = ({
                 variant: DsTextVariant.BodySm,
               }}
               onClick={onActionClick}
-              className="mt-2"
+              className="mt-2 rounded-lg"
             >
               {actionText}
             </Button>

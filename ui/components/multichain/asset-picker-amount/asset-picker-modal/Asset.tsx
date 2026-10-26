@@ -29,6 +29,7 @@ export default function Asset({
   tooltipText,
   tokenFiatAmount,
   chainId,
+  accountType,
   assetItemProps = {},
   isDestinationToken = false,
   rwaData,
@@ -68,6 +69,7 @@ export default function Asset({
       tokenChainImage={getImageForChainId(chainId)}
       isDestinationToken={isDestinationToken}
       address={address}
+      accountType={accountType}
       rwaData={rwaData}
       {...assetItemProps}
     />

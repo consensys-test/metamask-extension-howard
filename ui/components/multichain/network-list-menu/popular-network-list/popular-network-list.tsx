@@ -1,20 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import {
-  AvatarNetwork,
-  AvatarNetworkSize,
   ButtonIcon,
   ButtonIconSize,
   Icon,
   IconName,
   IconSize,
   IconColor,
-  Popover,
-  PopoverPosition,
-  TextButton,
-  TextButtonSize,
 } from '@metamask/design-system-react';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
-import { Box, Text } from '../../../component-library';
+import {
+  Box,
+  Text,
+  AvatarNetwork,
+  AvatarNetworkSize,
+  ButtonLinkSize,
+  ButtonLink,
+  Popover,
+  PopoverPosition,
+} from '../../../component-library';
 import { ENVIRONMENT_TYPE_POPUP } from '../../../../../shared/constants/app';
 import {
   setEnabledNetworks,
@@ -29,6 +32,7 @@ import {
   JustifyContent,
   TextColor,
   TextVariant,
+  BorderColor,
 } from '../../../../helpers/constants/design-system';
 import { CHAIN_ID_TO_NETWORK_IMAGE_URL_MAP } from '../../../../../shared/constants/network';
 import ZENDESK_URLS from '../../../../helpers/constants/zendesk-url';
@@ -88,11 +92,13 @@ const PopularNetworkList = ({
             <Popover
               referenceElement={referenceElement}
               position={PopoverPosition.TopStart}
+              paddingTop={3}
+              paddingBottom={3}
               offset={[16, 12]}
               isOpen={isOpen}
               flip
+              backgroundColor={BackgroundColor.backgroundSection}
               onMouseLeave={close}
-              className="bg-section pt-3 pb-3"
               style={{
                 width: '326px',
               }}
@@ -102,8 +108,9 @@ const PopularNetworkList = ({
                 {t('popularNetworkAddToolTip')}{' '}
               </Text>
               <Box key="learn-more-link">
-                <TextButton
-                  size={TextButtonSize.BodyMd}
+                <ButtonLink
+                  size={ButtonLinkSize.Auto}
+                  externalLink
                   onClick={() => {
                     global.platform.openTab({
                       url: ZENDESK_URLS.UNKNOWN_NETWORK,
@@ -111,7 +118,7 @@ const PopularNetworkList = ({
                   }}
                 >
                   {t('learnMoreUpperCase')}
-                </TextButton>
+                </ButtonLink>
               </Box>
             </Popover>
           </Box>
@@ -144,6 +151,7 @@ const PopularNetworkList = ({
           >
             <Box display={Display.Flex} alignItems={AlignItems.center}>
               <AvatarNetwork
+                borderColor={BorderColor.backgroundDefault}
                 size={AvatarNetworkSize.Sm}
                 src={
                   network.imageUrl ??

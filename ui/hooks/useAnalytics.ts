@@ -13,7 +13,7 @@ import {
 import { getEnvironmentType } from '../../shared/lib/environment-type';
 import {
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
 } from '../selectors';
 import { trackAnalyticsEvent } from '../store/actions';
@@ -32,13 +32,15 @@ type UseAnalyticsResult = {
 
 export function useAnalytics(): UseAnalyticsResult {
   const context = useSegmentContext();
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
   const analyticsId = useSelector(getAnalyticsId);
-  const isMetricsEnabled = consentDecisionMade && isOptedIn;
+  const isMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
   const canTrackImmediately = isMetricsEnabled && Boolean(analyticsId);
   const canMaybeTrackLater =
-    !consentDecisionMade || (isMetricsEnabled && !analyticsId);
+    !completedMetaMetricsOnboarding || (isMetricsEnabled && !analyticsId);
 
   const trackEvent = useCallback(
     async (built: AnalyticsEvent): Promise<void> => {

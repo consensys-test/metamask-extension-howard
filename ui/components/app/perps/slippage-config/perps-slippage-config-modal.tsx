@@ -86,24 +86,11 @@ export const PerpsSlippageConfigModal = ({
 }: PerpsSlippageConfigModalProps) => {
   const t = useI18nContext();
   const customInputRef = useRef<HTMLInputElement | null>(null);
-  const initialStartsAsCustom = isOpen && !matchesPreset(currentValueBps);
   const [selectedBps, setSelectedBps] = useState(currentValueBps);
-  // Seed from props so a modal that mounts already open (non-preset value)
-  // shows the custom input on the first paint — matching the old mount effect.
-  const [isCustomMode, setIsCustomMode] = useState(initialStartsAsCustom);
-  const [draftValue, setDraftValue] = useState(
-    initialStartsAsCustom ? bpsToPercent(currentValueBps).toString() : '',
-  );
-  // Start unset so the first open/value sync always runs when props settle
-  // after mount with different values than the initial seed.
-  const [prevIsOpen, setPrevIsOpen] = useState<boolean | undefined>(undefined);
-  const [prevCurrentValueBps, setPrevCurrentValueBps] = useState<
-    number | undefined
-  >(undefined);
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [draftValue, setDraftValue] = useState('');
 
-  if (isOpen !== prevIsOpen || currentValueBps !== prevCurrentValueBps) {
-    setPrevIsOpen(isOpen);
-    setPrevCurrentValueBps(currentValueBps);
+  useEffect(() => {
     if (isOpen) {
       const startsAsCustom = !matchesPreset(currentValueBps);
       setSelectedBps(currentValueBps);
@@ -112,7 +99,7 @@ export const PerpsSlippageConfigModal = ({
         startsAsCustom ? bpsToPercent(currentValueBps).toString() : '',
       );
     }
-  }
+  }, [isOpen, currentValueBps]);
 
   useEffect(() => {
     if (isOpen && isCustomMode) {

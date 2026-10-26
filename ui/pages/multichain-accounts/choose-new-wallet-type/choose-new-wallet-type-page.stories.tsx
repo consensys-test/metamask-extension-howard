@@ -1,5 +1,5 @@
 import React from 'react';
-import { Meta, StoryObj } from '@storybook/react-webpack5';
+import { Meta, StoryObj } from '@storybook/react';
 import { ChooseNewWalletTypePage } from './choose-new-wallet-type-page';
 
 const meta: Meta<typeof ChooseNewWalletTypePage> = {

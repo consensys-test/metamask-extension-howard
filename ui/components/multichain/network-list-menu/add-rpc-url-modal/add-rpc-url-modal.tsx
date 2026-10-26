@@ -1,15 +1,12 @@
-import React, { useRef, useState } from 'react';
-import {
-  Button,
-  ButtonSize,
-  ButtonVariant,
-  HelpText,
-  HelpTextSeverity,
-} from '@metamask/design-system-react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
+  ButtonPrimary,
+  ButtonPrimarySize,
   FormTextField,
   FormTextFieldSize,
+  HelpText,
+  HelpTextSeverity,
 } from '../../../component-library';
 import {
   BackgroundColor,
@@ -31,16 +28,16 @@ const AddRpcUrlModal = ({
   const t = useI18nContext();
 
   const [url, setUrl] = useState<string>();
+  const [error, setError] = useState<string>();
   const nameRef = useRef<HTMLInputElement>(null);
-  const error = (() => {
-    if (!url || isWebUrl(url)) {
-      return undefined;
+
+  useEffect(() => {
+    if (url && !isWebUrl(url)) {
+      setError(isWebUrl(`https://${url}`) ? t('urlErrorMsg') : t('invalidRPC'));
+    } else {
+      setError(undefined);
     }
-    if (isWebUrl(`https://${url}`)) {
-      return t('urlErrorMsg');
-    }
-    return t('invalidRPC');
-  })();
+  }, [url]);
 
   return (
     <Box
@@ -95,12 +92,11 @@ const AddRpcUrlModal = ({
         padding={4}
         width={BlockSize.Full}
       >
-        <Button
-          isFullWidth
-          isDisabled={Boolean(error)}
-          size={ButtonSize.Lg}
-          variant={ButtonVariant.Primary}
-          data-testid="add-rpc-url-button"
+        <ButtonPrimary
+          width={BlockSize.Full}
+          disabled={Boolean(error)}
+          size={ButtonPrimarySize.Lg}
+          data-testid="page-container-footer-next"
           onClick={async () => {
             if (url && !error && nameRef.current) {
               onAdded(url, nameRef.current.value || undefined);
@@ -108,7 +104,7 @@ const AddRpcUrlModal = ({
           }}
         >
           {t('addUrl')}
-        </Button>
+        </ButtonPrimary>
       </Box>
     </Box>
   );
