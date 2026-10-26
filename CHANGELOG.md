@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a Max option to money account deposits for all non-native tokens (#47115)
 - Added earn banners and earnings sections to eligible stablecoin and aToken details pages (#47056)
 - Added deep links to notification settings and supported preference sections (#46753)
 - Added a Perps outage banner with help-center and support links across Perps screens (#46864)
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed the Speed up option from pending swap and bridge activity rows (#47152)
 - Removed Bitcoin account label tags except in the multichain account address list (#47077)
 
 ### Fixed
