@@ -59,10 +59,7 @@ describe('Confirmation Signature - Personal Sign', function (this: Suite) {
         await confirmation.verifyPersonalSignInfo();
 
         await confirmation.clickScrollToBottomButton();
-        await confirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await confirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
 
         await testDapp.verifyPersonalSignSuccess(publicAddress);
 
@@ -97,10 +94,7 @@ describe('Confirmation Signature - Personal Sign', function (this: Suite) {
           SignatureType.PersonalSign,
         );
 
-        await confirmation.clickFooterButton({
-          button: 'cancel',
-          waitUntil: 'windowClose',
-        });
+        await confirmation.clickFooterCancelButtonAndAndWaitForWindowToClose();
 
         await driver.switchToWindowWithTitle(WINDOW_TITLES.TestDApp);
 
@@ -155,11 +149,11 @@ describe('Confirmation Signature - Personal Sign', function (this: Suite) {
         await confirmation.verifyMessage();
 
         // Confirm first personal sign
-        await confirmation.clickFooterButton({ button: 'confirm' });
+        await confirmation.clickFooterConfirmButton();
         await confirmation.verifyRejectAllButtonNotPresent();
 
         // Confirm second personal sign
-        await confirmation.clickFooterButton({ button: 'confirm' });
+        await confirmation.clickFooterConfirmButton();
 
         // Verify the signature
         await testDapp.verifyPersonalSignSuccess(publicAddress);

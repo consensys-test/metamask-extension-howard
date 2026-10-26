@@ -1,10 +1,4 @@
-import {
-  useState,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { validateRewardsReferralCode } from '../../store/actions';
 import { useDispatch } from '../../store/hooks';
 
@@ -76,14 +70,9 @@ export const useValidateReferralCode = (
   );
   const [isVipCode, setIsVipCode] = useState(false);
   const [trackedInitialValue, setTrackedInitialValue] = useState(initialValue);
-  const [requestId, setRequestId] = useState(0);
-  const requestIdRef = useRef(requestId);
+  const requestIdRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dispatch = useDispatch();
-
-  useLayoutEffect(() => {
-    requestIdRef.current = requestId;
-  }, [requestId]);
 
   const clearDebounceTimer = useCallback(() => {
     if (debounceTimerRef.current) {
@@ -93,9 +82,7 @@ export const useValidateReferralCode = (
   }, []);
 
   const invalidatePendingValidation = useCallback(() => {
-    const nextRequestId = requestIdRef.current + 1;
-    requestIdRef.current = nextRequestId;
-    setRequestId(nextRequestId);
+    requestIdRef.current += 1;
     clearDebounceTimer();
   }, [clearDebounceTimer]);
 
@@ -105,7 +92,7 @@ export const useValidateReferralCode = (
   // response can still apply and flip isUnknownError after the prop was cleared.
   if (initialValue !== trackedInitialValue) {
     setTrackedInitialValue(initialValue);
-    setRequestId((current) => current + 1);
+    invalidatePendingValidation();
     const normalized = normalizeReferralCode(initialValue);
     setReferralCodeState(normalized);
     if (normalized.length < REFERRAL_CODE_MIN_LENGTH) {
@@ -149,9 +136,8 @@ export const useValidateReferralCode = (
 
   const scheduleValidation = useCallback(
     (code: string) => {
-      const currentRequestId = requestIdRef.current + 1;
-      requestIdRef.current = currentRequestId;
-      setRequestId(currentRequestId);
+      requestIdRef.current += 1;
+      const currentRequestId = requestIdRef.current;
 
       clearDebounceTimer();
 
@@ -240,10 +226,6 @@ export const useValidateReferralCode = (
   // Short/invalid values are handled by the render-time sync (which invalidates
   // pending work); do not invalidate here or we can cancel setReferralCode work
   // while the controlled initialValue is still empty/unchanged.
-  useEffect(() => {
-    clearDebounceTimer();
-  }, [trackedInitialValue, clearDebounceTimer]);
-
   useEffect(() => {
     const normalized = normalizeReferralCode(initialValue);
     if (!isReferralCodeFormatValid(normalized)) {

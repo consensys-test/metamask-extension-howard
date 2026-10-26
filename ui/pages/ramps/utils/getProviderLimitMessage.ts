@@ -13,14 +13,7 @@ type GetProviderLimitMessageArgs = {
   currency: string;
   formatCurrency: FormatCurrency;
   t: TranslateFn;
-  backendError?: string | null;
 };
-
-function isProviderLimitError(message: string | null | undefined): boolean {
-  return Boolean(
-    message && /\b(minimum|maximum)\s+purchase\s+is\b/iu.test(message),
-  );
-}
 
 /**
  * Resolves the user-facing limit message for a provider that can't quote.
@@ -38,7 +31,6 @@ function isProviderLimitError(message: string | null | undefined): boolean {
  * @param args.amount
  * @param args.currency
  * @param args.formatCurrency
- * @param args.backendError
  * @param args.t
  * @returns The localized limit message, or null.
  */
@@ -50,32 +42,28 @@ export function getProviderLimitMessage({
   currency,
   formatCurrency,
   t,
-  backendError,
 }: GetProviderLimitMessageArgs): string | null {
-  if (amount > 0) {
-    const buyLimit = getProviderBuyLimit(
-      provider,
-      fiatCurrency,
-      paymentMethodId,
-    );
-
-    if (buyLimit) {
-      if (Number.isFinite(buyLimit.minAmount) && amount < buyLimit.minAmount) {
-        return t('rampsMinPurchaseLimit', [
-          formatCurrency(buyLimit.minAmount, currency),
-        ]);
-      }
-
-      if (Number.isFinite(buyLimit.maxAmount) && amount > buyLimit.maxAmount) {
-        return t('rampsMaxPurchaseLimit', [
-          formatCurrency(buyLimit.maxAmount, currency),
-        ]);
-      }
-    }
+  if (amount <= 0) {
+    return null;
   }
 
-  if (isProviderLimitError(backendError)) {
-    return backendError ?? null;
+  const buyLimit = getProviderBuyLimit(provider, fiatCurrency, paymentMethodId);
+
+  if (!buyLimit) {
+    return null;
   }
+
+  if (Number.isFinite(buyLimit.minAmount) && amount < buyLimit.minAmount) {
+    return t('rampsMinPurchaseLimit', [
+      formatCurrency(buyLimit.minAmount, currency),
+    ]);
+  }
+
+  if (Number.isFinite(buyLimit.maxAmount) && amount > buyLimit.maxAmount) {
+    return t('rampsMaxPurchaseLimit', [
+      formatCurrency(buyLimit.maxAmount, currency),
+    ]);
+  }
+
   return null;
 }

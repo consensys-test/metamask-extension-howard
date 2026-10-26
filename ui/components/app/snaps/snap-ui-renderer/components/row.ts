@@ -1,6 +1,5 @@
 import type { JSXElement, RowElement } from '@metamask/snaps-sdk/jsx';
 
-import { FlexDirection } from '../../../../../helpers/constants/design-system';
 import { mapToTemplate } from '../utils';
 import { UIComponentFactory } from './types';
 
@@ -17,13 +16,6 @@ export const row: UIComponentFactory<RowElement> = ({
     variant: element.props.variant,
     tooltip: element.props.tooltip,
     style: {
-      // Warning text can wrap inside a scrollable flex panel, so retain its content height.
-      ...(element.props.variant === 'warning'
-        ? {
-            flexDirection: FlexDirection.Column,
-            flexShrink: 0,
-          }
-        : {}),
       // We do this to cause an overhang with certain confirmation row variants
       marginLeft: '-8px',
       marginRight: '-8px',

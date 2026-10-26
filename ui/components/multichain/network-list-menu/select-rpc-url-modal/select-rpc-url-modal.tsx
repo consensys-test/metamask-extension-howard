@@ -8,8 +8,9 @@ import { useLocation } from 'react-router-dom';
 import {
   AvatarNetwork,
   AvatarNetworkSize,
-} from '@metamask/design-system-react';
-import { Box, Text } from '../../../component-library';
+  Box,
+  Text,
+} from '../../../component-library';
 import {
   AlignItems,
   BackgroundColor,
@@ -66,7 +67,7 @@ export const SelectRpcUrlModal = ({
               src={image}
               name={networkConfigurationToUse.name}
               size={AvatarNetworkSize.Sm}
-              className="mr-1"
+              marginRight={1}
             />
           )}
           <Text variant={TextVariant.bodySm} color={TextColor.textAlternative}>
@@ -76,10 +77,12 @@ export const SelectRpcUrlModal = ({
       </Box>
 
       {networkConfigurationToUse.rpcEndpoints.map((rpcEndpoint, index) => (
-        <button
-          type="button"
+        <Box
+          alignItems={AlignItems.center}
+          paddingLeft={4}
+          paddingRight={4}
+          display={Display.Flex}
           key={rpcEndpoint.url}
-          data-testid={`network-rpc-option-${rpcEndpoint.name ?? String(index)}`}
           onClick={() => {
             const network = {
               ...networkConfigurationToUse,
@@ -92,13 +95,10 @@ export const SelectRpcUrlModal = ({
               rpcEndpoint.networkClientId,
             );
           }}
-          className={classnames(
-            'select-rpc-url__item flex w-full items-center px-4 text-left',
-            {
-              'select-rpc-url__item--selected':
-                index === networkConfigurationToUse.defaultRpcEndpointIndex,
-            },
-          )}
+          className={classnames('select-rpc-url__item', {
+            'select-rpc-url__item--selected':
+              index === networkConfigurationToUse.defaultRpcEndpointIndex,
+          })}
         >
           {index === networkConfigurationToUse.defaultRpcEndpointIndex && (
             <Box
@@ -108,7 +108,7 @@ export const SelectRpcUrlModal = ({
             />
           )}
           <RpcListItem rpcEndpoint={rpcEndpoint} />
-        </button>
+        </Box>
       ))}
     </Box>
   );

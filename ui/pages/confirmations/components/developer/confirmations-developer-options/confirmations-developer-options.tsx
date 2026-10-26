@@ -7,8 +7,6 @@ import {
   TextColor,
 } from '../../../../../helpers/constants/design-system';
 import { MoneyAccountDepositButton } from '../money-account-deposit-button';
-import { MoneyAccountWithdrawButton } from '../money-account-withdraw-button';
-import { MoneyAccountToPerpsButton } from '../money-account-to-perps-button';
 import { MusdConversionButton } from '../musd-conversion-button';
 import { PerpsDepositButton } from '../perps-deposit-button';
 import { PerpsWithdrawButton } from '../perps-withdraw-button';
@@ -41,8 +39,6 @@ export const ConfirmationsDeveloperOptions = () => {
         <PerpsWithdrawButton />
         <MusdConversionButton />
         <MoneyAccountDepositButton />
-        <MoneyAccountWithdrawButton />
-        <MoneyAccountToPerpsButton />
       </Box>
     </>
   );

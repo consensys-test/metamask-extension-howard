@@ -188,8 +188,8 @@ class NetworksPage {
   async checkRpcIsSelected(rpcName: string): Promise<void> {
     console.log(`Check RPC ${rpcName} is selected on the networks page`);
     await this.driver.waitForSelector({
-      css: 'button',
       text: rpcName,
+      tag: 'button',
     });
   }
 
@@ -319,7 +319,8 @@ class NetworksPage {
     console.log(`Select RPC ${rpcName} for network`);
     await this.driver.waitForSelector(this.selectRpcMessage);
     await this.driver.clickElementAndWaitToDisappear({
-      testId: `network-rpc-option-${rpcName}`,
+      text: rpcName,
+      tag: 'button',
     });
   }
 

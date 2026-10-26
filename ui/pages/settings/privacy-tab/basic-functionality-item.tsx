@@ -8,7 +8,6 @@ import {
 } from '../../../store/actions';
 import { openBasicFunctionalityModal } from '../../../ducks/app/app';
 import { getIsBasicFunctionalityConsolidationEnabled } from '../../../selectors/multichain/feature-flags';
-import { getIsBasicFunctionalitySocialLoginUser } from '../../../selectors/onboarding';
 import { SettingsToggleItem } from '../shared/settings-toggle-item';
 import { useAnalytics } from '../../../hooks/useAnalytics';
 import {
@@ -24,18 +23,11 @@ export const BasicFunctionalityToggleItem = () => {
   const dispatch = useDispatch();
   const { trackEvent, createEventBuilder } = useAnalytics();
   const useExternalServices = useSelector(getUseExternalServices);
-  const isSocialLoginUser = useSelector(getIsBasicFunctionalitySocialLoginUser);
   const isBasicFunctionalityConsolidationEnabled = useSelector(
     getIsBasicFunctionalityConsolidationEnabled,
   );
-  const isSocialLoginBasicFunctionalityLocked =
-    isSocialLoginUser && isBasicFunctionalityConsolidationEnabled;
 
   const handleToggle = (value: boolean) => {
-    if (isSocialLoginBasicFunctionalityLocked) {
-      return;
-    }
-
     if (value) {
       dispatch(openBasicFunctionalityModal());
     } else {
@@ -72,7 +64,6 @@ export const BasicFunctionalityToggleItem = () => {
       description={description}
       value={useExternalServices}
       onToggle={handleToggle}
-      disabled={isSocialLoginBasicFunctionalityLocked}
       dataTestId="basic-functionality-toggle"
     />
   );

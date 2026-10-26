@@ -1,28 +1,11 @@
 import log from 'loglevel';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import {
-  Box,
-  BoxAlignItems,
-  BoxBackgroundColor,
-  BoxFlexDirection,
-  BoxJustifyContent,
-  Button,
-  ButtonSize,
-  ButtonVariant,
-  HelpText,
-  HelpTextSeverity,
+  Button as DSButton,
+  ButtonSize as DSButtonSize,
+  ButtonVariant as DSButtonVariant,
   IconName,
-  Label,
-  Popover,
-  PopoverPosition,
-  Text,
-  TextButton,
-  TextButtonSize,
-  TextColor,
-  TextField,
-  TextFieldSize,
-  TextVariant,
 } from '@metamask/design-system-react';
 import {
   type UpdateNetworkFields,
@@ -51,10 +34,7 @@ import {
   isPrefixedFormattedHexString,
   isSafeChainId,
 } from '../../../../shared/lib/network.utils';
-import {
-  isRpcRateLimitError,
-  jsonRpcRequest,
-} from '../../../../shared/lib/rpc.utils';
+import { jsonRpcRequest } from '../../../../shared/lib/rpc.utils';
 import { submitRequestToBackground } from '../../../store/background-connection';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { getNetworkConfigurationsByChainId } from '../../../../shared/lib/selectors/networks';
@@ -67,6 +47,28 @@ import {
   toggleNetworkMenu,
   updateNetwork,
 } from '../../../store/actions';
+import {
+  Box,
+  ButtonLink,
+  ButtonPrimary,
+  ButtonPrimarySize,
+  FormTextField,
+  FormTextFieldSize,
+  HelpText,
+  HelpTextSeverity,
+  Text,
+} from '../../component-library';
+import {
+  AlignItems,
+  BackgroundColor,
+  BlockSize,
+  BorderRadius,
+  Display,
+  FlexDirection,
+  JustifyContent,
+  TextColor,
+  TextVariant,
+} from '../../../helpers/constants/design-system';
 import RpcListItem, {
   stripKeyFromInfuraUrl,
   stripProtocol,
@@ -81,18 +83,8 @@ import {
 } from '../../../selectors';
 import { onlyKeepHost } from '../../../../shared/lib/only-keep-host';
 import { useDispatch } from '../../../store/hooks';
-import {
-  ChainlistNetworkPicker,
-  type ChainlistNetwork,
-} from '../../../pages/networks/chainlist-network-picker';
 import { useSafeChains, rpcIdentifierUtility } from './use-safe-chains';
 import { useNetworkFormState } from './networks-form-state';
-
-export type NetworksFormChainlist = {
-  existingNetworkChainIds: Set<string>;
-  existingNetworkNamesByChainId: Record<string, string>;
-  onSelect: (network: ChainlistNetwork, searchQuery?: string) => void;
-};
 
 export const NetworksForm = ({
   networkFormState,
@@ -105,7 +97,6 @@ export const NetworksForm = ({
   onComplete,
   onEdit,
   onAddFromChainlist,
-  chainlist,
 }: {
   networkFormState: ReturnType<typeof useNetworkFormState>;
   existingNetwork?: UpdateNetworkFields;
@@ -117,38 +108,15 @@ export const NetworksForm = ({
   onComplete?: () => void;
   onEdit?: () => void;
   onAddFromChainlist?: () => void;
-  chainlist?: NetworksFormChainlist;
 }) => {
   const t = useI18nContext();
   const dispatch = useDispatch();
   const { trackEvent, createEventBuilder } = useAnalytics();
   const scrollableRef = useRef<HTMLDivElement>(null);
-  const nameFieldRef = useRef<HTMLDivElement>(null);
-  const [isChainlistOpen, setIsChainlistOpen] = useState(false);
-  const [chainlistReference, setChainlistReference] =
-    useState<HTMLElement | null>(null);
-  const showChainlist = Boolean(chainlist) && !existingNetwork;
-
-  const openChainlist = () => {
-    if (!showChainlist) {
-      return;
-    }
-    setChainlistReference(nameFieldRef.current);
-    if (!isChainlistOpen) {
-      trackEvent(
-        createEventBuilder(MetaMetricsEventName.ChainlistAddClicked)
-          .addCategory(MetaMetricsEventCategory.Network)
-          .build(),
-      );
-    }
-    setIsChainlistOpen(true);
-  };
   const networkConfigurations = useSelector(getNetworkConfigurationsByChainId);
   const isRpcFailoverEnabled = useSelector(getIsRpcFailoverEnabled);
 
   const {
-    source,
-    setSource,
     name,
     setName,
     chainId,
@@ -175,27 +143,24 @@ export const NetworksForm = ({
   // failover URLs solely for Infura endpoints; applying them to custom RPCs
   // would leak requests to the failover, so it does not. Only surface failover
   // in the form for Infura endpoints so the UI matches the actual behaviour.
-  const failoverUrlsForEndpoint = (endpoint?: { url: string }) => {
-    return endpoint?.url &&
-      new URL(endpoint.url).hostname.endsWith('.infura.io')
-      ? chainFailoverUrls
-      : [];
-  };
+  const failoverUrlsForEndpoint = (endpoint?: { type?: RpcEndpointType }) =>
+    endpoint?.type === RpcEndpointType.Infura ? chainFailoverUrls : [];
 
   const defaultFailoverUrls = failoverUrlsForEndpoint(defaultRpcEndpoint);
 
   const { safeChains } = useSafeChains();
 
-  const [rpcFetchError, setRpcFetchError] = useState<
-    { key: string; msg: string } | undefined
-  >();
+  const [errors, setErrors] = useState<
+    Record<string, { key: string; msg: string } | undefined>
+  >({});
+
+  const [warnings, setWarnings] = useState<
+    Record<string, { key: string; msg: string } | undefined>
+  >({});
+
+  const [suggestedName, setSuggestedName] = useState<string>();
+  const [suggestedTicker, setSuggestedTicker] = useState<string>();
   const [fetchedChainId, setFetchedChainId] = useState<string>();
-  // Save writes this chain into network configurations before the form closes.
-  // Skip the duplicate warning for that chain so the network just added is not
-  // reported as already saved.
-  const [submittedChainId, setSubmittedChainId] = useState<string | undefined>(
-    undefined,
-  );
 
   const tokenNetworkFilter = useSelector(getTokenNetworkFilter);
 
@@ -204,9 +169,9 @@ export const NetworksForm = ({
       ? endpoint.replace('{infuraProjectId}', infuraProjectId ?? '')
       : endpoint;
 
-  const chainIdHex = chainId ? toHex(chainId) : undefined;
-
-  const { suggestedName, nameWarning } = useMemo(() => {
+  // Validate the network name when it changes
+  useEffect(() => {
+    const chainIdHex = chainId ? toHex(chainId) : undefined;
     const expectedName = chainIdHex
       ? (NETWORK_TO_NAME_MAP[chainIdHex as keyof typeof NETWORK_TO_NAME_MAP] ??
         NETWORKS_BYPASSING_VALIDATION[
@@ -215,19 +180,22 @@ export const NetworksForm = ({
         safeChains?.find((chain) => toHex(chain.chainId) === chainIdHex)?.name)
       : undefined;
 
-    const mismatch = Boolean(expectedName && expectedName !== name);
-    return {
-      suggestedName: mismatch ? expectedName : undefined,
-      nameWarning: mismatch
+    const mismatch = expectedName && expectedName !== name;
+    setSuggestedName(mismatch ? expectedName : undefined);
+    setWarnings((state) => ({
+      ...state,
+      name: mismatch
         ? {
             key: 'wrongNetworkName',
             msg: t('wrongNetworkName'),
           }
         : undefined,
-    };
-  }, [chainIdHex, name, safeChains, t]);
+    }));
+  }, [chainId, name, safeChains]);
 
-  const { suggestedTicker, tickerWarning } = useMemo(() => {
+  // Validate the ticker when it changes
+  useEffect(() => {
+    const chainIdHex = chainId ? toHex(chainId) : undefined;
     const expectedSymbol = chainIdHex
       ? (CHAIN_ID_TO_CURRENCY_SYMBOL_MAP[
           chainIdHex as keyof typeof CHAIN_ID_TO_CURRENCY_SYMBOL_MAP
@@ -242,22 +210,23 @@ export const NetworksForm = ({
         ]?.symbol?.toLowerCase() === ticker?.toLowerCase()
       : false;
 
-    const mismatch = Boolean(
-      expectedSymbol && expectedSymbol !== ticker && !isWhitelistedSymbol,
-    );
+    const mismatch =
+      expectedSymbol && expectedSymbol !== ticker && !isWhitelistedSymbol;
 
-    return {
-      suggestedTicker: mismatch ? expectedSymbol : undefined,
-      tickerWarning: mismatch
+    setSuggestedTicker(mismatch ? expectedSymbol : undefined);
+    setWarnings((state) => ({
+      ...state,
+      ticker: mismatch
         ? {
             key: 'chainListReturnedDifferentTickerSymbol',
             msg: t('chainListReturnedDifferentTickerSymbol'),
           }
         : undefined,
-    };
-  }, [chainIdHex, ticker, safeChains, t]);
+    }));
+  }, [chainId, ticker, safeChains]);
 
-  const chainIdError = useMemo(() => {
+  // Validate the chain ID when it changes
+  useEffect(() => {
     let error: [string, string] | undefined;
 
     if (chainId === undefined || chainId === '') {
@@ -282,7 +251,9 @@ export const NetworksForm = ({
       error = ['invalidChainIdTooBig', t('invalidChainIdTooBig')];
     }
 
-    if (!error && !existingNetwork && chainIdHex !== submittedChainId) {
+    const chainIdHex = toHex(chainId);
+
+    if (!error && !existingNetwork) {
       const matchingNetwork = chainIdHex
         ? networkConfigurations[chainIdHex]
         : undefined;
@@ -294,89 +265,48 @@ export const NetworksForm = ({
       }
     }
 
-    return error ? { key: error[0], msg: error[1] } : undefined;
-  }, [
-    chainId,
-    chainIdHex,
-    existingNetwork,
-    networkConfigurations,
-    submittedChainId,
-    t,
-  ]);
-
-  const rpcMismatchError = useMemo(() => {
+    let rpcError: [string, string] | undefined;
     if (fetchedChainId && chainIdHex && fetchedChainId !== chainIdHex) {
-      return {
-        key: 'endpointReturnedDifferentChainId',
-        msg: t('endpointReturnedDifferentChainId', [
-          hexToDecimal(fetchedChainId),
-        ]),
-      };
+      rpcError = [
+        'endpointReturnedDifferentChainId',
+        t('endpointReturnedDifferentChainId', [hexToDecimal(fetchedChainId)]),
+      ];
     }
-    return undefined;
-  }, [fetchedChainId, chainIdHex, t]);
 
-  const warnings = useMemo(
-    () => ({
-      name: nameWarning,
-      ticker: tickerWarning,
-    }),
-    [nameWarning, tickerWarning],
-  );
-
-  const errors = useMemo(
-    () => ({
-      chainId: chainIdError,
-      rpcUrl: rpcFetchError ?? rpcMismatchError,
-    }),
-    [chainIdError, rpcFetchError, rpcMismatchError],
-  );
-
-  const selectedRpcUrl =
-    rpcUrls?.rpcEndpoints?.[rpcUrls?.defaultRpcEndpointIndex ?? -1]?.url;
-  const [prevSelectedRpcUrl, setPrevSelectedRpcUrl] = useState(selectedRpcUrl);
-
-  if (selectedRpcUrl !== prevSelectedRpcUrl) {
-    setPrevSelectedRpcUrl(selectedRpcUrl);
-    setRpcFetchError(undefined);
-    setFetchedChainId(undefined);
-  }
+    setErrors((state) => ({
+      ...state,
+      chainId: error ? { key: error[0], msg: error[1] } : undefined,
+      rpcUrl: rpcError ? { key: rpcError[0], msg: rpcError[1] } : undefined,
+    }));
+  }, [chainId, fetchedChainId, existingNetwork?.chainId]);
 
   // Fetch the chain ID from the RPC endpoint when it changes
   useEffect(() => {
-    if (!selectedRpcUrl) {
-      return undefined;
-    }
+    const rpcUrl =
+      rpcUrls?.rpcEndpoints?.[rpcUrls?.defaultRpcEndpointIndex ?? -1]?.url;
 
-    let cancelled = false;
-
-    jsonRpcRequest(templateInfuraRpc(selectedRpcUrl), 'eth_chainId')
-      .then((response) => {
-        if (!cancelled) {
+    if (rpcUrl) {
+      jsonRpcRequest(templateInfuraRpc(rpcUrl), 'eth_chainId')
+        .then((response) => {
           setFetchedChainId(response as string);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
+        })
+        .catch((err) => {
           setFetchedChainId(undefined);
           log.warn('Failed to fetch the chainId from the endpoint.', err);
-          const errorKey = isRpcRateLimitError(err)
-            ? 'rpcUrlRateLimited'
-            : 'failedToFetchChainId';
-          setRpcFetchError({
-            key: errorKey,
-            msg: t(errorKey),
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRpcUrl, t]);
+          setErrors((state) => ({
+            ...state,
+            rpcUrl: {
+              key: 'failedToFetchChainId',
+              msg: t('failedToFetchChainId'),
+            },
+          }));
+        });
+    }
+  }, [chainId, rpcUrls]);
 
   const onSubmit = async () => {
     try {
+      const chainIdHex = chainId ? toHex(chainId) : undefined;
       if (chainIdHex === CHAIN_IDS.GOERLI) {
         dispatch(showDeprecatedNetworkModal());
       } else if (chainIdHex) {
@@ -468,7 +398,6 @@ export const NetworksForm = ({
           // network from the Networks page should only persist the
           // configuration; switching is reserved for the homepage network
           // modal (`toggleNetworkMenuAfterSubmit=true`).
-          setSubmittedChainId(chainIdHex);
           await dispatch(
             addNetwork(networkPayload, {
               setActive: toggleNetworkMenuAfterSubmit,
@@ -499,7 +428,6 @@ export const NetworksForm = ({
               // eslint-disable-next-line @typescript-eslint/naming-convention
               source_connection_method:
                 MetaMetricsNetworkEventSource.CustomNetworkForm,
-              source,
               // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
               // eslint-disable-next-line @typescript-eslint/naming-convention
               token_symbol: ticker,
@@ -540,151 +468,130 @@ export const NetworksForm = ({
 
   return (
     <Box
-      flexDirection={BoxFlexDirection.Column}
-      justifyContent={BoxJustifyContent.Between}
-      alignItems={BoxAlignItems.Center}
+      height={BlockSize.Full}
+      display={Display.Flex}
+      justifyContent={JustifyContent.spaceBetween}
+      flexDirection={FlexDirection.Column}
+      alignItems={AlignItems.center}
       ref={scrollableRef}
-      className="networks-form__scrollable h-full"
+      className="networks-form__scrollable"
     >
-      <Box paddingHorizontal={4} paddingBottom={2} className="w-full">
-        {onAddFromChainlist && !existingNetwork && !showChainlist ? (
-          <Button
-            variant={ButtonVariant.Secondary}
-            size={ButtonSize.Lg}
+      <Box
+        width={BlockSize.Full}
+        paddingLeft={4}
+        paddingRight={4}
+        paddingBottom={2}
+      >
+        {onAddFromChainlist && !existingNetwork ? (
+          <DSButton
+            variant={DSButtonVariant.Secondary}
+            size={DSButtonSize.Lg}
             startIconName={IconName.FlashFilled}
             isFullWidth
             onClick={onAddFromChainlist}
-            className="mb-4"
+            className="mb-4 rounded-xl"
             data-testid="network-form-add-from-chainlist"
           >
             {t('addFromChainlist')}
-          </Button>
+          </DSButton>
         ) : null}
-        <Label htmlFor="networkName" className="mb-1">
-          {t('networkName')}
-        </Label>
-        <Box ref={nameFieldRef}>
-          <TextField
-            id="networkName"
-            size={TextFieldSize.Lg}
-            placeholder={t('enterNetworkName')}
-            data-testid="network-form-name-input"
-            autoFocus
-            className="w-full"
-            onClick={openChainlist}
-            onFocus={(event) => {
-              // Skip the mount auto-focus so the list opens on a click or a later focus.
-              if (event.relatedTarget) {
-                openChainlist();
-              }
-            }}
-            onChange={(event) => {
-              setName(event.target.value);
-              openChainlist();
-            }}
-            inputProps={
-              {
-                'data-testid': 'network-form-network-name',
-              } as React.ComponentPropsWithoutRef<'input'>
-            }
-            value={name}
-          />
-        </Box>
-        {showChainlist && chainlist ? (
-          <Popover
-            referenceElement={chainlistReference}
-            position={PopoverPosition.Bottom}
-            matchWidth
-            isOpen={isChainlistOpen}
-            isPortal
-            onClickOutside={() => setIsChainlistOpen(false)}
-            onPressEscKey={() => setIsChainlistOpen(false)}
-            className="z-10 overflow-hidden rounded-xl p-0"
-          >
-            <ChainlistNetworkPicker
-              existingNetworkChainIds={chainlist.existingNetworkChainIds}
-              existingNetworkNamesByChainId={
-                chainlist.existingNetworkNamesByChainId
-              }
-              layout="dropdown"
-              searchValue={name}
-              showSearchField={false}
-              onSelect={(network, searchQuery) => {
-                setSource('chainlist');
-                setIsChainlistOpen(false);
-                chainlist.onSelect(network, searchQuery);
-              }}
-              onUseTypedName={(typedName) => {
-                setSource('manual');
-                setName(typedName);
-                setIsChainlistOpen(false);
-              }}
-            />
-          </Popover>
-        ) : null}
-        {name && warnings?.name?.msg ? (
-          <HelpText severity={HelpTextSeverity.Warning}>
-            {warnings.name.msg}
-          </HelpText>
-        ) : null}
-        {suggestedName ? (
-          <Text
-            asChild
-            variant={TextVariant.BodySm}
-            color={TextColor.TextDefault}
-            data-testid="network-form-name-suggestion"
-          >
-            <span>
-              {t('suggestedTokenName')}
-              <TextButton
-                size={TextButtonSize.BodySm}
-                onClick={() => {
-                  setName(suggestedName);
-                }}
-                className="px-1 align-baseline"
-              >
-                {suggestedName}
-              </TextButton>
-            </span>
-          </Text>
-        ) : null}
+
+        <FormTextField
+          id="networkName"
+          size={FormTextFieldSize.Lg}
+          placeholder={t('enterNetworkName')}
+          data-testid="network-form-name-input"
+          autoFocus
+          helpText={
+            ((name && warnings?.name?.msg) || suggestedName) && (
+              <>
+                {name && warnings?.name?.msg && (
+                  <HelpText
+                    variant={TextVariant.bodySm}
+                    severity={HelpTextSeverity.Warning}
+                  >
+                    {warnings.name.msg}
+                  </HelpText>
+                )}
+
+                {suggestedName && (
+                  <Text
+                    as="span"
+                    variant={TextVariant.bodySm}
+                    color={TextColor.textDefault}
+                    data-testid="network-form-name-suggestion"
+                  >
+                    {t('suggestedTokenName')}
+                    <ButtonLink
+                      as="button"
+                      variant={TextVariant.bodySm}
+                      color={TextColor.primaryDefault}
+                      onClick={() => {
+                        setName(suggestedName);
+                      }}
+                      paddingLeft={1}
+                      paddingRight={1}
+                      style={{ verticalAlign: 'baseline' }}
+                    >
+                      {suggestedName}
+                    </ButtonLink>
+                  </Text>
+                )}
+              </>
+            )
+          }
+          // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31973
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onChange={(e: any) => {
+            setName(e.target?.value);
+          }}
+          label={t('networkName')}
+          labelProps={{
+            children: undefined,
+            variant: TextVariant.bodyMdMedium,
+          }}
+          textFieldProps={{
+            borderRadius: BorderRadius.LG,
+          }}
+          inputProps={{
+            'data-testid': 'network-form-network-name',
+          }}
+          value={name}
+        />
         <DropdownEditor
           title={t('defaultRpcUrl')}
           placeholder={t('addAUrl')}
           style={DropdownEditorStyle.PopoverStyle}
           items={rpcUrls.rpcEndpoints}
           itemKey={(endpoint) => endpoint.url}
-          itemDataTestId={(endpoint, index) =>
-            `network-form-rpc-option-${endpoint.name ?? String(index)}`
-          }
           selectedItemIndex={rpcUrls.defaultRpcEndpointIndex}
           error={Boolean(errors.rpcUrl)}
           buttonDataTestId="test-add-rpc-drop-down"
-          renderItem={(item, isList) => {
-            const failoverUrls = failoverUrlsForEndpoint(item);
-            return isList ||
-              item?.name ||
-              item?.type === RpcEndpointType.Infura ||
-              failoverUrls.length > 0 ? (
+          renderItem={(item, isList) =>
+            isList || item?.name || item?.type === RpcEndpointType.Infura ? (
               <RpcListItem
                 rpcEndpoint={{
                   ...item,
-                  failoverUrls,
+                  failoverUrls: failoverUrlsForEndpoint(item),
                 }}
               />
             ) : (
               // A custom (non Infura) endpoint never has a failover, so it just
               // renders the URL with no failover tag.
               <Text
-                asChild
+                as="span"
                 ellipsis
-                variant={TextVariant.BodyMd}
-                className="flex items-center gap-1 py-3"
+                variant={TextVariant.bodyMd}
+                paddingTop={3}
+                paddingBottom={3}
+                display={Display.Flex}
+                alignItems={AlignItems.center}
+                gap={1}
               >
-                <span>{stripProtocol(stripKeyFromInfuraUrl(item.url))}</span>
+                {stripProtocol(stripKeyFromInfuraUrl(item.url))}
               </Text>
-            );
-          }}
+            )
+          }
           renderTooltip={(item, isList) => {
             const url = stripKeyFromInfuraUrl(item.url);
             return url.length > (isList ? 37 : 35) ? url : undefined;
@@ -711,55 +618,63 @@ export const NetworksForm = ({
         />
 
         {errors.rpcUrl?.msg && (
-          <HelpText
-            severity={HelpTextSeverity.Danger}
-            data-testid="network-form-chain-id-error"
-          >
-            {errors.rpcUrl?.msg}
-          </HelpText>
+          <Box>
+            <HelpText
+              variant={TextVariant.bodySm}
+              severity={HelpTextSeverity.Danger}
+              data-testid="network-form-chain-id-error"
+            >
+              {errors.rpcUrl?.msg}
+            </HelpText>
+          </Box>
         )}
 
         {isRpcFailoverEnabled && defaultFailoverUrls.length > 0 ? (
-          <div className="mt-4">
-            <Label htmlFor="failoverRpcUrl" className="mb-1">
-              {t('failoverRpcUrl')}
-            </Label>
-            <TextField
-              id="failoverRpcUrl"
-              size={TextFieldSize.Lg}
-              className="w-full"
-              value={onlyKeepHost(defaultFailoverUrls[0])}
-              isDisabled
-            />
-          </div>
+          <FormTextField
+            id="failoverRpcUrl"
+            size={FormTextFieldSize.Lg}
+            paddingTop={4}
+            label={t('failoverRpcUrl')}
+            labelProps={{
+              children: undefined,
+              variant: TextVariant.bodyMdMedium,
+            }}
+            textFieldProps={{
+              borderRadius: BorderRadius.LG,
+            }}
+            value={onlyKeepHost(defaultFailoverUrls[0])}
+            disabled={true}
+          />
         ) : null}
 
-        <div className="mt-4">
-          <Label htmlFor="chainId" className="mb-1">
-            {t('chainId')}
-          </Label>
-          <TextField
-            id="chainId"
-            size={TextFieldSize.Lg}
-            placeholder={t('enterChainId')}
-            data-testid="network-form-chain-id-input"
-            className="w-full"
-            onChange={(event) => {
-              setChainId(event.target.value.trim());
-            }}
-            isError={Boolean(errors?.chainId)}
-            inputProps={
-              {
-                'data-testid': 'network-form-chain-id',
-              } as React.ComponentPropsWithoutRef<'input'>
-            }
-            value={chainId}
-            isDisabled={Boolean(existingNetwork)}
-          />
-        </div>
+        <FormTextField
+          id="chainId"
+          size={FormTextFieldSize.Lg}
+          placeholder={t('enterChainId')}
+          paddingTop={4}
+          data-testid="network-form-chain-id-input"
+          onChange={(e) => {
+            setChainId(e.target?.value.trim());
+          }}
+          error={Boolean(errors?.chainId)}
+          label={t('chainId')}
+          labelProps={{
+            children: undefined,
+            variant: TextVariant.bodyMdMedium,
+          }}
+          textFieldProps={{
+            borderRadius: BorderRadius.LG,
+          }}
+          inputProps={{
+            'data-testid': 'network-form-chain-id',
+          }}
+          value={chainId}
+          disabled={Boolean(existingNetwork)}
+        />
 
         {errors.chainId?.msg ? (
           <HelpText
+            variant={TextVariant.bodySm}
             severity={HelpTextSeverity.Danger}
             data-testid="network-form-chain-id-error"
           >
@@ -767,16 +682,19 @@ export const NetworksForm = ({
           </HelpText>
         ) : null}
         {errors.chainId?.key === 'existingChainId' ? (
-          <HelpText
-            asChild
-            severity={HelpTextSeverity.Danger}
-            data-testid="network-form-chain-id-error"
-          >
-            <div>
+          <Box>
+            <HelpText
+              variant={TextVariant.bodySm}
+              severity={HelpTextSeverity.Danger}
+              data-testid="network-form-chain-id-error"
+            >
               {t('updateOrEditNetworkInformations')}{' '}
-              <TextButton
-                size={TextButtonSize.BodySm}
+              <ButtonLink
+                as="button"
+                variant={TextVariant.bodySm}
+                color={TextColor.primaryDefault}
                 onClick={() => {
+                  const chainIdHex = toHex(chainId);
                   if (chainIdHex) {
                     dispatch(
                       setEditedNetwork({
@@ -788,54 +706,62 @@ export const NetworksForm = ({
                 }}
               >
                 {t('editNetworkLink')}
-              </TextButton>
-            </div>
-          </HelpText>
+              </ButtonLink>
+            </HelpText>
+          </Box>
         ) : null}
-        <div className="mt-4">
-          <Label htmlFor="nativeCurrency" className="mb-1">
-            {t('currencySymbol')}
-          </Label>
-          <TextField
-            id="nativeCurrency"
-            size={TextFieldSize.Lg}
-            placeholder={t('enterSymbol')}
-            data-testid="network-form-ticker"
-            className="w-full"
-            onChange={(event) => {
-              setTicker(event.target.value);
-            }}
-            inputProps={
-              {
-                'data-testid': 'network-form-ticker-input',
-              } as React.ComponentPropsWithoutRef<'input'>
-            }
-            value={ticker}
-          />
-          {suggestedTicker ? (
-            <Text
-              asChild
-              variant={TextVariant.BodySm}
-              color={TextColor.TextDefault}
-              data-testid="network-form-ticker-suggestion"
-            >
-              <span>
+        <FormTextField
+          id="nativeCurrency"
+          size={FormTextFieldSize.Lg}
+          placeholder={t('enterSymbol')}
+          paddingTop={4}
+          data-testid="network-form-ticker"
+          helpText={
+            suggestedTicker ? (
+              <Text
+                as="span"
+                variant={TextVariant.bodySm}
+                color={TextColor.textDefault}
+                data-testid="network-form-ticker-suggestion"
+              >
                 {t('suggestedCurrencySymbol')}
-                <TextButton
-                  size={TextButtonSize.BodySm}
+                <ButtonLink
+                  as="button"
+                  variant={TextVariant.bodySm}
+                  color={TextColor.primaryDefault}
                   onClick={() => {
                     setTicker(suggestedTicker);
                   }}
-                  className="px-1 align-baseline"
+                  paddingLeft={1}
+                  paddingRight={1}
+                  style={{ verticalAlign: 'baseline' }}
                 >
                   {suggestedTicker}
-                </TextButton>
-              </span>
-            </Text>
-          ) : null}
-        </div>
+                </ButtonLink>
+              </Text>
+            ) : null
+          }
+          // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31973
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onChange={(e: any) => {
+            setTicker(e.target?.value);
+          }}
+          label={t('currencySymbol')}
+          labelProps={{
+            children: undefined,
+            variant: TextVariant.bodyMdMedium,
+          }}
+          textFieldProps={{
+            borderRadius: BorderRadius.LG,
+          }}
+          inputProps={{
+            'data-testid': 'network-form-ticker-input',
+          }}
+          value={ticker}
+        />
         {ticker && warnings.ticker?.msg ? (
           <HelpText
+            variant={TextVariant.bodySm}
             severity={HelpTextSeverity.Warning}
             data-testid="network-form-ticker-warning"
           >
@@ -878,47 +804,51 @@ export const NetworksForm = ({
           }}
           renderItem={(item) => (
             <Text
-              asChild
+              as="button"
+              paddingLeft={0}
+              paddingRight={0}
+              paddingTop={3}
+              paddingBottom={3}
+              color={TextColor.textDefault}
+              variant={TextVariant.bodyMd}
+              backgroundColor={BackgroundColor.transparent}
               ellipsis
-              color={TextColor.TextDefault}
-              variant={TextVariant.BodyMd}
-              className="bg-transparent px-0 py-3"
             >
-              <span>{stripProtocol(item)}</span>
+              {stripProtocol(item)}
             </Text>
           )}
           renderTooltip={(item) => (item.length > 36 ? item : undefined)}
         />
       </Box>
       <Box
-        className={`networks-form__footer w-full${
+        className={`networks-form__footer${
           usePageFooterStyle ? ' networks-form__footer--page' : ''
         }`}
-        backgroundColor={BoxBackgroundColor.BackgroundDefault}
+        backgroundColor={BackgroundColor.backgroundDefault}
         padding={4}
+        width={BlockSize.Full}
       >
         {usePageFooterStyle ? (
-          <Button
-            variant={ButtonVariant.Primary}
-            size={ButtonSize.Lg}
+          <DSButton
+            variant={DSButtonVariant.Primary}
+            size={DSButtonSize.Lg}
             isDisabled={isSaveDisabled}
             onClick={onSubmit}
-            className="w-full"
+            className="w-full rounded-xl"
             data-testid="page-container-footer-next"
           >
             {t('save')}
-          </Button>
+          </DSButton>
         ) : (
-          <Button
-            variant={ButtonVariant.Primary}
-            isDisabled={isSaveDisabled}
+          <ButtonPrimary
+            disabled={isSaveDisabled}
             onClick={onSubmit}
-            size={ButtonSize.Lg}
-            isFullWidth
+            size={ButtonPrimarySize.Lg}
+            width={BlockSize.Full}
             data-testid="page-container-footer-next"
           >
             {t('save')}
-          </Button>
+          </ButtonPrimary>
         )}
       </Box>
     </Box>

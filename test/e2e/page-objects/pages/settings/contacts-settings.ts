@@ -1,43 +1,15 @@
 import { Driver } from '../../../webdriver/driver';
 
 /**
- * Standalone Contacts address book (list, add, view, edit, delete).
- *
- * Screen: `#/contacts` (and add/view/edit sub-routes), opened from
- * `HeaderNavbar.openContactsPage` — not a Settings tab.
- * Owns: contact list, add/edit forms, network selector on create, delete
- * confirm, and presence/label/address assertions.
- * Boundaries: contacts CRUD only. Contact sync toggles belong to
- * `BackupAndSyncSettings`.
- * Related: `HeaderNavbar` (how tests get here), `BackupAndSyncSettings`.
- *
- * @see ui/pages/contacts/contacts-list-page.tsx
- * @see ui/pages/contacts/add-contact-page.tsx
- * @see ui/pages/contacts/contact-details-page.tsx
- * @see ui/pages/contacts/edit-contact-page.tsx
+ * Page object for the new Contacts flow (standalone contacts page from global menu).
+ * Replaces the old settings contact list tab.
  */
 class ContactsSettings {
   private readonly addContactButton =
     '[data-testid="contacts-add-contact-button"]';
 
-  private readonly closeContactUpdatedToast = {
-    testId: 'toast-close-button',
-  };
-
   private readonly confirmAddContactButton = {
     testId: 'page-container-footer-next',
-  };
-
-  private readonly contactDetailsHeader = {
-    tag: 'p',
-    text: 'Contact details',
-  };
-
-  private readonly contactDetailsName = (contactName: string) => {
-    return {
-      testId: 'address-book-name',
-      text: contactName,
-    };
   };
 
   private readonly contactListItem = '[data-testid="contact-list-item"]';
@@ -49,7 +21,7 @@ class ContactsSettings {
     '[data-testid="contact-list-item-label"]';
 
   private readonly contactsPage = {
-    testId: 'parent-selector-contacts-page',
+    testId: 'contacts-page',
   };
 
   private readonly createContactAddressInput = '#contact-address';
@@ -188,12 +160,10 @@ class ContactsSettings {
    */
   async deleteContact(contactName: string): Promise<void> {
     console.log('Deleting contact on contacts page');
-    await this.driver.clickElement({
+    await this.driver.findScrollToAndClickElement({
       text: contactName,
       css: this.contactListItem,
     });
-    await this.driver.waitForSelector(this.contactDetailsHeader);
-    await this.driver.waitForSelector(this.contactDetailsName(contactName));
     await this.driver.clickElement(this.deleteContactButton);
     await this.driver.clickElementAndWaitToDisappear(
       this.deleteContactConfirmButton,
@@ -235,7 +205,6 @@ class ContactsSettings {
     await this.driver.clickElementAndWaitToDisappear(
       this.confirmAddContactButton,
     );
-    await this.driver.clickElementSafe(this.closeContactUpdatedToast);
   }
 }
 

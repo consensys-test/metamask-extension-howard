@@ -3,13 +3,14 @@ import { WALLET_PASSWORD } from '../../constants';
 import FixtureBuilderV2 from '../../fixtures/fixture-builder-v2';
 import { withFixtures } from '../../helpers';
 import { login } from '../../page-objects/flows/login.flow';
-import AccountListPage from '../../page-objects/pages/accounts/list-page';
-import HeaderNavbar from '../../page-objects/pages/home/header-navbar';
-import AccountAddressModal from '../../page-objects/pages/accounts/address-modal';
-import AccountAddressListPage from '../../page-objects/pages/accounts/address-list-page';
-import AccountDetailsPage from '../../page-objects/pages/accounts/details-page';
-import WalletDetailsPage from '../../page-objects/pages/accounts/wallet-details-page';
-import PrivateKeyModal from '../../page-objects/pages/accounts/private-key-modal';
+import AccountListPage from '../../page-objects/pages/account-list-page';
+import AccountDetailsModal from '../../page-objects/pages/dialog/account-details-modal';
+import HeaderNavbar from '../../page-objects/pages/header-navbar';
+import AccountAddressModal from '../../page-objects/pages/multichain/account-address-modal';
+import AddressListModal from '../../page-objects/pages/multichain/address-list-modal';
+import MultichainAccountDetailsPage from '../../page-objects/pages/multichain/multichain-account-details-page';
+import MultichainWalletDetailsPage from '../../page-objects/pages/multichain/multichain-wallet-details-page';
+import PrivateKeyModal from '../../page-objects/pages/multichain/private-key-modal';
 import { Driver } from '../../webdriver/driver';
 
 const account1 = {
@@ -43,7 +44,7 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
             'Account details',
           );
 
-          const accountDetailsPage = new AccountDetailsPage(driver);
+          const accountDetailsPage = new MultichainAccountDetailsPage(driver);
           await accountDetailsPage.checkPageIsLoaded();
           const headerName = await accountDetailsPage.getAccountName();
           if (headerName !== account1.name) {
@@ -66,16 +67,14 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
           }
 
           await accountDetailsPage.clickNetworksRow();
-          const accountAddressListPage = new AccountAddressListPage(driver);
+          const addressListModal = new AddressListModal(driver);
 
           const visibleNetworks = ['Ethereum', 'Linea', 'Base'];
           for (const networkName of visibleNetworks) {
-            await accountAddressListPage.checkNetworkNameisDisplayed(
-              networkName,
-            );
+            await addressListModal.checkNetworkNameisDisplayed(networkName);
           }
 
-          await accountAddressListPage.clickQRbutton();
+          await addressListModal.clickQRbutton();
           const accountAddressModal = new AccountAddressModal(driver);
           await accountAddressModal.checkPageIsLoaded();
           const address = await accountAddressModal.getAccountAddress();
@@ -86,7 +85,7 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
           }
 
           await accountAddressModal.goBack();
-          await accountAddressListPage.goBack();
+          await addressListModal.goBack();
 
           const walletName = await accountDetailsPage.getWalletName();
           if (!walletName) {
@@ -100,7 +99,7 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
   });
 
   describe('Show account details', function () {
-    it('copies the private key without revealing it', async function () {
+    it('should show the correct private key from account menu', async function () {
       await withFixtures(
         {
           fixtures: new FixtureBuilderV2()
@@ -124,15 +123,16 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
             'Account details',
           );
 
-          const accountDetailsPage = new AccountDetailsPage(driver);
+          const accountDetailsPage = new MultichainAccountDetailsPage(driver);
           await accountDetailsPage.clickPrivateKeyRow();
 
           const privateKeyModal = new PrivateKeyModal(driver);
           await privateKeyModal.checkPageIsLoaded();
           await privateKeyModal.typePassword(WALLET_PASSWORD);
           await privateKeyModal.clickConfirm();
-          await privateKeyModal.clickCopyPrivateKeyButton();
-          await privateKeyModal.checkPrivateKeyIsCopied();
+          const accountDetailsModal = new AccountDetailsModal(driver);
+          await accountDetailsModal.clickCopyPrivateKeyButton();
+          await accountDetailsModal.checkAddressIsCopied();
         },
       );
     });
@@ -159,7 +159,7 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
             accountLabel: account1.name,
           });
           await accountListPage.clickMultichainAccountMenuItem('Rename');
-          const accountDetailsPage = new AccountDetailsPage(driver);
+          const accountDetailsPage = new MultichainAccountDetailsPage(driver);
 
           const newName = 'Updated Account Name';
           await accountDetailsPage.fillAccountNameInput(newName);
@@ -199,10 +199,10 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
             'Account details',
           );
 
-          const accountDetailsPage = new AccountDetailsPage(driver);
+          const accountDetailsPage = new MultichainAccountDetailsPage(driver);
           await accountDetailsPage.clickWalletRow();
 
-          const walletDetailsPage = new WalletDetailsPage(driver);
+          const walletDetailsPage = new MultichainWalletDetailsPage(driver);
           await walletDetailsPage.checkPageIsLoaded('Wallet 1');
         },
       );
@@ -232,8 +232,8 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
           });
           await accountListPage.clickMultichainAccountMenuItem('Addresses');
 
-          const accountAddressListPage = new AccountAddressListPage(driver);
-          await accountAddressListPage.clickQRbutton();
+          const addressListModal = new AddressListModal(driver);
+          await addressListModal.clickQRbutton();
           await driver.delay(1000);
 
           const accountAddressModal = new AccountAddressModal(driver);
@@ -271,12 +271,12 @@ describe('Multichain Accounts - Account Details', function (this: Suite) {
           });
           await accountListPage.clickMultichainAccountMenuItem('Addresses');
 
-          const accountAddressListPage = new AccountAddressListPage(driver);
-          await accountAddressListPage.checkPageIsLoaded();
-          await accountAddressListPage.clickCopyButton();
+          const addressListModal = new AddressListModal(driver);
+          await addressListModal.checkPageIsLoaded();
+          await addressListModal.clickCopyButton();
 
           // Verify UI feedback for copy action
-          await accountAddressListPage.verifyCopyButtonFeedback();
+          await addressListModal.verifyCopyButtonFeedback();
         },
       );
     });

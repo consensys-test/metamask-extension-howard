@@ -270,7 +270,7 @@ describe('Confirmation Security Alert - Blockaid', function () {
               '0x1': true,
             },
           })
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,

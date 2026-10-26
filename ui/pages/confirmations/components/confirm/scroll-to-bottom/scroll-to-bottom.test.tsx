@@ -1,72 +1,37 @@
 import React from 'react';
 import configureMockStore from 'redux-mock-store';
 
+import { unapprovedTypedSignMsgV4 } from '../../../../../../test/data/confirmations/typed_sign';
 import {
   getMockContractInteractionConfirmState,
   getMockPersonalSignConfirmState,
 } from '../../../../../../test/data/confirmations/helper';
 import { renderWithConfirmContextProvider } from '../../../../../../test/lib/confirmations/render-helpers';
-import {
-  ConfirmContext,
-  type ConfirmContextType,
-} from '../../../context/confirm';
+import * as usePreviousHooks from '../../../../../hooks/usePrevious';
 import ScrollToBottom from './scroll-to-bottom';
 
 const buttonSelector = '.confirm-scroll-to-bottom__button';
 
 const mockState = getMockPersonalSignConfirmState();
-const mockStore = configureMockStore([])(mockState);
 
 const mockSetHasScrolledToBottom = jest.fn();
-const mockScrollTo = jest.fn();
 
-type MockScrollRequiredResult = {
-  hasScrolledToBottom: boolean;
-  isScrollable: boolean;
-  isScrolledToBottom: boolean;
-  onScroll: jest.Mock;
-  scrollToBottom: jest.Mock;
-  setHasScrolledToBottom: jest.Mock;
-  scrollElement: { scrollTo: jest.Mock } | null;
-  ref: jest.Mock;
-};
-
-const mockUseScrollRequiredResult: MockScrollRequiredResult = {
+const mockUseScrollRequiredResult = {
   hasScrolledToBottom: false,
   isScrollable: false,
   isScrolledToBottom: false,
   onScroll: jest.fn(),
   scrollToBottom: jest.fn(),
   setHasScrolledToBottom: mockSetHasScrolledToBottom,
-  scrollElement: { scrollTo: mockScrollTo },
-  ref: jest.fn(),
+  ref: {
+    current: {},
+  },
 };
 
-function confirmContextWithId(id: string): ConfirmContextType {
-  return {
-    currentConfirmation: {
-      id,
-    } as ConfirmContextType['currentConfirmation'],
-    isScrollToBottomCompleted: true,
-    setIsScrollToBottomCompleted: jest.fn(),
-    goBackTo: undefined,
-    suppressAutoExit: () => undefined,
-    isAmountPending: false,
-    setIsAmountPending: () => undefined,
-  };
-}
-
-function renderScrollToBottom(confirmationId: string) {
-  return renderWithConfirmContextProvider(
-    <ConfirmContext.Provider value={confirmContextWithId(confirmationId)}>
-      <ScrollToBottom>foobar</ScrollToBottom>
-    </ConfirmContext.Provider>,
-    mockStore,
-  );
-}
+const mockedUseScrollRequiredResult = jest.mocked(mockUseScrollRequiredResult);
 
 jest.mock('../../../../../hooks/useScrollRequired', () => ({
-  useScrollRequired: () => mockUseScrollRequiredResult,
+  useScrollRequired: () => mockedUseScrollRequiredResult,
 }));
 
 describe('ScrollToBottom', () => {
@@ -81,7 +46,7 @@ describe('ScrollToBottom', () => {
           <div>foo</div>
           <div>bar</div>
         </ScrollToBottom>,
-        mockStore,
+        configureMockStore([])(mockState),
       );
 
       expect(getByText('foo')).toBeInTheDocument();
@@ -92,8 +57,7 @@ describe('ScrollToBottom', () => {
 
   describe('when content is scrollable', () => {
     beforeEach(() => {
-      mockUseScrollRequiredResult.isScrollable = true;
-      mockUseScrollRequiredResult.scrollElement = { scrollTo: mockScrollTo };
+      mockedUseScrollRequiredResult.isScrollable = true;
     });
 
     it('renders with button', () => {
@@ -104,7 +68,7 @@ describe('ScrollToBottom', () => {
             <div>bar</div>
           </ScrollToBottom>
         </div>,
-        mockStore,
+        configureMockStore([])(mockState),
       );
 
       expect(getByText('foo')).toBeInTheDocument();
@@ -113,64 +77,43 @@ describe('ScrollToBottom', () => {
     });
 
     it('does not scroll to the top while the confirmation id does not change', () => {
-      mockScrollTo.mockClear();
+      const mockScrollTo = jest.fn();
+      const originalScrollTo = window.HTMLDivElement.prototype.scrollTo;
+      window.HTMLDivElement.prototype.scrollTo = mockScrollTo;
 
-      const { rerender } = renderWithConfirmContextProvider(
+      jest
+        .spyOn(usePreviousHooks, 'usePrevious')
+        .mockImplementation(() => unapprovedTypedSignMsgV4.id);
+
+      renderWithConfirmContextProvider(
         <ScrollToBottom>foobar</ScrollToBottom>,
-        mockStore,
+        configureMockStore([])(mockState),
       );
 
-      mockScrollTo.mockClear();
-
-      rerender(<ScrollToBottom>foobar</ScrollToBottom>);
-
       expect(mockScrollTo).not.toHaveBeenCalled();
+
+      window.HTMLDivElement.prototype.scrollTo = originalScrollTo;
     });
 
     it('scrolls to the top when the confirmation changes', () => {
-      mockScrollTo.mockClear();
+      const mockScrollTo = jest.fn();
+      const originalScrollTo = window.HTMLDivElement.prototype.scrollTo;
+      window.HTMLDivElement.prototype.scrollTo = mockScrollTo;
 
-      const { rerender } = renderScrollToBottom('confirmation-1');
-
-      expect(mockScrollTo).toHaveBeenCalledWith(0, 0);
-      mockScrollTo.mockClear();
-
-      rerender(
-        <ConfirmContext.Provider value={confirmContextWithId('confirmation-2')}>
-          <ScrollToBottom>foobar</ScrollToBottom>
-        </ConfirmContext.Provider>,
-      );
-
-      expect(mockScrollTo).toHaveBeenCalledWith(0, 0);
-    });
-
-    it('scrolls to the top when scrollElement attaches after the first render', () => {
-      mockScrollTo.mockClear();
-      mockUseScrollRequiredResult.scrollElement = null;
-
-      const { rerender } = renderWithConfirmContextProvider(
+      renderWithConfirmContextProvider(
         <ScrollToBottom>foobar</ScrollToBottom>,
-        mockStore,
+        configureMockStore([])(mockState),
       );
 
-      expect(mockScrollTo).not.toHaveBeenCalled();
-
-      mockUseScrollRequiredResult.scrollElement = { scrollTo: mockScrollTo };
-
-      rerender(<ScrollToBottom>foobar</ScrollToBottom>);
-
       expect(mockScrollTo).toHaveBeenCalledWith(0, 0);
+
+      window.HTMLDivElement.prototype.scrollTo = originalScrollTo;
     });
 
     it('resets setHasScrolledToBottom to false when the confirmation changes', () => {
-      const { rerender } = renderScrollToBottom('confirmation-1');
-
-      mockSetHasScrolledToBottom.mockClear();
-
-      rerender(
-        <ConfirmContext.Provider value={confirmContextWithId('confirmation-2')}>
-          <ScrollToBottom>foobar</ScrollToBottom>
-        </ConfirmContext.Provider>,
+      renderWithConfirmContextProvider(
+        <ScrollToBottom>foobar</ScrollToBottom>,
+        configureMockStore([])(mockState),
       );
 
       expect(mockSetHasScrolledToBottom).toHaveBeenCalledWith(false);
@@ -188,14 +131,14 @@ describe('ScrollToBottom', () => {
 
     describe('when user has scrolled to the bottom', () => {
       beforeEach(() => {
-        mockUseScrollRequiredResult.isScrolledToBottom = true;
-        mockUseScrollRequiredResult.hasScrolledToBottom = true;
+        mockedUseScrollRequiredResult.isScrolledToBottom = true;
+        mockedUseScrollRequiredResult.hasScrolledToBottom = true;
       });
 
       it('hides the button', () => {
         const { container } = renderWithConfirmContextProvider(
           <ScrollToBottom>foobar</ScrollToBottom>,
-          mockStore,
+          configureMockStore([])(mockState),
         );
 
         expect(container.querySelector(buttonSelector)).not.toBeInTheDocument();

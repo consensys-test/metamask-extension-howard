@@ -1,14 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useI18nContext } from '../../../../hooks/useI18nContext';
 import {
   ButtonIcon,
   ButtonIconSize,
-  IconColor,
   IconName,
-} from '@metamask/design-system-react';
-import { useI18nContext } from '../../../../hooks/useI18nContext';
-import { Text } from '../../../component-library';
+  Text,
+} from '../../../component-library';
 import {
+  IconColor,
   TextVariant,
   TextColor,
 } from '../../../../helpers/constants/design-system';
@@ -96,7 +96,7 @@ export const StackCard = ({
             <ButtonIcon
               iconName={IconName.Close}
               size={ButtonIconSize.Md}
-              iconProps={{ className: IconColor.IconAlternative }}
+              color={IconColor.iconAlternative}
               ariaLabel={t('closeSlide', [
                 isContentfulContent ? slide.title : t(slide.title),
               ])}

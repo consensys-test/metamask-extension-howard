@@ -6,6 +6,7 @@ import { normalizeSafeAddress } from '../../../../shared/lib/multichain/address'
 import { getDefaultScopeAndAddressByAccountGroupId } from '../../../selectors/multichain-accounts/account-tree';
 import {
   getDefaultAddressScope,
+  getIsDefaultAddressEnabled,
   getShowDefaultAddressPreference,
 } from '../../../selectors/selectors';
 import { DefaultAddressScope } from '../../../../shared/constants/default-address';
@@ -21,6 +22,7 @@ type UseDefaultAddressReturn = {
 export const useDefaultAddress = (
   groupId: AccountGroupId,
 ): UseDefaultAddressReturn => {
+  const isDefaultAddressEnabled = useSelector(getIsDefaultAddressEnabled);
   const showDefaultAddressPreference = useSelector(
     getShowDefaultAddressPreference,
   );
@@ -31,9 +33,12 @@ export const useDefaultAddress = (
     getDefaultScopeAndAddressByAccountGroupId(state, groupId),
   );
 
-  const displayDefaultAddress = showDefaultAddressPreference && defaultAddress;
+  const displayDefaultAddress =
+    isDefaultAddressEnabled && showDefaultAddressPreference && defaultAddress;
 
-  const [addressCopied, handleCopy] = useCopyToClipboard();
+  const [addressCopied, handleCopy] = useCopyToClipboard({
+    clearDelayMs: null,
+  });
 
   const handleDefaultAddressClick = useCallback(() => {
     if (defaultAddress) {

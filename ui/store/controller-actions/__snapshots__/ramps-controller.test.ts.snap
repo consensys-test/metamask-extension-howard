@@ -85,7 +85,6 @@ exports[`ramps-controller actions matches snapshot for background action calls 1
     "addRampsPrecreatedOrder",
     [
       {
-        "chainId": "eip155:1",
         "orderId": "order-1",
         "providerCode": "transak",
         "walletAddress": "0xabc",
@@ -122,9 +121,6 @@ exports[`ramps-controller actions matches snapshot for background action calls 1
       "https://callback",
       "0xabc",
     ],
-  ],
-  [
-    "syncRampsOrdersWithUserStorage",
   ],
 ]
 `;

@@ -5,8 +5,6 @@ import {
   UnifiedSwapBridgeEventName,
   isCrossChain,
   isNonEvmChainId,
-  assetIdsMatch,
-  MetaMetricsSwapsEventSource,
 } from '@metamask/bridge-controller';
 import { CaipAssetType, parseCaipAssetType } from '@metamask/utils';
 import { selectDefaultNetworkClientIdsByChainId } from '../../../shared/lib/selectors/networks';
@@ -28,6 +26,7 @@ import {
 import { FEATURED_RPCS } from '../../../shared/constants/network';
 import { captureException } from '../../../shared/lib/sentry';
 import { clearAllBridgeCacheItems } from '../../pages/bridge/utils/cache';
+import { MetaMetricsSwapsEventSource } from '../../../shared/constants/metametrics';
 import {
   bridgeSlice,
   setSrcTokenExchangeRates,
@@ -266,7 +265,7 @@ export const setToToken = (newToToken: TokenPayload) => {
     const fromChains = getFromChains(bridgeState);
     // If the new toToken is the same as the current fromToken
     // try to set the fromToken to the old toToken
-    if (assetIdsMatch(fromToken?.assetId, newToToken.assetId)) {
+    if (fromToken?.assetId.toLowerCase() === newToToken.assetId.toLowerCase()) {
       let fromTokenToUse = toToken;
 
       // If the old toToken's chain is disabled, it can't be set as the fromToken
@@ -287,9 +286,9 @@ export const setToToken = (newToToken: TokenPayload) => {
           typeof dispatch
         >[0],
       );
-      dispatch(setFromTokenInputValue(currentFromAmount));
     }
 
     dispatch(setToTokenAction(newToToken));
+    dispatch(setFromTokenInputValue(currentFromAmount));
   };
 };

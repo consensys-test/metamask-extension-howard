@@ -15,6 +15,7 @@ import {
   getShieldCommonTrackingProps,
   getShieldMarketingTrackingProps,
 } from '../../../../shared/lib/shield';
+import type { MetaMaskReduxDispatch } from '../../../store/types';
 import { useDispatch } from '../../../store/hooks';
 import { setShieldSubscriptionMetricsProps } from '../../../store/actions';
 import { ShieldMetricsSourceEnum } from '../../../../shared/constants/subscriptions';
@@ -27,7 +28,6 @@ import { useAnalytics } from '../../useAnalytics';
 
 import {
   CaptureShieldClaimSubmissionEventParams,
-  CaptureShieldCryptoConfirmationEventParams,
   CaptureShieldCtaClickedEventParams,
   CaptureShieldEligibilityCohortAssignedEventParams,
   CaptureShieldEligibilityCohortTimeoutEventParams,
@@ -177,29 +177,6 @@ export const useSubscriptionMetrics = () => {
   );
 
   /**
-   * Capture the event when the crypto confirmation screen is opened or the
-   * approval transaction is rejected.
-   */
-  const captureShieldCryptoConfirmationEvent = useCallback(
-    (params: CaptureShieldCryptoConfirmationEventParams) => {
-      const formattedParams =
-        formatDefaultShieldSubscriptionRequestEventProps(params);
-
-      trackShieldEvent(
-        MetaMetricsEventName.ShieldSubscriptionCryptoConfirmation,
-        {
-          ...formattedParams,
-          status: params.confirmationScreenStatus,
-          // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          has_insufficient_gas: params.hasInsufficientGas,
-        },
-      );
-    },
-    [trackShieldEvent],
-  );
-
-  /**
    * Capture the event when the subscription restart request is triggered.
    */
   const captureShieldSubscriptionRestartRequestEvent = useCallback(
@@ -207,8 +184,8 @@ export const useSubscriptionMetrics = () => {
       const formattedParams = formatExistingSubscriptionEventProps(params);
       trackShieldEvent(MetaMetricsEventName.ShieldMembershipRestartRequest, {
         ...formattedParams,
-        status: params.status,
-        error: params.error,
+        status: params.requestStatus,
+        error: params.errorMessage,
       });
     },
     [trackShieldEvent],
@@ -278,8 +255,10 @@ export const useSubscriptionMetrics = () => {
         subscription_status: params.subscriptionStatus,
         // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        attachment_count: params.attachmentsCount,
-        status: params.status,
+        attachments_count: params.attachmentsCount,
+        // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        submission_status: params.submissionStatus,
         error: params.errorMessage,
       });
     },
@@ -294,7 +273,7 @@ export const useSubscriptionMetrics = () => {
       const formattedParams = formatExistingSubscriptionEventProps(params);
       trackShieldEvent(MetaMetricsEventName.ShieldMembershipErrorStateClicked, {
         ...formattedParams,
-        type: params.type,
+        type: params.errorCause,
         action: params.actionClicked,
         location: params.location,
         view: params.view,
@@ -325,7 +304,6 @@ export const useSubscriptionMetrics = () => {
     setShieldSubscriptionMetricsPropsToBackground,
     captureShieldEntryModalEvent,
     captureShieldSubscriptionRequestEvent,
-    captureShieldCryptoConfirmationEvent,
     captureShieldMembershipCancelledEvent,
     captureShieldPaymentMethodChangeEvent,
     captureShieldCtaClickedEvent,

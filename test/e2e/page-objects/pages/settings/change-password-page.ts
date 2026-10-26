@@ -1,21 +1,5 @@
 import { Driver } from '../../../webdriver/driver';
 
-/**
- * Change-password flow under Security and password.
- *
- * Screen: `#/settings/security-and-password/password`, reached from
- * `PrivacySettings.openChangePassword` (after
- * `SettingsPage.goToSecurityAndPasswordSettings` /
- * `flows/settings.flow.ts` `navigateToSecurityAndPassword`).
- * Owns: current-password verify, new/confirm password inputs, terms, save,
- * and the cross-device lock warning confirm.
- * Boundaries: password change only. Passkey register/turn-off and SRP reveal
- * stay on `PrivacySettings`; login after change belongs to `LoginPage`.
- * Related: `PrivacySettings`, `SettingsPage`, `flows/settings.flow.ts`.
- *
- * @see ui/components/app/change-password/change-password.tsx
- * @see ui/pages/settings/security-and-password-tab/password-sub-page.tsx
- */
 export default class ChangePasswordPage {
   private readonly confirmNewPasswordInput =
     '[data-testid="change-password-confirm-input"]';
@@ -31,22 +15,16 @@ export default class ChangePasswordPage {
   private readonly newPasswordInput = '[data-testid="change-password-input"]';
 
   private readonly passwordChangedWarning = {
-    testId: 'change-password-warning-modal',
+    text: 'Changing your password here will lock MetaMask on other devices you’re using. You’ll need to log in again with your new password.',
+    css: 'p',
   };
 
   private readonly passwordTerms = '[data-testid="change-password-terms"]';
 
   private readonly saveButton = '[data-testid="change-password-button"]';
 
-  private readonly settingsPage = {
-    testId: 'parent-selector-settings-page',
-  };
-
   private readonly verifyCurrentPasswordButton =
     '[data-testid="verify-current-password-button"]';
-
-  private readonly verifyPasskeyUsePasswordButton =
-    '[data-testid="change-password-verify-passkey-use-password"]';
 
   constructor(driver: Driver) {
     this.driver = driver;
@@ -62,24 +40,12 @@ export default class ChangePasswordPage {
 
   async checkPageIsLoaded(): Promise<void> {
     console.log('Check change password page is loaded');
-    await this.driver.waitForMultipleSelectors([
-      this.currentPasswordInput,
-      this.settingsPage,
-    ]);
+    await this.driver.waitForSelector(this.currentPasswordInput);
   }
 
   async checkPasswordChangedWarning(): Promise<void> {
     console.log('Check password changed warning');
     await this.driver.waitForSelector(this.passwordChangedWarning);
-  }
-
-  async clickUsePasswordForPasskeyVerification(): Promise<void> {
-    console.log(
-      'Switch change-password verification from passkey to current password',
-    );
-    await this.driver.waitForSelector(this.verifyPasskeyUsePasswordButton);
-    await this.driver.clickElement(this.verifyPasskeyUsePasswordButton);
-    await this.driver.waitForSelector(this.currentPasswordInput);
   }
 
   async confirmChangePasswordWarning(): Promise<void> {

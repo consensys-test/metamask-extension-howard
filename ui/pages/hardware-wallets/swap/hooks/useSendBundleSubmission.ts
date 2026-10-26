@@ -5,10 +5,8 @@ import {
   findNetworkClientIdByChainId,
   updateAndApproveTx,
 } from '../../../../store/actions';
-import {
-  getHardwareWalletSignatureErrorEvent,
-  cleanupPendingApproval,
-} from '../hardware-wallet-signatures.utils';
+import { isUserRejectedHardwareWalletError } from '../../../../contexts/hardware-wallets';
+import { cleanupPendingApproval } from '../hardware-wallet-signatures.utils';
 import { HardwareWalletSignatureEvent } from '../hardware-wallet-signatures-state-machine';
 import type {
   UseSendBundleSubmissionOptions,
@@ -42,7 +40,6 @@ import type {
  * @param options.dispatchSignatureEvent
  * @param options.isStaleAttempt
  * @param options.dispatch
- * @param options.onSubmissionNeedsRestart
  * @returns `submitSendBundleTransaction` and `retrySendBundleSubmission`.
  */
 export function useSendBundleSubmission({
@@ -54,7 +51,6 @@ export function useSendBundleSubmission({
   retryGenerationRef,
   dispatchSignatureEvent,
   isStaleAttempt,
-  onSubmissionNeedsRestart,
   dispatch,
 }: UseSendBundleSubmissionOptions): UseSendBundleSubmissionReturn {
   const submitSendBundleTransaction = useCallback(async () => {
@@ -82,20 +78,20 @@ export function useSendBundleSubmission({
         type: HardwareWalletSignatureEvent.TransactionSubmitted,
       });
     } catch (error) {
-      if (!isStaleAttempt(submissionGeneration)) {
-        const event = getHardwareWalletSignatureErrorEvent(error);
-        if (event) {
-          dispatchSignatureEvent(event);
-        } else {
-          // No event means the error keeps the signing UI on the awaiting
-          // path (e.g. DeviceStateEthAppClosed: the "Open Ethereum app"
-          // modal prompts the user). The signing request itself has died,
-          // so flag the interruption — once the device recovers the send
-          // must be restarted through the standard retry path, otherwise
-          // the flow is stuck in Awaiting* with no retry CTA.
-          onSubmissionNeedsRestart();
-        }
+      if (isStaleAttempt(submissionGeneration)) {
+        return;
       }
+
+      if (isUserRejectedHardwareWalletError(error)) {
+        dispatchSignatureEvent({
+          type: HardwareWalletSignatureEvent.TransactionRejected,
+        });
+        return;
+      }
+
+      dispatchSignatureEvent({
+        type: HardwareWalletSignatureEvent.TransactionFailed,
+      });
     }
   }, [
     currentApprovalRequestId,
@@ -103,7 +99,6 @@ export function useSendBundleSubmission({
     dispatchSignatureEvent,
     expectedSendBundleApproval,
     isStaleAttempt,
-    onSubmissionNeedsRestart,
     sendBundleTxMeta,
   ]);
 
@@ -183,23 +178,26 @@ export function useSendBundleSubmission({
         type: HardwareWalletSignatureEvent.TransactionSubmitted,
       });
     } catch (error) {
-      if (!isStaleAttempt(submissionGeneration)) {
-        const event = getHardwareWalletSignatureErrorEvent(error);
-        if (event) {
-          dispatchSignatureEvent(event);
-        } else {
-          // Same no-event interruption handling as the submit path: flag the
-          // dead attempt so the orchestrator can restart it after recovery.
-          onSubmissionNeedsRestart();
-        }
+      if (isStaleAttempt(submissionGeneration)) {
+        return;
       }
+
+      if (isUserRejectedHardwareWalletError(error)) {
+        dispatchSignatureEvent({
+          type: HardwareWalletSignatureEvent.TransactionRejected,
+        });
+        return;
+      }
+
+      dispatchSignatureEvent({
+        type: HardwareWalletSignatureEvent.TransactionFailed,
+      });
     }
   }, [
     currentApprovalRequestId,
     dispatch,
     dispatchSignatureEvent,
     isStaleAttempt,
-    onSubmissionNeedsRestart,
     sendBundleTxMeta,
   ]);
 

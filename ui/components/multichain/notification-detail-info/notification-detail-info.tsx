@@ -1,13 +1,9 @@
 import React from 'react';
-import {
-  AvatarIcon,
-  AvatarIconSeverity,
-  IconName,
-} from '@metamask/design-system-react';
 
 import { NotificationDetail } from '../notification-detail';
-import { Text } from '../../component-library';
+import { AvatarIcon, IconName, Text } from '../../component-library';
 import {
+  BackgroundColor,
   FontWeight,
   TextVariant,
   TextColor,
@@ -15,7 +11,8 @@ import {
 
 type IconProps = {
   iconName: IconName;
-  severity?: AvatarIconSeverity;
+  color: TextColor;
+  backgroundColor: BackgroundColor;
 };
 
 export type NotificationDetailInfoProps = {
@@ -43,12 +40,7 @@ export const NotificationDetailInfo = ({
 }: NotificationDetailInfoProps): JSX.Element => {
   return (
     <NotificationDetail
-      icon={
-        <AvatarIcon
-          iconName={icon.iconName}
-          severity={icon.severity ?? AvatarIconSeverity.Success}
-        />
-      }
+      icon={<AvatarIcon {...icon} />}
       primaryTextLeft={
         <Text
           variant={TextVariant.bodyLgMedium}

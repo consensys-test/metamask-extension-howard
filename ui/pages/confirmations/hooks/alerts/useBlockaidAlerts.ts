@@ -23,7 +23,6 @@ import {
 } from '../../types/confirm';
 import { useConfirmContext } from '../../context/confirm';
 import useCurrentSignatureSecurityAlertResponse from '../useCurrentSignatureSecurityAlertResponse';
-import { useSendingAssetsFiatTotal } from './useSendingAssetsFiatTotal';
 import { normalizeProviderAlert } from './utils';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -45,7 +44,6 @@ type SecurityAlertResponsesState = {
 const useBlockaidAlerts = (): Alert[] => {
   const t = useI18nContext();
   const { currentConfirmation } = useConfirmContext();
-  const sendingFiatTotal = useSendingAssetsFiatTotal();
 
   const securityAlertId = (
     currentConfirmation?.securityAlertResponse as SecurityAlertResponse
@@ -126,20 +124,12 @@ const useBlockaidAlerts = (): Alert[] => {
       )}&utm_source=${SECURITY_PROVIDER_UTM_SOURCE}`;
     }
 
-    return [
-      normalizeProviderAlert(
-        securityAlertResponse,
-        t,
-        reportUrl,
-        sendingFiatTotal,
-      ),
-    ];
+    return [normalizeProviderAlert(securityAlertResponse, t, reportUrl)];
   }, [
     isTransactionTypeSupported,
     shouldShowAlert,
     securityAlertResponse,
     stringifiedJSONData,
-    sendingFiatTotal,
     t,
   ]);
 };

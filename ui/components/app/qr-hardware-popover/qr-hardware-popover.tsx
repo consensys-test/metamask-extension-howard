@@ -1,4 +1,4 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import { providerErrors, serializeError } from '@metamask/rpc-errors';
@@ -75,12 +75,10 @@ const QRHardwarePopover = () => {
   const txDataRef = useRef(txData);
   const prevRequestIdRef = useRef(activeScanRequest?.requestId);
 
-  useLayoutEffect(() => {
-    if (prevRequestIdRef.current !== activeScanRequest?.requestId) {
-      prevRequestIdRef.current = activeScanRequest?.requestId;
-      txDataRef.current = txData;
-    }
-  }, [activeScanRequest?.requestId, txData]);
+  if (prevRequestIdRef.current !== activeScanRequest?.requestId) {
+    prevRequestIdRef.current = activeScanRequest?.requestId;
+    txDataRef.current = txData;
+  }
 
   const dispatch = useDispatch();
   const setCameraPermissionErrorCode = useCallback(

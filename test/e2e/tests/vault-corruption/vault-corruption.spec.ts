@@ -13,18 +13,13 @@ import {
   getFirstAddress,
   onboardThenTriggerCorruptionFlow,
 } from '../../page-objects/flows/vault-corruption.flow';
-import CriticalErrorPage from '../../page-objects/pages/vault/critical-error-page';
-import { pausePersistence, readStorage } from '../state-persistence/helpers';
+import VaultRecoveryPage from '../../page-objects/pages/vault-recovery-page';
 import { getConfig, mockFeatureFlagsWithoutNonEvmAccounts } from './helpers';
 
 describe('Vault Corruption', function () {
   this.timeout(120000); // This test is very long, so we need an unusually high timeout
 
-  // The missing-vault Sentry event is sent asynchronously: captureException runs
-  // in the background, then the metaMetricsIntegration's async opt-in resolution
-  // (which reads persisted/backup state) must complete before the event is
-  // transmitted. Under CI load this can take a while, so we allow a generous wait.
-  const WAIT_FOR_SENTRY_MS = 30000;
+  const WAIT_FOR_SENTRY_MS = 10000;
 
   /**
    * Script template to simulate a broken database.
@@ -78,12 +73,12 @@ describe('Vault Corruption', function () {
   }
 
   /**
-   * Script to break the primary database and delete one backup key.
+   * Script to break both the primary and backup databases.
    *
    * @param backupKeyToDelete - The key to delete from the backup database.
    */
-  const breakPrimaryDatabaseAndDeleteBackupKeyScript = (
-    backupKeyToDelete: 'AnalyticsController' | 'KeyringController' | 'meta',
+  const breakAllDatabasesScript = (
+    backupKeyToDelete: 'meta' | 'KeyringController',
   ) => {
     return createCorruptionScript(`
       // indexedDB is not scuttled in test builds, so we can use it to access the
@@ -105,7 +100,7 @@ describe('Vault Corruption', function () {
       };`);
   };
 
-  it('preserves primary controller state omitted from the recovery backup', async function () {
+  it('recovers metamask vault when primary database is broken but backup is intact', async function () {
     await withFixtures(
       {
         ...getConfig(this.test?.title),
@@ -114,28 +109,12 @@ describe('Vault Corruption', function () {
       async ({ driver }: { driver: Driver }) => {
         const initialFirstAddress = await onboardThenTriggerCorruptionFlow(
           driver,
-          breakPrimaryDatabaseAndDeleteBackupKeyScript('AnalyticsController'),
+          breakPrimaryDatabaseOnlyScript,
         );
-        const backupVault = await getBackupVault(driver);
-        assert.ok(backupVault, 'Expected backup vault to exist');
-
-        // Disable debounced writes so this test verifies that recovery itself
-        // persists the restored vault before initialization completes.
-        await pausePersistence(driver);
-        const storageBeforeRecovery = await readStorage(driver);
-        assert.ok(
-          'AnalyticsController' in storageBeforeRecovery,
-          'AnalyticsController should exist in primary storage before recovery',
-        );
-        const analyticsStateBeforeRecovery =
-          storageBeforeRecovery.AnalyticsController;
 
         // start recovery
-        const criticalErrorPage = new CriticalErrorPage(driver);
-        await criticalErrorPage.clickRepairButton({
-          confirm: true,
-          expectsExtensionReload: false,
-        });
+        const vaultRecoveryPage = new VaultRecoveryPage(driver);
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: true });
 
         // onboard again
         await completeVaultRecoveryOnboardingFlow({
@@ -151,25 +130,6 @@ describe('Vault Corruption', function () {
           restoredFirstAddress,
           initialFirstAddress,
           'Addresses should match',
-        );
-        const storageAfterRecovery = await readStorage(driver);
-        assert.ok(
-          'AnalyticsController' in storageAfterRecovery,
-          'AnalyticsController should remain in primary storage after recovery',
-        );
-        assert.deepStrictEqual(
-          storageAfterRecovery.AnalyticsController,
-          analyticsStateBeforeRecovery,
-          'AnalyticsController should remain unchanged after recovery',
-        );
-        assert.equal(
-          (
-            storageAfterRecovery.KeyringController as
-              | { vault?: unknown }
-              | undefined
-          )?.vault,
-          backupVault,
-          'Recovered vault should be persisted to primary storage',
         );
       },
     );
@@ -255,15 +215,12 @@ describe('Vault Corruption', function () {
       async ({ driver }: { driver: Driver }) => {
         const initialFirstAddress = await onboardThenTriggerCorruptionFlow(
           driver,
-          breakPrimaryDatabaseAndDeleteBackupKeyScript('KeyringController'),
+          breakAllDatabasesScript('KeyringController'),
         );
 
         // start reset
-        const criticalErrorPage = new CriticalErrorPage(driver);
-        await criticalErrorPage.clickRepairButton({
-          confirm: true,
-          expectsExtensionReload: false,
-        });
+        const vaultRecoveryPage = new VaultRecoveryPage(driver);
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: true });
 
         // Now onboard again, like a first-time user :-(
         await completeCreateNewWalletOnboardingFlow({
@@ -301,12 +258,12 @@ describe('Vault Corruption', function () {
           breakPrimaryDatabaseOnlyScript,
         );
 
-        const criticalErrorPage = new CriticalErrorPage(driver);
+        const vaultRecoveryPage = new VaultRecoveryPage(driver);
 
         // click recover but dismiss the prompt
-        await criticalErrorPage.clickRepairButton({ confirm: false });
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: false });
         // make sure the button can be clicked yet again; dismiss again
-        await criticalErrorPage.clickRepairButton({ confirm: false });
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: false });
 
         // reload to make sure the UI is still in the same Vault Corrupted state
         await driver.navigate(PAGES.HOME, {
@@ -314,13 +271,10 @@ describe('Vault Corruption', function () {
         });
 
         // make sure the button can be clicked yet again; dismiss the prompt
-        await criticalErrorPage.clickRepairButton({ confirm: false });
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: false });
         // actually recover the vault this time just to make sure
         // it all still works after dismissing the prompt previously
-        await criticalErrorPage.clickRepairButton({
-          confirm: true,
-          expectsExtensionReload: false,
-        });
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: true });
 
         // verify that the UI has completed recovery this time
         await completeVaultRecoveryOnboardingFlow({
@@ -349,15 +303,12 @@ describe('Vault Corruption', function () {
       async ({ driver }: { driver: Driver }) => {
         const initialFirstAddress = await onboardThenTriggerCorruptionFlow(
           driver,
-          breakPrimaryDatabaseAndDeleteBackupKeyScript('meta'),
+          breakAllDatabasesScript('meta'),
         );
 
         // start recovery
-        const criticalErrorPage = new CriticalErrorPage(driver);
-        await criticalErrorPage.clickRepairButton({
-          confirm: true,
-          expectsExtensionReload: false,
-        });
+        const vaultRecoveryPage = new VaultRecoveryPage(driver);
+        await vaultRecoveryPage.clickRecoveryButton({ confirm: true });
 
         // onboard again
         await completeVaultRecoveryOnboardingFlow({

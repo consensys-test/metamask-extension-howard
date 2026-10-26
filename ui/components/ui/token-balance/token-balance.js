@@ -15,10 +15,7 @@ export default function TokenBalance({
   showFiat,
   ...restProps
 }) {
-  const { tokensWithBalances } = useTokenTracker({
-    tokens: [token],
-    chainId: token.chainId ?? null,
-  });
+  const { tokensWithBalances } = useTokenTracker({ tokens: [token] });
   const { string, symbol, address } = tokensWithBalances[0] || {};
   const formattedFiat = useTokenFiatAmount(address, string, symbol);
   if (showFiat) {
@@ -44,7 +41,6 @@ TokenBalance.propTypes = {
     address: PropTypes.string.isRequired,
     decimals: PropTypes.number,
     symbol: PropTypes.string,
-    chainId: PropTypes.string,
   }).isRequired,
   showFiat: PropTypes.bool,
 };

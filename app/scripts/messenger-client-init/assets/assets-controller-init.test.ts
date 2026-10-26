@@ -500,6 +500,10 @@ describe('AssetsControllerInit', () => {
             return {
               remoteFeatureFlags: {
                 [ASSETS_UNIFY_STATE_FLAG]: {
+                  enabled: true,
+                  featureVersion: '1',
+                  minimumVersion: '13.38.0',
+                  deprecatedControllers: ['TokenListController'],
                   tracesEnabled: true,
                 },
               },
@@ -656,38 +660,6 @@ describe('AssetsControllerInit', () => {
         throw new Error('Expected getBearerToken to be defined');
       }
       expect(await getBearerToken()).toBeUndefined();
-    });
-
-    it('getBearerToken returns undefined when backend auth is disabled', async () => {
-      process.env.MM_BACKEND_DISABLE_AUTH = 'true';
-
-      try {
-        const requestMock = getInitRequestMock();
-
-        jest.isolateModules(() => {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-          const freshModule = require('./assets-controller-init') as any;
-          freshModule.AssetsControllerInit(requestMock);
-        });
-
-        const callArgs = jest.mocked(createApiPlatformClient).mock.calls[0];
-        if (!callArgs) {
-          throw new Error(
-            'Expected createApiPlatformClient to have been called',
-          );
-        }
-        const { getBearerToken } = callArgs[0];
-        if (!getBearerToken) {
-          throw new Error('Expected getBearerToken to be defined');
-        }
-
-        expect(await getBearerToken()).toBeUndefined();
-        expect(requestMock.initMessenger.call).not.toHaveBeenCalledWith(
-          'AuthenticationController:getBearerToken',
-        );
-      } finally {
-        delete process.env.MM_BACKEND_DISABLE_AUTH;
-      }
     });
   });
 

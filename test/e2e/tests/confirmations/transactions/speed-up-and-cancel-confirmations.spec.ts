@@ -43,7 +43,7 @@ describe('Speed Up and Cancel Transaction Tests', function () {
           await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
 
           const confirmationPage = new Confirmation(driver);
-          await confirmationPage.clickFooterButton({ button: 'confirm' });
+          await confirmationPage.clickFooterConfirmButton();
 
           // Switch to extension and handle transaction
           await driver.switchToWindowWithTitle(
@@ -103,7 +103,7 @@ describe('Speed Up and Cancel Transaction Tests', function () {
           await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
 
           const confirmationPage = new Confirmation(driver);
-          await confirmationPage.clickFooterButton({ button: 'confirm' });
+          await confirmationPage.clickFooterConfirmButton();
           await driver.switchToWindowWithTitle(
             WINDOW_TITLES.ExtensionInFullScreenView,
           );

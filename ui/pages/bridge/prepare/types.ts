@@ -70,13 +70,11 @@ export type MinimalBridgeAlert = {
     | 'price-impact'
     | 'tx-alert'
     | 'market-closed'
-    | 'off-hours'
     | 'no-quotes'
     | 'insufficient-gas'
     | 'price-data-unavailable'
     | 'token-security'
-    | 'insufficient-native-reserve'
-    | 'stellar-trustline';
+    | 'insufficient-native-reserve';
   title?: string;
   description: string;
   severity: 'warning' | 'danger';

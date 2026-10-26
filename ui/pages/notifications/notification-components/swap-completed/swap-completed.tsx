@@ -1,6 +1,5 @@
 import React from 'react';
 import { NotificationServicesController } from '@metamask/notification-services-controller';
-import { AvatarIconSeverity, IconName } from '@metamask/design-system-react';
 import { type ExtractedNotification, isOfTypeNodeGuard } from '../node-guard';
 import {
   NotificationComponentType,
@@ -14,21 +13,29 @@ import {
   NotificationDetailAsset,
   NotificationDetailNetworkFee,
   NotificationDetailBlockExplorerButton,
+  NotificationDetailTitle,
   NotificationDetailCopyButton,
   NotificationDetailAddress,
 } from '../../../../components/multichain';
 import { NotificationListItemIconType } from '../../../../components/multichain/notification-list-item-icon/notification-list-item-icon';
-import { BadgeWrapperPosition } from '../../../../components/component-library';
+import {
+  BadgeWrapperPosition,
+  IconName,
+} from '../../../../components/component-library';
 
 import {
   createTextItems,
   getAmount,
+  formatIsoDateString,
   getNativeCurrencyLogoByChainId,
   getNetworkDetailsFromNotifPayload,
   getUsdAmount,
 } from '../../../../helpers/utils/notification.util';
-import { TextVariant } from '../../../../helpers/constants/design-system';
-import { OnChainNotificationDetailsTitle } from '../notification-details-title';
+import {
+  TextVariant,
+  BackgroundColor,
+  TextColor,
+} from '../../../../helpers/constants/design-system';
 
 const { TRIGGER_TYPES } = NotificationServicesController.Constants;
 
@@ -39,12 +46,22 @@ const isSwapCompletedNotification = isOfTypeNodeGuard([
 ]);
 
 const getTitle = (n: SwapCompletedNotification) => {
-  const items = createTextItems([n.template?.title ?? ''], TextVariant.bodySm);
+  const items = createTextItems(
+    [
+      t('notificationItemSwapped') ?? '',
+      n.payload.data.token_in.symbol,
+      t('notificationItemSwappedFor') ?? '',
+    ],
+    TextVariant.bodySm,
+  );
   return items;
 };
 
 const getDescription = (n: SwapCompletedNotification) => {
-  const items = createTextItems([n.template?.body ?? ''], TextVariant.bodyMd);
+  const items = createTextItems(
+    [n.payload.data.token_out.symbol],
+    TextVariant.bodyMd,
+  );
   return items;
 };
 
@@ -78,7 +95,14 @@ export const components: NotificationComponent<SwapCompletedNotification> = {
     );
   },
   details: {
-    title: OnChainNotificationDetailsTitle,
+    title: ({ notification }) => (
+      <NotificationDetailTitle
+        title={`${t('notificationItemSwapped') ?? ''} ${
+          notification.payload.data.token_out.symbol
+        }`}
+        date={formatIsoDateString(notification.createdAt)}
+      />
+    ),
     body: {
       type: NotificationComponentType.OnChainBody,
       Account: ({ notification }) => {
@@ -152,7 +176,8 @@ export const components: NotificationComponent<SwapCompletedNotification> = {
         <NotificationDetailInfo
           icon={{
             iconName: IconName.Check,
-            severity: AvatarIconSeverity.Success,
+            color: TextColor.successDefault,
+            backgroundColor: BackgroundColor.successMuted,
           }}
           label={t('notificationItemStatus') ?? ''}
           detail={t('notificationItemConfirmed') ?? ''}
@@ -187,7 +212,8 @@ export const components: NotificationComponent<SwapCompletedNotification> = {
           <NotificationDetailInfo
             icon={{
               iconName: IconName.SwapHorizontal,
-              severity: AvatarIconSeverity.Info,
+              color: TextColor.infoDefault,
+              backgroundColor: BackgroundColor.infoMuted,
             }}
             label={t('notificationItemRate') || ''}
             detail={`1 ${notification.payload.data.token_out.symbol} ≈ ${(

@@ -6,7 +6,6 @@ import {
 } from '@metamask/utils';
 import { useSelector } from 'react-redux';
 import { useLocation, useParams } from 'react-router-dom';
-import { isNativeCaipAssetId } from '#shared/lib/asset-utils';
 import { getNetworkConfigurationsByChainId } from '../../../../shared/lib/selectors/networks';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { useTokenSecurityData } from '../../../hooks/useTokenSecurityData';
@@ -69,10 +68,10 @@ export const useSecurityTrustPageData = () => {
     }
 
     try {
-      const { assetReference } = parseCaipAssetType(assetId);
+      const { assetReference, assetNamespace } = parseCaipAssetType(assetId);
       return {
         address: assetReference,
-        isNative: isNativeCaipAssetId(assetId),
+        isNative: assetNamespace === 'slip44',
       };
     } catch {
       return null;

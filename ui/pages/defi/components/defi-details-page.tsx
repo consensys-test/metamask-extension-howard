@@ -29,7 +29,7 @@ import { useFormatters } from '../../../hooks/useFormatters';
 import { AssetCellBadge } from '../../../components/app/assets/asset-list/cells/asset-cell-badge';
 import { getDefiPositions } from '../../../selectors/assets';
 import { getIsDefiControllerV2Enabled } from '../../../selectors/defi-controller-v2/feature-flags';
-import { RouteMessengerProvider } from '../../../contexts/route-messenger';
+import { RouteWithMessenger } from '../../../layouts/route-with-messenger';
 import { DEFI_ROUTE_ALLOWED_CAPABILITIES } from '../messenger';
 import DeFiDetailsPageV2 from '../pages/defi-details-page-v2';
 import DefiDetailsList, {
@@ -173,12 +173,12 @@ const DeFiDetailsPage = () => {
   // working when the V2 flag is off.
   if (isDefiControllerV2Enabled) {
     return (
-      <RouteMessengerProvider
+      <RouteWithMessenger
         path={`${DEFI_ROUTE}/:chainId/:protocolId`}
         capabilities={DEFI_ROUTE_ALLOWED_CAPABILITIES}
       >
         <DeFiDetailsPageV2 />
-      </RouteMessengerProvider>
+      </RouteWithMessenger>
     );
   }
 

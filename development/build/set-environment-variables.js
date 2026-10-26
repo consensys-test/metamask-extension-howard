@@ -1,6 +1,6 @@
 const { readFileSync } = require('node:fs');
 const assert = require('node:assert');
-const ENVIRONMENT = require('../../shared/constants/build-environment.json');
+const { ENVIRONMENT } = require('./constants');
 
 /**
  * Sets environment variables to inject in the current build.
@@ -61,8 +61,7 @@ function setEnvironmentVariables({
     }),
     TEST_GAS_FEE_FLOWS:
       isDevBuild && variables.getMaybe('TEST_GAS_FEE_FLOWS') === true,
-    CANONICAL_DEEP_LINK_HOST: variables.getMaybe('CANONICAL_DEEP_LINK_HOST'),
-    DEEP_LINK_HOSTS: variables.getMaybe('DEEP_LINK_HOSTS'),
+    DEEP_LINK_HOST: variables.getMaybe('DEEP_LINK_HOST'),
     DEEP_LINK_PUBLIC_KEY: variables.getMaybe('DEEP_LINK_PUBLIC_KEY'),
     SEEDLESS_ONBOARDING_ENABLED: isTestBuild
       ? 'true'
@@ -74,7 +73,11 @@ function setEnvironmentVariables({
     QR_SYNC_ENABLED: isTestBuild
       ? 'true'
       : variables.getMaybe('QR_SYNC_ENABLED'),
+    ASSETS_UNIFIED_STATE_ENABLED: variables.getMaybe(
+      'ASSETS_UNIFIED_STATE_ENABLED',
+    ),
     COMPLIANCE_API_URL: variables.getMaybe('COMPLIANCE_API_URL'),
+    MM_PURE_BLACK_PREVIEW: variables.getMaybe('MM_PURE_BLACK_PREVIEW'),
   });
 }
 

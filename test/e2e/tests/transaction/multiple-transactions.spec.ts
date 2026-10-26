@@ -38,16 +38,13 @@ describe('Multiple transactions', function () {
         await transactionConfirmation.checkPageIsLoaded();
         await transactionConfirmation.checkGasFee('0.0002');
         await transactionConfirmation.checkPageNumbers(1, 2);
-        await transactionConfirmation.clickFooterButton({ button: 'confirm' });
+        await transactionConfirmation.clickFooterConfirmButton();
         await transactionConfirmation.checkPageIsLoaded();
         await transactionConfirmation.checkGasFee('0.0002');
         await transactionConfirmation.checkNavigationIsNotPresent();
 
         // confirms first transaction
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );
@@ -90,16 +87,13 @@ describe('Multiple transactions', function () {
         await transactionConfirmation.checkPageIsLoaded();
         await transactionConfirmation.checkPageNumbers(1, 2);
         await transactionConfirmation.checkGasFee('0.0002');
-        await transactionConfirmation.clickFooterButton({ button: 'cancel' });
+        await transactionConfirmation.clickFooterCancelButton();
         await transactionConfirmation.checkPageIsLoaded();
         await transactionConfirmation.checkGasFee('0.0002');
         await transactionConfirmation.checkNavigationIsNotPresent();
 
         // rejects first transaction
-        await transactionConfirmation.clickFooterButton({
-          button: 'cancel',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterCancelButtonAndAndWaitForWindowToClose();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );

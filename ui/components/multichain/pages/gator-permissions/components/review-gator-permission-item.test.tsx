@@ -380,6 +380,8 @@ describe('Permission List Item', () => {
           />,
           store,
         );
+        expect(container).toMatchSnapshot();
+
         expect(getByTestId('review-gator-permission-item')).toBeInTheDocument();
 
         // Verify the streaming amount per week
@@ -477,6 +479,8 @@ describe('Permission List Item', () => {
           />,
           store,
         );
+        expect(container).toMatchSnapshot();
+
         expect(getByTestId('review-gator-permission-item')).toBeInTheDocument();
 
         // Verify the periodic amount
@@ -634,6 +638,8 @@ describe('Permission List Item', () => {
           />,
           store,
         );
+        expect(container).toMatchSnapshot();
+
         expect(getByTestId('review-gator-permission-item')).toBeInTheDocument();
 
         // Verify the streaming amount per week for ERC20 token (WBTC with 8 decimals)
@@ -696,6 +702,8 @@ describe('Permission List Item', () => {
           />,
           store,
         );
+        expect(container).toMatchSnapshot();
+
         expect(getByTestId('review-gator-permission-item')).toBeInTheDocument();
 
         // Verify the periodic amount for ERC20 token (WBTC with 8 decimals)
@@ -772,14 +780,13 @@ describe('Permission List Item', () => {
           store,
         );
 
+        expect(container).toMatchSnapshot();
+
         expect(getByTestId('review-gator-permission-item')).toBeInTheDocument();
 
         // Verify that when token metadata is loading, it shows a skeleton
-        const skeletonSelector =
-          'div[aria-hidden="true"][style*="width: 100px"]';
-        const skeletonCount =
-          container.querySelectorAll(skeletonSelector).length;
-        expect(container.querySelector(skeletonSelector)).toBeInTheDocument();
+        const skeletons = container.querySelectorAll('.mm-skeleton');
+        expect(skeletons.length).toBeGreaterThan(0);
 
         // The amount label should still be in the DOM but wrapped by skeleton
         const amountLabel = getByTestId('review-gator-permission-amount-label');
@@ -806,9 +813,8 @@ describe('Permission List Item', () => {
         expect(streamRate).toBeInTheDocument();
 
         // Verify that more skeletons are present after expanding
-        const expandedSkeletons =
-          container.querySelectorAll(skeletonSelector).length;
-        expect(expandedSkeletons).toBeGreaterThan(skeletonCount);
+        const expandedSkeletons = container.querySelectorAll('.mm-skeleton');
+        expect(expandedSkeletons.length).toBeGreaterThan(skeletons.length);
       });
 
       it('renders token approval revocation permission correctly without frequency row', () => {
@@ -850,6 +856,8 @@ describe('Permission List Item', () => {
           />,
           store,
         );
+
+        expect(container).toMatchSnapshot();
 
         expect(getByTestId('review-gator-permission-item')).toBeInTheDocument();
 

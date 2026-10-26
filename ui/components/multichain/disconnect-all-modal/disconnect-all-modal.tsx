@@ -4,14 +4,16 @@ import {
   Text,
   TextVariant,
   TextColor,
+} from '@metamask/design-system-react';
+import {
+  Button,
   Modal,
   ModalBody,
+  ModalContent,
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  ModalContent,
-} from '@metamask/design-system-react';
-import { Button } from '../../component-library';
+} from '../../component-library';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { getURLHost } from '../../../helpers/utils/util';
 
@@ -33,11 +35,7 @@ export const DisconnectAllModal = ({
     <Modal isOpen onClose={onClose} data-testid="disconnect-all-modal">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader
-          className=""
-          onClose={onClose}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
+        <ModalHeader className="" onClose={onClose}>
           {t('disconnectQuestion')}
         </ModalHeader>
         <ModalBody>

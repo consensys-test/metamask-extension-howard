@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
 import {
-  TransactionContainerType,
   TransactionStatus,
   TransactionType,
 } from '@metamask/transaction-controller';
@@ -136,36 +135,6 @@ describe('transaction metrics handlers', () => {
     expect(trackEventMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: TransactionMetaMetricsEvent.submitted }),
     );
-  });
-
-  it('tracks original contract details for enforced simulations', async () => {
-    const request = createRequest();
-    await handleTransactionApproved(request, {
-      transactionMeta: createTxMeta({
-        status: TransactionStatus.approved,
-        type: TransactionType.contractInteraction,
-        containerTypes: [TransactionContainerType.EnforcedSimulations],
-        txParams: {
-          ...createTxMeta().txParams,
-          to: '0xdb9b1e94b5b69df7e401ddbede43491141047db3',
-          data: '0x1cff79cd',
-        },
-        txParamsOriginal: {
-          ...createTxMeta().txParams,
-          to: '0x3333333333333333333333333333333333333333',
-          data: '0xa9059cbb',
-        },
-      }),
-    });
-
-    const payload = trackEventMock.mock.calls[0][0];
-    expect(payload.properties).toMatchObject({
-      enforced_simulation_submitted_enabled: true,
-      transaction_contract_address: [
-        '0x3333333333333333333333333333333333333333',
-      ],
-      transaction_contract_method_4byte: '0xa9059cbb',
-    });
   });
 
   it('tracks rejected event', async () => {
@@ -325,23 +294,15 @@ describe('transaction metrics handlers', () => {
     expect(payload.name).toBe(MetaMetricsEventName.SwapCompleted);
   });
 
-  it('preserves enforced simulation batch contract details', async () => {
+  it('preserves batch arrays without index-based merge corruption', async () => {
     const request = createRequest();
     (request.getMethodData as jest.Mock)
-      .mockResolvedValueOnce({ name: 'redeemDelegations' })
       .mockResolvedValueOnce({ name: 'approve' })
       .mockResolvedValueOnce({ name: 'transfer' });
 
-    await handleTransactionApproved(request, {
+    await handleTransactionAdded(request, {
       transactionMeta: createTxMeta({
-        status: TransactionStatus.approved,
-        containerTypes: [TransactionContainerType.EnforcedSimulations],
         txParams: {
-          ...createTxMeta().txParams,
-          to: '0xdb9b1e94b5b69df7e401ddbede43491141047db3',
-          data: '0x1cff79cd',
-        },
-        txParamsOriginal: {
           ...createTxMeta().txParams,
           to: '0x9999999999999999999999999999999999999999',
           data: undefined,

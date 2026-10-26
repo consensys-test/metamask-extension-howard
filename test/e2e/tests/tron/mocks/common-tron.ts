@@ -22,9 +22,6 @@ export const TRX_BALANCE = 106072392; // ~106.07 TRX
 export const TRX_TO_USD_RATE = 0.29469;
 export const SUN_PER_TRX = 1_000_000;
 
-export const BROADCAST_TXID =
-  '6db783c4142b3749a4b598db4644155455c9206e2eca4b31efbd48e46773d9d5';
-
 const TRON_BLOCK_RESPONSE = {
   blockID: '0000000004b6f733ff89d72ddc1ce1eabd6045d84cbc4eb0a7e88d9223c12c5e',
   block_header: {
@@ -219,7 +216,7 @@ export async function mockBroadTransaction(
       statusCode: 200,
       json: {
         result: true,
-        txid: BROADCAST_TXID,
+        txid: '6db783c4142b3749a4b598db4644155455c9206e2eca4b31efbd48e46773d9d5',
       },
     }));
 }
@@ -479,7 +476,7 @@ export async function createStatefulTronAccountMock(
         statusCode: 200,
         json: {
           result: true,
-          txid: BROADCAST_TXID,
+          txid: '6db783c4142b3749a4b598db4644155455c9206e2eca4b31efbd48e46773d9d5',
         },
       };
     });
@@ -1033,25 +1030,14 @@ export async function mockTronSpotPrices(
     .forGet('https://price.api.cx.metamask.io/v3/spot-prices')
     .always()
     .thenCallback((request) => {
-      const { searchParams } = new URL(request.url);
-      const assetIds = searchParams.get('assetIds')?.split(',');
-      // Without `includeMarketData` the API answers with prices keyed by the
-      // requested currency instead of market data. The bridge controller relies
-      // on that form to populate `assetExchangeRates` for the quoted assets.
-      const includeMarketData =
-        searchParams.get('includeMarketData') === 'true';
-      const vsCurrency = searchParams.get('vsCurrency') ?? 'usd';
+      const assetIds = new URL(request.url).searchParams
+        .get('assetIds')
+        ?.split(',');
       const requestedPrices = Object.fromEntries(
-        (assetIds ?? Object.keys(pricesByAssetId)).map((assetId) => {
-          const marketData =
-            pricesByAssetId[assetId as keyof typeof pricesByAssetId] ?? null;
-
-          if (includeMarketData || !marketData) {
-            return [assetId, marketData];
-          }
-
-          return [assetId, { [vsCurrency]: marketData.price }];
-        }),
+        (assetIds ?? Object.keys(pricesByAssetId)).map((assetId) => [
+          assetId,
+          pricesByAssetId[assetId as keyof typeof pricesByAssetId] ?? null,
+        ]),
       );
 
       return {
@@ -1445,28 +1431,22 @@ const MOCK_TRON_TOKENS = [
 
 export async function mockBridgeGetTronTokens(
   mockServer: Mockttp,
-): Promise<MockedEndpoint[]> {
-  const searchEndpoint = await mockServer
-    .forPost(/getTokens\/search/u)
-    .thenCallback(() => ({
-      statusCode: 200,
-      json: {
-        pageInfo: {
-          hasNextPage: false,
-          endCursor: null,
-        },
-        data: MOCK_TRON_TOKENS,
+): Promise<MockedEndpoint> {
+  mockServer.forPost(/getTokens\/search/u).thenCallback(() => ({
+    statusCode: 200,
+    json: {
+      pageInfo: {
+        hasNextPage: false,
+        endCursor: null,
       },
-    }));
+      data: MOCK_TRON_TOKENS,
+    },
+  }));
 
-  const popularEndpoint = await mockServer
-    .forPost(/getTokens\/popular/u)
-    .thenCallback(() => ({
-      statusCode: 200,
-      json: MOCK_TRON_TOKENS,
-    }));
-
-  return [searchEndpoint, popularEndpoint];
+  return mockServer.forPost(/getTokens\/popular/u).thenCallback(() => ({
+    statusCode: 200,
+    json: MOCK_TRON_TOKENS,
+  }));
 }
 
 // Backwards-compatible default for existing tests (1 TRX → ~0.295 USDT)
@@ -1591,18 +1571,8 @@ export async function mockAccountsApiV2WithTron(
     .forGet(/https:\/\/accounts\.api\.cx\.metamask\.io\/v2\/supportedNetworks/u)
     .always()
     .thenJson(200, {
-      fullSupport: [
-        'eip155:1',
-        'eip155:137',
-        'eip155:56',
-        'eip155:59144',
-        'eip155:8453',
-        'eip155:10',
-        'eip155:42161',
-        'eip155:534352',
-        'eip155:1337',
-      ],
-      partialSupport: ['eip155:42220', 'eip155:43114'],
+      fullSupport: [1, 137, 56, 59144, 8453, 10, 42161, 534352, 1337],
+      partialSupport: { balances: [42220, 43114] },
     });
 }
 
@@ -1679,7 +1649,7 @@ export async function mockTronSwapApis(
 ): Promise<MockedEndpoint[]> {
   return [
     ...(await mockTronApis(mockServer, mockZeroBalance)),
-    ...(await mockBridgeGetTronTokens(mockServer)),
+    await mockBridgeGetTronTokens(mockServer),
     await mockBridgeGetTronQuote(mockServer),
     await mockTronGetChainParameters(mockServer),
     await mockTronGetNextMaintenanceTime(mockServer),
@@ -1694,7 +1664,7 @@ export async function mockTronSwapApisNoQuotes(
 ): Promise<MockedEndpoint[]> {
   return [
     ...(await mockTronApis(mockServer, mockZeroBalance)),
-    ...(await mockBridgeGetTronTokens(mockServer)),
+    await mockBridgeGetTronTokens(mockServer),
     await mockBridgeGetTronQuoteEmpty(mockServer),
   ];
 }
@@ -1705,23 +1675,7 @@ export async function mockTronSwapApisWithoutFeeEstimation(
 ): Promise<MockedEndpoint[]> {
   return [
     ...(await mockTronApis(mockServer, mockZeroBalance)),
-    ...(await mockBridgeGetTronTokens(mockServer)),
+    await mockBridgeGetTronTokens(mockServer),
     await mockBridgeGetTronQuote(mockServer),
-    await mockServer
-      .forGet(tronInfuraUrl('/wallet/getchainparameters'))
-      .always()
-      .thenCallback(() => ({ statusCode: 200 })),
-    await mockServer
-      .forPost(tronInfuraUrl('/wallet/getnextmaintenancetime'))
-      .always()
-      .thenCallback(() => ({ statusCode: 200 })),
-    await mockServer
-      .forPost(tronInfuraUrl('/wallet/triggerconstantcontract'))
-      .always()
-      .thenCallback(() => ({ statusCode: 200 })),
-    await mockServer
-      .forPost(tronInfuraUrl('/wallet/getcontract'))
-      .always()
-      .thenCallback(() => ({ statusCode: 200 })),
   ];
 }

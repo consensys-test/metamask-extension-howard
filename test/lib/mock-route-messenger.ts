@@ -30,7 +30,7 @@ export function createMockRouteMessenger<
   Actions extends UIMessengerActions = never,
 >(actionHandlers?: {
   [Action in Actions as Action['type']]: Action['handler'];
-}): RouteMessenger {
+}): RouteMessenger<Actions['type']> {
   const messenger = new Messenger<
     MockAnyNamespace,
     UIMessengerActions,

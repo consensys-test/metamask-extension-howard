@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import { TabEmptyState } from './tab-empty-state';
 import { useTheme } from '../../../hooks/useTheme';
 

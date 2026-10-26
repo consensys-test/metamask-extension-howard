@@ -1,4 +1,5 @@
 import React from 'react';
+// @ts-expect-error suppress CommonJS vs ECMAScript error
 import { Point } from 'chart.js';
 import { Box } from '@metamask/design-system-react';
 import { Text, TextDirection } from '../../../../components/component-library';

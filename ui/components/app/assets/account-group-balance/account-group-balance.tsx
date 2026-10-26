@@ -12,8 +12,10 @@ import {
 } from '@metamask/design-system-react';
 import {
   getMultichainNativeTokenBalance,
+  selectBalanceBySelectedAccountGroup,
   selectUnifiedBalanceBySelectedAccountGroup,
 } from '../../../../selectors/assets';
+import { getIsAssetsUnifyStateEnabled } from '../../../../selectors/assets-unify-state';
 
 import { TextVariant } from '../../../../helpers/constants/design-system';
 import { SensitiveText } from '../../../component-library';
@@ -53,9 +55,16 @@ export const AccountGroupBalance = ({
   const enabledNetworks = useSelector(getEnabledNetworksByNamespace);
   const { formatCurrency, formatTokenQuantity } = useFormatters();
 
-  const selectedGroupBalance = useSelector(
+  const isAssetsUnifyStateEnabled = useSelector(getIsAssetsUnifyStateEnabled);
+  const legacySelectedGroupBalance = useSelector(
+    selectBalanceBySelectedAccountGroup,
+  );
+  const unifiedSelectedGroupBalance = useSelector(
     selectUnifiedBalanceBySelectedAccountGroup,
   );
+  const selectedGroupBalance = isAssetsUnifyStateEnabled
+    ? unifiedSelectedGroupBalance
+    : legacySelectedGroupBalance;
   const fallbackCurrency = useSelector(getCurrentCurrency);
   const anyEnabledNetworksAreAvailable = useSelector(
     selectAnyEnabledNetworksAreAvailable,

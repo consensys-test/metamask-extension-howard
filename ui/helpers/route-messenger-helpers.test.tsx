@@ -14,7 +14,7 @@ describe('createRouteWithMessenger', () => {
 
     expect(route).toMatchInlineSnapshot(`
       {
-        "element": <RouteMessengerProvider
+        "element": <RouteWithMessenger
           capabilities={
             {
               "actions": [
@@ -30,7 +30,7 @@ describe('createRouteWithMessenger', () => {
           <div>
             Test
           </div>
-        </RouteMessengerProvider>,
+        </RouteWithMessenger>,
         "path": "/test",
       }
     `);

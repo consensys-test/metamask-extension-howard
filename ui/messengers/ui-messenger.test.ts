@@ -12,7 +12,6 @@ import {
   type UIMessengerActions,
   type UIMessengerEvents,
 } from './ui-messenger';
-import { EXCLUDED_CAPABILITIES as PASSKEY_CONTROLLER_EXCLUDED_CAPABILITIES } from './configs/passkey-controller';
 
 jest.mock('../store/background-connection', () => ({
   submitRequestToBackground: jest.fn(),
@@ -53,45 +52,29 @@ describe('UIMessenger', () => {
           messenger: delegatee,
         });
 
-        const result = await delegatee.call(
-          'SnapController:installSnaps',
-          'https://example.com',
-          { 'npm:my-snap': {} },
-        );
+        const result = await delegatee.call('SnapController:installSnaps', {
+          'npm:my-snap': {},
+        });
 
         expect(mockSubmitRequestToBackground).toHaveBeenCalledWith(
           'messengerCall',
-          [
-            'SnapController:installSnaps',
-            ['https://example.com', { 'npm:my-snap': {} }],
-          ],
+          ['SnapController:installSnaps', [{ 'npm:my-snap': {} }]],
         );
         expect(result).toBe('result');
       });
 
-      // @ts-expect-error This function is missing from the Mocha type definitions
-      it.each([
-        'KeyringController:addNewKeyring',
-        ...PASSKEY_CONTROLLER_EXCLUDED_CAPABILITIES.actions,
-      ])(
-        'throws if the excluded action "%s" is called',
-        async (action: string) => {
-          const delegatee = createDelegatee();
+      it('throws if an excluded action is called', async () => {
+        const delegatee = createDelegatee();
 
-          await uiMessenger.delegate({
-            // Each action is deliberately excluded from the UI messenger.
-            // @ts-expect-error Delegating an excluded action on purpose.
-            actions: [action],
-            messenger: delegatee,
-          });
+        await uiMessenger.delegate({
+          actions: ['KeyringController:addKeyring'],
+          messenger: delegatee,
+        });
 
-          expect(() =>
-            // @ts-expect-error Calling an excluded action on purpose.
-            delegatee.call(action),
-          ).toThrow(`The action "${action}" has not been exposed to the UI.`);
-          expect(mockSubmitRequestToBackground).not.toHaveBeenCalled();
-        },
-      );
+        expect(() => delegatee.call('KeyringController:addKeyring')).toThrow(
+          'The action "KeyringController:addKeyring" has not been exposed to the UI.',
+        );
+      });
 
       it('throws if the same action is delegated to the same messenger twice', async () => {
         const delegatee = createDelegatee();
@@ -220,9 +203,7 @@ describe('UIMessenger', () => {
         });
 
         expect(() =>
-          delegatee.call('SnapController:installSnaps', 'https://example.com', {
-            'npm:my-snap': {},
-          }),
+          delegatee.call('SnapController:installSnaps', { 'npm:my-snap': {} }),
         ).toThrow();
       });
 

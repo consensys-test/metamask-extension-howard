@@ -3,22 +3,17 @@ import {
   KeyringControllerGetStateAction,
   KeyringControllerLockEvent,
   KeyringControllerUnlockEvent,
-  KeyringControllerWithKeyringV2UnsafeAction,
 } from '@metamask/keyring-controller';
 import type { AuthenticationControllerProfileSignInEvent } from '@metamask/profile-sync-controller/auth';
-import type {
-  SeedlessOnboardingControllerGetAccessTokenAction,
-  SeedlessOnboardingControllerGetStateAction,
-} from '@metamask/seedless-onboarding-controller';
+import type { SeedlessOnboardingControllerGetStateAction } from '@metamask/seedless-onboarding-controller';
+import { SnapControllerHandleRequestAction } from '@metamask/snaps-controllers';
 import type { AnalyticsControllerGetStateAction } from '@metamask/analytics-controller';
-import type { RemoteFeatureFlagControllerGetStateAction } from '@metamask/remote-feature-flag-controller';
 import { RootMessenger } from '../../../lib/messenger';
 
 type MessengerActions =
   | KeyringControllerGetStateAction
-  | KeyringControllerWithKeyringV2UnsafeAction
   | SeedlessOnboardingControllerGetStateAction
-  | SeedlessOnboardingControllerGetAccessTokenAction;
+  | SnapControllerHandleRequestAction;
 
 type MessengerEvents =
   | AuthenticationControllerProfileSignInEvent
@@ -52,18 +47,15 @@ export function getAuthenticationControllerMessenger(
     messenger: controllerMessenger,
     actions: [
       'KeyringController:getState',
-      'KeyringController:withKeyringV2Unsafe',
       'SeedlessOnboardingController:getState',
-      'SeedlessOnboardingController:getAccessToken',
+      'SnapController:handleRequest',
     ],
     events: ['KeyringController:lock', 'KeyringController:unlock'],
   });
   return controllerMessenger;
 }
 
-export type AllowedInitializationActions =
-  | AnalyticsControllerGetStateAction
-  | RemoteFeatureFlagControllerGetStateAction;
+export type AllowedInitializationActions = AnalyticsControllerGetStateAction;
 
 export type AuthenticationControllerInitMessenger = ReturnType<
   typeof getAuthenticationControllerInitMessenger
@@ -91,10 +83,7 @@ export function getAuthenticationControllerInitMessenger(
   });
   messenger.delegate({
     messenger: controllerInitMessenger,
-    actions: [
-      'AnalyticsController:getState',
-      'RemoteFeatureFlagController:getState',
-    ],
+    actions: ['AnalyticsController:getState'],
   });
   return controllerInitMessenger;
 }

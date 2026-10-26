@@ -21,25 +21,20 @@ import {
 import { type CaipChainId, type Hex } from '@metamask/utils';
 import { ChainId } from '@metamask/controller-utils';
 import {
-  AvatarNetworkSize,
   Button,
   ButtonSize,
   ButtonVariant,
-  BoxFlexDirection,
   IconName,
-  Modal,
-  ModalOverlay,
-  ModalHeader,
-  ModalContent,
 } from '@metamask/design-system-react';
 import { useAnalytics } from '../../../hooks/useAnalytics';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { useAccountNetworkAvailability } from '../../../hooks/accounts/useAccountNetworkAvailability';
+import { usePermittedNetworkToast } from '../../../hooks/multichain-accounts/usePermittedNetworkToast';
 import { NetworkListItem } from '../network-list-item';
 import {
   removeNetwork,
   setActiveNetwork,
-  setShowTestNetworksPreference,
+  setShowTestNetworks,
   showModal,
   toggleNetworkMenu,
   updateNetworksList,
@@ -59,10 +54,11 @@ import {
   TEST_CHAINS,
   CHAIN_ID_PORTFOLIO_LANDING_PAGE_URL_MAP,
   BUILT_IN_NETWORKS,
+  CAIP_FORMATTED_TEST_CHAINS,
 } from '../../../../shared/constants/network';
 import { MultichainNetworks } from '../../../../shared/constants/multichain/networks';
 import {
-  getShouldShowTestNetworks,
+  getShowTestNetworks,
   getOriginOfCurrentTab,
   getEditedNetwork,
   getOrderedNetworksList,
@@ -73,7 +69,6 @@ import {
   getPermittedEVMChainsForSelectedTab,
   getMultichainNetworkConfigurationsByChainId,
   getSelectedMultichainNetworkChainId,
-  getIsTestnetInUse,
   getNetworkDiscoverButtonEnabled,
   getAllChainsToPoll,
 } from '../../../selectors';
@@ -89,7 +84,15 @@ import {
   TextColor,
   TextVariant,
 } from '../../../helpers/constants/design-system';
-import { Box, Text } from '../../component-library';
+import {
+  Box,
+  Modal,
+  ModalOverlay,
+  Text,
+  ModalContent,
+  ModalHeader,
+  AvatarNetworkSize,
+} from '../../component-library';
 import {
   MetaMetricsEventCategory,
   MetaMetricsEventName,
@@ -168,9 +171,10 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
   const dispatch = useDispatch();
   const { trackEvent, createEventBuilder } = useAnalytics();
   const { hasAnyAccountsInNetwork } = useAccountNetworkAvailability();
+  const { showPermittedNetworkToast } = usePermittedNetworkToast();
 
   const { tokenNetworkFilter } = useSelector(getPreferences);
-  const showTestnets = useSelector(getShouldShowTestNetworks);
+  const showTestnets = useSelector(getShowTestNetworks);
   const selectedTabOrigin = useSelector(getOriginOfCurrentTab);
   const isUnlocked = useSelector(getIsUnlocked);
   const domains = useSelector(getAllDomains);
@@ -226,7 +230,10 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
     endTrace({ name: TraceName.NetworkList });
   }, []);
 
-  const currentlyOnTestnet = useSelector(getIsTestnetInUse);
+  const currentlyOnTestnet = useMemo(
+    () => CAIP_FORMATTED_TEST_CHAINS.includes(currentChainId),
+    [currentChainId],
+  );
 
   const [nonTestNetworks, testNetworks] = useMemo(
     () =>
@@ -282,19 +289,12 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
   const [orderedNetworks, setOrderedNetworks] = useState(
     sortNetworks(nonTestNetworks, orderedNetworksList),
   );
-  const [prevNonTestNetworks, setPrevNonTestNetworks] =
-    useState(nonTestNetworks);
-  const [prevOrderedNetworksList, setPrevOrderedNetworksList] =
-    useState(orderedNetworksList);
 
-  if (
-    nonTestNetworks !== prevNonTestNetworks ||
-    orderedNetworksList !== prevOrderedNetworksList
-  ) {
-    setPrevNonTestNetworks(nonTestNetworks);
-    setPrevOrderedNetworksList(orderedNetworksList);
-    setOrderedNetworks(sortNetworks(nonTestNetworks, orderedNetworksList));
-  }
+  useEffect(
+    () =>
+      setOrderedNetworks(sortNetworks(nonTestNetworks, orderedNetworksList)),
+    [nonTestNetworks, orderedNetworksList],
+  );
 
   const featuredNetworksNotYetEnabled = useMemo(() => {
     // Filter out networks that are already enabled
@@ -431,6 +431,10 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
 
           if (!isNetworkPermitted) {
             await dispatch(addPermittedChain(selectedTabOrigin, chainId));
+            showPermittedNetworkToast({
+              origin: selectedTabOrigin,
+              network: getMultichainNetworkConfigurationOrThrow(chainId),
+            });
           }
 
           await setNetworkClientIdForDomain(
@@ -468,6 +472,8 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
       allChainIds,
       tokenNetworkFilter,
       dispatch,
+      getMultichainNetworkConfigurationOrThrow,
+      showPermittedNetworkToast,
     ],
   );
 
@@ -817,11 +823,11 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
                   </Text>
                   <ToggleButton
                     dataTestId="network-menu-show-test-networks"
-                    value={showTestnets}
+                    value={showTestnets || currentlyOnTestnet}
                     disabled={currentlyOnTestnet}
                     onToggle={(value: boolean) => {
                       const newVal = !value;
-                      dispatch(setShowTestNetworksPreference(newVal));
+                      dispatch(setShowTestNetworks(newVal));
                       trackEvent(
                         createEventBuilder(
                           MetaMetricsEventName.TestNetworksDisplayed,
@@ -837,7 +843,7 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
                 </Box>
               ) : null}
 
-              {showTestnets ? (
+              {showTestnets || currentlyOnTestnet ? (
                 <Box className="multichain-network-list-menu">
                   {sortedTestNetworks.map((network) =>
                     generateMultichainNetworkListItem(network),
@@ -963,22 +969,22 @@ export const NetworkListMenu = ({ onClose }: NetworkListMenuProps) => {
     <Modal isOpen onClose={onClose}>
       <ModalOverlay />
       <ModalContent
-        className="multichain-network-list-menu-content-wrapper p-0"
+        padding={0}
+        className="multichain-network-list-menu-content-wrapper"
         modalDialogProps={{
           className: 'multichain-network-list-menu-content-wrapper__dialog',
-          flexDirection: BoxFlexDirection.Column,
+          display: Display.Flex,
+          flexDirection: FlexDirection.Column,
           paddingTop: 0,
           paddingBottom: 0,
         }}
       >
         <ModalHeader
-          className={`pt-4 pr-4 ${
-            actionMode === ACTION_MODE.SELECT_RPC ? 'pb-0' : 'pb-4'
-          }`}
+          paddingTop={4}
+          paddingRight={4}
+          paddingBottom={actionMode === ACTION_MODE.SELECT_RPC ? 0 : 4}
           onClose={onClose}
-          closeButtonProps={{ ariaLabel: t('close') }}
-          onBack={onBack as () => void}
-          backButtonProps={{ ariaLabel: t('back') }}
+          onBack={onBack}
         >
           <Text
             ellipsis

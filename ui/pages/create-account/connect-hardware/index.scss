@@ -122,6 +122,10 @@
     display: flex;
     flex: 1;
     min-width: 0;
+
+    input {
+      margin-top: 13px;
+    }
   }
 
   &__item__label {

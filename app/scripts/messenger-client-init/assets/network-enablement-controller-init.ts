@@ -10,7 +10,6 @@ import {
   SolAccountType,
   SolScope,
   TrxScope,
-  XlmScope,
 } from '@metamask/keyring-api';
 import {
   CaipChainId,
@@ -116,7 +115,6 @@ const generateDefaultNetworkEnablementControllerState = (
   const enabledMultichainNetworks: string[] = [SolScope.Mainnet];
   enabledMultichainNetworks.push(BtcScope.Mainnet);
   enabledMultichainNetworks.push(TrxScope.Mainnet);
-  enabledMultichainNetworks.push(XlmScope.Pubnet);
 
   return {
     enabledNetworkMap: {

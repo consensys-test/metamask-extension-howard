@@ -122,7 +122,7 @@ describe('Transaction Controller Hooks', () => {
   });
 
   describe('afterAdd', () => {
-    it('calls ShieldSubscriptionService:submitSubscriptionSponsorshipIntent', async () => {
+    it('calls SubscriptionService:submitSubscriptionSponsorshipIntent', async () => {
       const messenger = buildMockMessenger();
       const request = buildMockRequest({ messenger });
       const { afterAdd } = getTransactionControllerHooks(request);
@@ -130,7 +130,7 @@ describe('Transaction Controller Hooks', () => {
       await afterAdd?.({ transactionMeta: mockTransactionMeta });
 
       expect(messenger.call).toHaveBeenCalledWith(
-        'ShieldSubscriptionService:submitSubscriptionSponsorshipIntent',
+        'SubscriptionService:submitSubscriptionSponsorshipIntent',
         mockTransactionMeta,
       );
     });

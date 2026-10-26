@@ -24,6 +24,9 @@ import { PermissionInfoWithMetadata } from '@metamask/gator-permissions-controll
 import { Content, Header, Page } from '../../page';
 import { BackgroundColor } from '../../../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
+import { useTheme } from '../../../../../hooks/useTheme';
+import { TabEmptyState } from '../../../../ui/tab-empty-state';
+import { ThemeType } from '../../../../../../shared/constants/preferences';
 import {
   extractNetworkName,
   getDisplayOrigin,
@@ -36,14 +39,12 @@ import {
   getAggregatedGatorPermissionByChainId,
   getAggregatedGatorPermissionByChainIdAndOrigin,
 } from '../../../../../selectors/gator-permissions/gator-permissions';
-import {
-  ReviewGatorPermissionItem,
-  PermissionsEmptyState,
-} from '../components';
+import { ReviewGatorPermissionItem } from '../components';
 import { PREVIOUS_ROUTE } from '../../../../../helpers/constants/routes';
 
 export const ReviewGatorPermissionsPage = () => {
   const t = useI18nContext();
+  const theme = useTheme();
   const navigate = useNavigate();
   const { chainId, origin } = useParams<{
     chainId: string;
@@ -179,6 +180,7 @@ export const ReviewGatorPermissionsPage = () => {
           <ButtonIcon
             ariaLabel={t('back')}
             iconName={IconName.ArrowLeft}
+            className="connections-header__start-accessory"
             color={IconColor.IconDefault}
             onClick={() => navigate(PREVIOUS_ROUTE)}
             size={ButtonIconSize.Md}
@@ -204,7 +206,22 @@ export const ReviewGatorPermissionsPage = () => {
             className="h-full"
             padding={4}
           >
-            <PermissionsEmptyState />
+            <TabEmptyState
+              icon={
+                <img
+                  src={
+                    theme === ThemeType.dark
+                      ? '/images/empty-state-permissions-dark.png'
+                      : '/images/empty-state-permissions-light.png'
+                  }
+                  alt={t('permissionsPageEmptyDescription')}
+                  width={72}
+                  height={72}
+                />
+              }
+              description={t('permissionsPageEmptyDescription')}
+              className="mx-auto"
+            />
           </Box>
         )}
       </Content>

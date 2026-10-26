@@ -2,16 +2,11 @@ import React, { useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { twMerge } from '@metamask/design-system-react';
-import {
-  BtcMethod,
-  EthMethod,
-  SolMethod,
-  TrxAccountType,
-} from '@metamask/keyring-api';
+import { EthMethod } from '@metamask/keyring-api';
 import { TabEmptyState } from '../../ui/tab-empty-state';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { useTheme } from '../../../hooks/useTheme';
-import { getUseExternalServices } from '../../../selectors';
+import { getUseExternalServices, getIsSwapsChain } from '../../../selectors';
 import { getCurrentChainId } from '../../../../shared/lib/selectors/networks';
 import {
   MetaMetricsEventCategory,
@@ -20,19 +15,15 @@ import {
 } from '../../../../shared/constants/metametrics';
 import useBridging from '../../../hooks/bridge/useBridging';
 import { ThemeType } from '../../../../shared/constants/preferences';
+import { getMultichainNetwork } from '../../../selectors/multichain';
+import { useMultichainSelector } from '../../../hooks/useMultichainSelector';
+import { MultichainNetworks } from '../../../../shared/constants/multichain/networks';
 import { getSelectedInternalAccount } from '../../../../shared/lib/selectors/accounts';
 import { selectAccountGroupBalanceForEmptyState } from '../../../selectors/assets';
 import { getSelectedAccountGroup } from '../../../selectors/multichain-accounts/account-tree';
 import { FundingMethodModal } from '../../multichain/funding-method-modal/funding-method-modal';
 import { getMultichainAccountAddressListReceivePagePath } from '../../../pages/multichain-accounts/multichain-account-address-list-page';
 import { useAnalytics } from '../../../hooks/useAnalytics';
-
-const SWAP_SIGNING_METHODS = [
-  EthMethod.SignTransaction,
-  EthMethod.SignUserOperation,
-  SolMethod.SignTransaction,
-  BtcMethod.SignPsbt,
-];
 
 export type TransactionActivityEmptyStateProps = {
   /**
@@ -54,10 +45,16 @@ export const TransactionActivityEmptyState = ({
   const [isFundingModalOpen, setIsFundingModalOpen] = useState(false);
 
   const isSigningEnabled =
-    SWAP_SIGNING_METHODS.some((method) => account.methods.includes(method)) ||
-    account.type === TrxAccountType.Eoa;
+    account.methods.includes(EthMethod.SignTransaction) ||
+    account.methods.includes(EthMethod.SignUserOperation);
   const isExternalServicesEnabled = useSelector(getUseExternalServices);
   const chainId = useSelector(getCurrentChainId);
+  const isSwapsChain = useSelector((state) => getIsSwapsChain(state, chainId));
+
+  const { chainId: multichainChainId } = useMultichainSelector(
+    getMultichainNetwork,
+    account,
+  );
 
   const { openBridgeExperience } = useBridging();
 
@@ -102,7 +99,9 @@ export const TransactionActivityEmptyState = ({
     }
   }, [navigate, selectedAccountGroup]);
 
-  const isSwapButtonEnabled = isSigningEnabled && isExternalServicesEnabled;
+  const isSwapButtonEnabled =
+    multichainChainId === MultichainNetworks.SOLANA ||
+    (isSwapsChain && isSigningEnabled && isExternalServicesEnabled);
 
   return (
     <>

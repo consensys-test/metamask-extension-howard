@@ -1,26 +1,35 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { Content, Header, Page } from '../page';
 import {
-  Box,
-  BoxFlexDirection,
-  BoxJustifyContent,
-  BoxAlignItems,
   ButtonIcon,
   ButtonIconSize,
-  FontWeight,
   Icon,
-  IconColor,
   IconName,
   IconSize,
   Text,
-  TextColor,
+  Box,
+} from '../../../component-library';
+import {
+  IconColor,
+  BackgroundColor,
+  TextAlign,
   TextVariant,
-} from '@metamask/design-system-react';
-import { Content, Header, Page } from '../page';
+  BlockSize,
+  Display,
+  FlexDirection,
+  JustifyContent,
+  TextColor,
+  AlignItems,
+} from '../../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
+import { useTheme } from '../../../../hooks/useTheme';
+import { TabEmptyState } from '../../../ui/tab-empty-state';
+import { ThemeType } from '../../../../../shared/constants/preferences';
 import {
   DEFAULT_ROUTE,
+  PREVIOUS_ROUTE,
   PERMISSIONS,
   TOKEN_TRANSFER_ROUTE,
 } from '../../../../helpers/constants/routes';
@@ -32,134 +41,161 @@ import {
 } from '../../../../selectors/gator-permissions/gator-permissions';
 import { useGlobalMenuRouteTransition } from '../../../../pages/routes/global-menu-route-transition';
 import { transitionForward } from '../../../ui/transition';
-import { PermissionListItem, PermissionsEmptyState } from './components';
+import { PermissionListItem } from './components/permission-list-item';
 
 export const GatorPermissionsPage = () => {
   const t = useI18nContext();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const runCloseTransition = useGlobalMenuRouteTransition();
 
-  const totalGatorPermissions = useSelector((state: AppState) =>
-    getAggregatedGatorPermissionsCountAcrossAllChains(state, 'token-transfer'),
-  );
-  const totalSitesConnections = useSelector(getTotalUniqueSitesCount);
-  const { loading } = useGatorPermissions();
-
-  const from = searchParams.get('from') ?? DEFAULT_ROUTE;
-
-  // If only sites permissions exist, redirect to sites page directly
-  const shouldRedirect =
-    !loading && totalSitesConnections > 0 && totalGatorPermissions === 0;
-
-  useEffect(() => {
-    if (shouldRedirect) {
-      navigate(`${PERMISSIONS}?from=${encodeURIComponent(from)}`, {
-        replace: true,
-      });
-    }
-  }, [shouldRedirect, navigate, from]);
+  const fromPath = searchParams.get('from') ?? undefined;
 
   const handleBack = () => {
-    if (from === DEFAULT_ROUTE) {
-      runCloseTransition(() => navigate(-1));
+    if (fromPath === DEFAULT_ROUTE) {
+      runCloseTransition(() => navigate(PREVIOUS_ROUTE));
     } else {
       navigate(DEFAULT_ROUTE);
     }
   };
 
-  if (shouldRedirect) {
-    return null;
-  }
+  const totalGatorPermissions = useSelector((state: AppState) =>
+    getAggregatedGatorPermissionsCountAcrossAllChains(state, 'token-transfer'),
+  );
+  const totalSitesConnections = useSelector(getTotalUniqueSitesCount);
+  const totalPermissions = totalGatorPermissions + totalSitesConnections;
 
-  const hasPermissions =
-    !loading && (totalGatorPermissions > 0 || totalSitesConnections > 0);
+  // Hook uses cache-first strategy: returns cached data immediately if available,
+  // then refreshes in background. Loading is only true on initial load with no cache.
+  const { loading: gatorPermissionsLoading } = useGatorPermissions();
 
-  const renderContent = () => {
-    if (loading) {
+  const handlePermissionGroupNameClick = async (
+    permissionGroupName: string,
+  ) => {
+    switch (permissionGroupName) {
+      case 'sites':
+        transitionForward(() => navigate(PERMISSIONS));
+        break;
+      case 'token-transfer':
+        transitionForward(() => navigate(TOKEN_TRANSFER_ROUTE));
+        break;
+      default:
+        console.error('Invalid permission group name:', permissionGroupName);
+        break;
+    }
+  };
+
+  const renderCategoryHeader = (title: string) => {
+    return (
+      <Box
+        display={Display.Flex}
+        flexDirection={FlexDirection.Row}
+        alignItems={AlignItems.center}
+        width={BlockSize.Full}
+        backgroundColor={BackgroundColor.backgroundDefault}
+        padding={[2, 4]}
+        marginTop={4}
+      >
+        <Text
+          variant={TextVariant.bodyMdMedium}
+          color={TextColor.textAlternative}
+          textAlign={TextAlign.Left}
+        >
+          {title.toUpperCase()}
+        </Text>
+      </Box>
+    );
+  };
+
+  const renderPermissionsList = () => {
+    return (
+      <Box
+        data-testid="permission-list"
+        display={Display.Flex}
+        flexDirection={FlexDirection.Column}
+        alignItems={AlignItems.baseline}
+        width={BlockSize.Full}
+        backgroundColor={BackgroundColor.backgroundDefault}
+        padding={4}
+        gap={4}
+      >
+        {totalSitesConnections > 0 && (
+          <>
+            {renderCategoryHeader(t('sites'))}
+            <PermissionListItem
+              total={totalSitesConnections}
+              permissionGroupName={t('sites')}
+              onClick={() => handlePermissionGroupNameClick('sites')}
+            />
+          </>
+        )}
+
+        {totalGatorPermissions > 0 && (
+          <>
+            {renderCategoryHeader(t('assets'))}
+            <PermissionListItem
+              total={totalGatorPermissions}
+              permissionGroupName={t('tokenTransfer')}
+              onClick={() => handlePermissionGroupNameClick('token-transfer')}
+            />
+          </>
+        )}
+      </Box>
+    );
+  };
+
+  const renderPageContent = () => {
+    if (gatorPermissionsLoading) {
       return (
         <Box
-          data-testid="gator-permissions-loading"
-          flexDirection={BoxFlexDirection.Column}
-          justifyContent={BoxJustifyContent.Center}
-          alignItems={BoxAlignItems.Center}
+          display={Display.Flex}
+          flexDirection={FlexDirection.Column}
+          justifyContent={JustifyContent.center}
+          alignItems={AlignItems.center}
+          height={BlockSize.Full}
+          gap={2}
           padding={4}
-          className="h-full"
         >
           <Icon
             name={IconName.Loading}
-            color={IconColor.IconMuted}
+            color={IconColor.iconMuted}
             size={IconSize.Lg}
-            className="animate-spin"
+            style={{ animation: 'spin 1.2s linear infinite' }}
           />
         </Box>
       );
     }
 
-    if (hasPermissions) {
-      return (
-        <Box
-          data-testid="permission-list"
-          flexDirection={BoxFlexDirection.Column}
-          alignItems={BoxAlignItems.Baseline}
-          paddingVertical={4}
-          gap={4}
-          className="w-full bg-background-default"
-        >
-          {totalSitesConnections > 0 && (
-            <>
-              <Text
-                variant={TextVariant.BodyMd}
-                fontWeight={FontWeight.Medium}
-                color={TextColor.TextAlternative}
-                className="pl-4"
-              >
-                {t('dapps')}
-              </Text>
-              <PermissionListItem
-                total={totalSitesConnections}
-                permissionGroupName={t('connections')}
-                onClick={() => transitionForward(() => navigate(PERMISSIONS))}
-              />
-            </>
-          )}
-          {totalSitesConnections > 0 && totalGatorPermissions > 0 && (
-            <Box className="w-full px-4">
-              <hr className="m-0 w-full border-0 border-t border-muted" />
-            </Box>
-          )}
-          {totalGatorPermissions > 0 && (
-            <>
-              <Text
-                variant={TextVariant.BodyMd}
-                fontWeight={FontWeight.Medium}
-                color={TextColor.TextAlternative}
-                className="pl-4"
-              >
-                {t('assets')}
-              </Text>
-              <PermissionListItem
-                total={totalGatorPermissions}
-                permissionGroupName={t('tokenTransfer')}
-                onClick={() =>
-                  transitionForward(() => navigate(TOKEN_TRANSFER_ROUTE))
-                }
-              />
-            </>
-          )}
-        </Box>
-      );
+    if (totalPermissions > 0) {
+      return renderPermissionsList();
     }
 
     return (
       <Box
         data-testid="no-connections"
-        flexDirection={BoxFlexDirection.Column}
-        justifyContent={BoxJustifyContent.Center}
+        display={Display.Flex}
+        flexDirection={FlexDirection.Column}
+        justifyContent={JustifyContent.center}
+        height={BlockSize.Full}
         padding={4}
-        className="h-full"
       >
-        <PermissionsEmptyState />
+        <TabEmptyState
+          icon={
+            <img
+              src={
+                theme === ThemeType.dark
+                  ? '/images/empty-state-permissions-dark.png'
+                  : '/images/empty-state-permissions-light.png'
+              }
+              alt={t('permissionsPageEmptyDescription')}
+              width={72}
+              height={72}
+            />
+          }
+          description={t('permissionsPageEmptyDescription')}
+          className="mx-auto"
+        />
       </Box>
     );
   };
@@ -167,24 +203,32 @@ export const GatorPermissionsPage = () => {
   return (
     <Page
       className="main-container"
-      data-testid="parent-selector-gator-permissions"
+      data-testid="gator-permissions-page"
+      key="gator-permissions-page"
     >
       <Header
-        className="bg-background-default"
+        backgroundColor={BackgroundColor.backgroundDefault}
         startAccessory={
           <ButtonIcon
             ariaLabel={t('back')}
             iconName={IconName.ArrowLeft}
-            color={IconColor.IconDefault}
+            className="connections-header__start-accessory"
+            color={IconColor.iconDefault}
             onClick={handleBack}
             size={ButtonIconSize.Md}
           />
         }
-        textProps={{ 'data-testid': 'gator-permissions-page-title' }}
       >
-        {t('permissions')}
+        <Text
+          as="span"
+          variant={TextVariant.headingMd}
+          textAlign={TextAlign.Center}
+          data-testid="gator-permissions-page-title"
+        >
+          {t('dappConnections')}
+        </Text>
       </Header>
-      <Content padding={0}>{renderContent()}</Content>
+      <Content padding={0}>{renderPageContent()}</Content>
     </Page>
   );
 };

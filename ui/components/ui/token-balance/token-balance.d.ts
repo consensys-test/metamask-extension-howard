@@ -5,7 +5,6 @@ export type TokenBalanceProps = OverridingUnion<
       address: string;
       decimals?: number;
       symbol?: string;
-      chainId?: string;
     };
     className?: string;
     showFiat?: boolean;

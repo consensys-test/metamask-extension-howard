@@ -1,7 +1,7 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TokenSecurityData } from '@metamask/assets-controllers';
 import { parseCaipAssetType, type CaipAssetType } from '@metamask/utils';
-import { isNativeCaipAssetId } from '#shared/lib/asset-utils';
-import { useTokenAssetQuery } from '#ui/hooks/token-asset/useTokenAssetQuery';
+import { fetchCachedTokenAssets } from '../pages/bridge/utils/token-security';
 
 type UseTokenSecurityDataOpts = {
   /** CAIP-19 asset ID. When null, no fetch is attempted. */
@@ -28,10 +28,10 @@ const getAssetMetadataFromAssetId = (
   assetId: CaipAssetType,
 ): TokenSecurityAssetMetadata => {
   try {
-    const { assetReference } = parseCaipAssetType(assetId);
+    const { assetReference, assetNamespace } = parseCaipAssetType(assetId);
     return {
       address: assetReference,
-      isNative: isNativeCaipAssetId(assetId),
+      isNative: assetNamespace === 'slip44',
     };
   } catch {
     return {};
@@ -45,6 +45,9 @@ const isValidTokenSecurityData = (data: unknown): data is TokenSecurityData =>
   typeof (data as TokenSecurityData).resultType === 'string' &&
   Array.isArray((data as TokenSecurityData).features);
 
+// TODO(security-trust): Once home page Security & Trust signals land (separate PR)
+// via TanStack Query, read from the shared query cache first and fall back to REST
+// (`fetchCachedTokenAssets`) when cached data is unavailable.
 export const useTokenSecurityData = ({
   assetId,
   prefetchedData: rawPrefetchedData,
@@ -53,40 +56,77 @@ export const useTokenSecurityData = ({
     ? rawPrefetchedData
     : undefined;
 
-  const { data, isLoading, error } = useTokenAssetQuery({
-    assetId,
-    fetchOnMiss: !prefetchedData,
-    enabled: Boolean(assetId) && !prefetchedData,
-  });
+  const [securityData, setSecurityData] = useState<TokenSecurityData | null>(
+    prefetchedData ?? null,
+  );
+  const [isLoading, setIsLoading] = useState(
+    !prefetchedData && Boolean(assetId),
+  );
+  const [error, setError] = useState<Error | null>(null);
+  const [assetMetadata, setAssetMetadata] =
+    useState<TokenSecurityAssetMetadata>({});
+  const activeAssetIdRef = useRef<CaipAssetType | null>(null);
 
-  const parsedAssetMetadata = assetId
-    ? getAssetMetadataFromAssetId(assetId)
-    : {};
+  const fetchData = useCallback(async (requestAssetId: CaipAssetType) => {
+    try {
+      const assets = await fetchCachedTokenAssets([requestAssetId]);
+      if (requestAssetId !== activeAssetIdRef.current) {
+        return;
+      }
+      const asset = assets?.[0];
+      setSecurityData(asset?.securityData ?? null);
+      setAssetMetadata(
+        asset
+          ? {
+              symbol: asset.symbol,
+              name: asset.name,
+              decimals: asset.decimals,
+              ...getAssetMetadataFromAssetId(requestAssetId),
+            }
+          : getAssetMetadataFromAssetId(requestAssetId),
+      );
+      setError(null);
+    } catch (err) {
+      if (requestAssetId !== activeAssetIdRef.current) {
+        return;
+      }
+      setError(err as Error);
+    } finally {
+      if (requestAssetId === activeAssetIdRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
-  if (prefetchedData) {
-    return {
-      securityData: prefetchedData,
-      isLoading: false,
-      error: null,
-      ...parsedAssetMetadata,
+  useEffect(() => {
+    if (prefetchedData) {
+      activeAssetIdRef.current = assetId;
+      setSecurityData(prefetchedData);
+      setError(null);
+      setIsLoading(false);
+      return undefined;
+    }
+
+    if (!assetId) {
+      activeAssetIdRef.current = null;
+      setSecurityData(null);
+      setError(null);
+      setAssetMetadata({});
+      setIsLoading(false);
+      return undefined;
+    }
+
+    activeAssetIdRef.current = assetId;
+    setSecurityData(null);
+    setError(null);
+    setAssetMetadata(getAssetMetadataFromAssetId(assetId));
+    setIsLoading(true);
+    fetchData(assetId);
+
+    return () => {
+      activeAssetIdRef.current = null;
     };
-  }
+  }, [assetId, prefetchedData, fetchData]);
 
-  if (!assetId) {
-    return {
-      securityData: null,
-      isLoading: false,
-      error: null,
-    };
-  }
-
-  return {
-    securityData: data?.securityData ?? null,
-    isLoading,
-    error: error ?? null,
-    symbol: data?.symbol,
-    name: data?.name,
-    decimals: data?.decimals,
-    ...parsedAssetMetadata,
-  };
+  return { securityData, isLoading, error, ...assetMetadata };
 };

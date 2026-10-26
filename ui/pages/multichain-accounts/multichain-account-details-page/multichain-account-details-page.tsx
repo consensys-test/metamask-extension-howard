@@ -42,7 +42,6 @@ import {
 } from '../../../selectors/multichain-accounts/account-tree';
 import { extractWalletIdFromGroupId } from '../../../selectors/multichain-accounts/utils';
 import {
-  MULTICHAIN_ACCOUNT_DETAILS_PAGE_ROUTE,
   MULTICHAIN_WALLET_DETAILS_PAGE_ROUTE,
   MULTICHAIN_ACCOUNT_ADDRESS_LIST_PAGE_ROUTE,
   MULTICHAIN_ACCOUNT_PRIVATE_KEY_LIST_PAGE_ROUTE,
@@ -184,10 +183,7 @@ export const MultichainAccountDetailsPage = () => {
   }, [accountGroupId, multichainAccount, navigate]);
 
   return accountGroupId && multichainAccount ? (
-    <Page
-      className="multichain-account-details-page"
-      data-testid="parent-selector-multichain-account-details-page"
-    >
+    <Page className="multichain-account-details-page">
       <Header
         textProps={{
           variant: TextVariant.headingSm,
@@ -222,14 +218,15 @@ export const MultichainAccountDetailsPage = () => {
             value={multichainAccount.metadata.name}
             onClick={handleAccountNameAction}
             endAccessory={
-              <ButtonIcon
-                className="ml-2"
-                iconName={IconName.ArrowRight}
-                iconProps={{ color: IconColor.IconAlternative }}
-                size={ButtonIconSize.Sm}
-                ariaLabel={t('accountName')}
-                data-testid="account-name-action"
-              />
+              <Box className="ml-2">
+                <ButtonIcon
+                  iconName={IconName.ArrowRight}
+                  iconProps={{ color: IconColor.IconAlternative }}
+                  size={ButtonIconSize.Sm}
+                  ariaLabel={t('accountName')}
+                  data-testid="account-name-action"
+                />
+              </Box>
             }
           />
           <AccountDetailsRow
@@ -237,14 +234,15 @@ export const MultichainAccountDetailsPage = () => {
             value={`${addressCount} ${addressCount > 1 ? t('addressesLabel') : t('addressLabel')}`}
             onClick={handleAddressesClick}
             endAccessory={
-              <ButtonIcon
-                className="ml-2"
-                iconName={IconName.ArrowRight}
-                iconProps={{ color: IconColor.IconAlternative }}
-                size={ButtonIconSize.Sm}
-                ariaLabel={t('addresses')}
-                data-testid="network-addresses-link"
-              />
+              <Box className="ml-2">
+                <ButtonIcon
+                  iconName={IconName.ArrowRight}
+                  iconProps={{ color: IconColor.IconAlternative }}
+                  size={ButtonIconSize.Sm}
+                  ariaLabel={t('addresses')}
+                  data-testid="network-addresses-link"
+                />
+              </Box>
             }
           />
           {(isEntropyWallet || isPrivateKeyWallet) && (
@@ -253,14 +251,15 @@ export const MultichainAccountDetailsPage = () => {
               value={t('unlockToReveal')}
               onClick={handlePrivateKeysClick}
               endAccessory={
-                <ButtonIcon
-                  className="ml-2"
-                  iconName={IconName.ArrowRight}
-                  iconProps={{ color: IconColor.IconAlternative }}
-                  size={ButtonIconSize.Sm}
-                  ariaLabel={t('privateKeys')}
-                  data-testid="private-keys-action"
-                />
+                <Box className="ml-2">
+                  <ButtonIcon
+                    iconName={IconName.ArrowRight}
+                    iconProps={{ color: IconColor.IconAlternative }}
+                    size={ButtonIconSize.Sm}
+                    ariaLabel={t('privateKeys')}
+                    data-testid="private-keys-action"
+                  />
+                </Box>
               }
             />
           )}
@@ -270,14 +269,15 @@ export const MultichainAccountDetailsPage = () => {
               value={t('setUp')}
               onClick={handleSmartAccountClick}
               endAccessory={
-                <ButtonIcon
-                  className="ml-2"
-                  iconName={IconName.ArrowRight}
-                  iconProps={{ color: IconColor.IconAlternative }}
-                  size={ButtonIconSize.Sm}
-                  ariaLabel={t('smartAccountLabel')}
-                  data-testid="smart-account-action"
-                />
+                <Box className="ml-2">
+                  <ButtonIcon
+                    iconName={IconName.ArrowRight}
+                    iconProps={{ color: IconColor.IconAlternative }}
+                    size={ButtonIconSize.Sm}
+                    ariaLabel={t('smartAccountLabel')}
+                    data-testid="smart-account-action"
+                  />
+                </Box>
               }
             />
           )}
@@ -288,14 +288,15 @@ export const MultichainAccountDetailsPage = () => {
             value={wallet.metadata.name}
             onClick={handleWalletAction}
             endAccessory={
-              <ButtonIcon
-                className="ml-2"
-                iconName={IconName.ArrowRight}
-                iconProps={{ color: IconColor.IconAlternative }}
-                size={ButtonIconSize.Sm}
-                ariaLabel={t('wallet')}
-                data-testid="wallet-details-link"
-              />
+              <Box className="ml-2">
+                <ButtonIcon
+                  iconName={IconName.ArrowRight}
+                  iconProps={{ color: IconColor.IconAlternative }}
+                  size={ButtonIconSize.Sm}
+                  ariaLabel={t('wallet')}
+                  data-testid="wallet-details-link"
+                />
+              </Box>
             }
           />
           {isEntropyWallet ? (
@@ -306,7 +307,6 @@ export const MultichainAccountDetailsPage = () => {
               )}
               shouldShowBackupReminder={shouldShowBackupReminder}
               keyringId={keyringId}
-              backupFlowReturnRoute={`${MULTICHAIN_ACCOUNT_DETAILS_PAGE_ROUTE}?${searchParams.toString()}`}
             />
           ) : null}
         </Box>
@@ -318,14 +318,15 @@ export const MultichainAccountDetailsPage = () => {
               value={''}
               onClick={() => setIsAccountRemoveModalOpen(true)}
               endAccessory={
-                <ButtonIcon
-                  className="ml-2"
-                  iconName={IconName.ArrowRight}
-                  iconProps={{ color: IconColor.IconAlternative }}
-                  size={ButtonIconSize.Md}
-                  ariaLabel={t('removeAccount')}
-                  data-testid="account-remove-action"
-                />
+                <Box className="ml-2">
+                  <ButtonIcon
+                    iconName={IconName.ArrowRight}
+                    iconProps={{ color: IconColor.IconAlternative }}
+                    size={ButtonIconSize.Md}
+                    ariaLabel={t('removeAccount')}
+                    data-testid="account-remove-action"
+                  />
+                </Box>
               }
             />
           </Box>

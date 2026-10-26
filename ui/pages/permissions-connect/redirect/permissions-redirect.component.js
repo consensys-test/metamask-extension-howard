@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   Box,
@@ -29,19 +29,16 @@ import PermissionsConnectFooter from '../../../components/app/permissions-connec
 
 export default function PermissionsRedirect({ subjectMetadata }) {
   const t = useContext(I18nContext);
-  const [lastValidSubjectMetadata, setLastValidSubjectMetadata] = useState(() =>
-    subjectMetadata?.origin ? subjectMetadata : null,
-  );
+  const [cachedSubjectMetadata, setCachedSubjectMetadata] =
+    useState(subjectMetadata);
 
   // While this redirecting screen is showing, the subject metadata will become invalidated
   // for that reason we cache the last seen valid subject metadata and show that.
-  if (subjectMetadata?.origin && subjectMetadata !== lastValidSubjectMetadata) {
-    setLastValidSubjectMetadata(subjectMetadata);
-  }
-
-  const displaySubjectMetadata = subjectMetadata?.origin
-    ? subjectMetadata
-    : (lastValidSubjectMetadata ?? subjectMetadata);
+  useEffect(() => {
+    if (subjectMetadata && subjectMetadata.origin) {
+      setCachedSubjectMetadata(subjectMetadata);
+    }
+  }, [subjectMetadata]);
 
   return (
     <Box
@@ -68,8 +65,8 @@ export default function PermissionsRedirect({ subjectMetadata }) {
           padding={2}
         >
           <AvatarToken
-            src={displaySubjectMetadata.iconUrl}
-            name={displaySubjectMetadata.name}
+            src={cachedSubjectMetadata.iconUrl}
+            name={cachedSubjectMetadata.name}
             size={AvatarTokenSize.Lg}
           />
           <Box

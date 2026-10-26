@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import { ComponentMeta, ComponentStory } from '@storybook/react';
 
 import { Label } from './label';
 
@@ -30,9 +30,9 @@ export default {
   args: {
     children: 'Label',
   },
-} satisfies Meta<typeof Label>;
+} as ComponentMeta<typeof Label>;
 
-export const DefaultStory: StoryObj<typeof Label> = {
-  render: (args) => <Label {...args} />,
-  name: 'Default',
-};
+const Template: ComponentStory<typeof Label> = (args) => <Label {...args} />;
+
+export const DefaultStory = Template.bind({});
+DefaultStory.storyName = 'Default';

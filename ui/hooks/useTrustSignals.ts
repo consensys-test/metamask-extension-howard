@@ -1,16 +1,22 @@
+'use no memo';
+// TODO: Fix - Calling `useTrustSignals` from `useTrustSignal`, which is not a component, violates the rules of hooks.
+
 import { useSelector } from 'react-redux';
 import { NameType } from '@metamask/name-controller';
-import type { Hex } from '@metamask/utils';
 import isEqual from 'lodash/isEqual';
 import { getAddressSecurityAlertResponse } from '../selectors';
-import { ResultType, createCacheKey } from '../../shared/lib/trust-signals';
+import {
+  ResultType,
+  createCacheKey,
+  mapChainIdToSupportedEVMChain,
+} from '../../shared/lib/trust-signals';
 import { SecurityAlertResponse } from '../pages/confirmations/types/confirm';
 import { useI18nContext } from './useI18nContext';
 
 export type UseTrustSignalRequest = {
   value: string;
   type: NameType;
-  chainId?: Hex;
+  chainId?: string;
 };
 
 export enum TrustSignalDisplayState {
@@ -45,7 +51,7 @@ export type TrustSignalResult = {
 export function useTrustSignal(
   value: string,
   type: NameType,
-  chainId: Hex | undefined,
+  chainId: string | undefined,
 ): TrustSignalResult {
   return useTrustSignals([{ value, type, chainId }])[0];
 }
@@ -72,7 +78,15 @@ export function useTrustSignals(
           };
         }
 
-        const cacheKey = createCacheKey(chainId, value);
+        const supportedEVMChain = mapChainIdToSupportedEVMChain(chainId);
+        if (!supportedEVMChain) {
+          return {
+            state: TrustSignalDisplayState.Unknown,
+            label: null,
+          };
+        }
+
+        const cacheKey = createCacheKey(supportedEVMChain, value);
 
         const securityAlertResponse = getAddressSecurityAlertResponse(
           state,

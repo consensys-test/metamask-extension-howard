@@ -31,7 +31,6 @@ import { setBackgroundConnection } from '../../store/background-connection';
 import { HardwareWalletProvider } from '../../contexts/hardware-wallets';
 import { createActiveABTestAssignment } from '../../../shared/lib/ab-testing/active-ab-test-assignment';
 import { CHAIN_VALUE_ORDER_AB_KEY } from '../../../shared/lib/ab-testing/configs/chain-value-order';
-import { BRIDGE_QUOTE_RESPONSE_MIGRATION_PHASE } from '../../../shared/constants/bridge';
 import useSubmitBridgeTransaction from './useSubmitBridgeTransaction';
 
 jest.mock('../../../shared/lib/sentry', () => ({
@@ -255,9 +254,7 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
             {
               "replace": true,
               "state": {
-                "bridgeState": null,
                 "stayOnHomePage": true,
-                "token": null,
               },
             },
           ],
@@ -311,9 +308,7 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
             {
               "replace": true,
               "state": {
-                "bridgeState": null,
                 "stayOnHomePage": true,
-                "token": null,
               },
             },
           ],
@@ -619,23 +614,14 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
         accountAddress: expect.any(String),
         location: 'Main View',
         tokenSecurityTypeDestination: null,
-        migrationPhase: BRIDGE_QUOTE_RESPONSE_MIGRATION_PHASE,
         activeAbTests: undefined,
         inputPrimaryDenomination: 'fiat_value',
-        quotesReceivedContext: expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/naming-convention -- analytics property
-          custom_slippage: false,
-          // eslint-disable-next-line @typescript-eslint/naming-convention -- analytics property
-          slippage_limit: 0,
-        }),
       });
       expect(submitTxSpy).not.toHaveBeenCalled();
       expect(mockUseNavigate).toHaveBeenCalledWith(DEFAULT_ROUTE, {
         replace: true,
         state: {
-          bridgeState: null,
           stayOnHomePage: true,
-          token: null,
         },
       });
       expect(resetBridgeStoreSpy).not.toHaveBeenCalled();
@@ -777,8 +763,6 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
       expect(mockUseNavigate).toHaveBeenCalledWith(DEFAULT_ROUTE, {
         replace: true,
         state: {
-          bridgeState: null,
-          token: null,
           stayOnHomePage: true,
         },
       });

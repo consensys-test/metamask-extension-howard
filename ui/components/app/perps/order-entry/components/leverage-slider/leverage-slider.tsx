@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Text,
@@ -41,12 +41,10 @@ export const LeverageSlider = ({
   const t = useI18nContext();
   const { track } = usePerpsEventTracking();
   const [inputValue, setInputValue] = useState<string>(String(leverage));
-  const [prevLeverage, setPrevLeverage] = useState(leverage);
 
-  if (leverage !== prevLeverage) {
-    setPrevLeverage(leverage);
+  useEffect(() => {
     setInputValue(String(leverage));
-  }
+  }, [leverage]);
 
   const handleSliderChange = useCallback(
     (_event: Event | React.SyntheticEvent, value: number | number[]) => {

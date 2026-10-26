@@ -30,23 +30,11 @@ import {
   onboardingMetricsFlow,
   skipPasskeySetup,
 } from '../../page-objects/flows/onboarding.flow';
-import LoginPage from '../../page-objects/pages/onboarding/login-page';
+import LoginPage from '../../page-objects/pages/login-page';
 import { lockAndWaitForPasskeyUnlockPage } from '../../page-objects/flows/login.flow';
-import DeepLink from '../../page-objects/pages/security/deep-link-page';
-import { getMockAssetsPrice } from '../tokens/utils/mocks';
+import DeepLink from '../../page-objects/pages/deep-link-page';
 
 const IMPORTED_SRP_ACCOUNT_1 = '0x0Cc5261AB8cE458dc977078A3623E2BaDD27afD3';
-
-const MOCK_ETH_PRICE = 1700;
-
-const NATIVE_ASSETS_INFO = {
-  'eip155:1/slip44:60': {
-    type: 'native' as const,
-    decimals: 18,
-    symbol: 'ETH',
-    name: 'Ethereum',
-  },
-};
 
 async function mockSpotPrices(mockServer: Mockttp) {
   return await mockServer
@@ -56,7 +44,7 @@ async function mockSpotPrices(mockServer: Mockttp) {
       json: {
         'eip155:1/slip44:60': {
           id: 'ethereum',
-          price: MOCK_ETH_PRICE,
+          price: 1700,
           marketCap: 382623505141,
           pricePercentChange1d: 0,
         },
@@ -69,19 +57,8 @@ async function mockCustomNetworkOnboarding(mockServer: Mockttp) {
     .forGet(/https:\/\/accounts\.api\.cx\.metamask\.io\/v2\/supportedNetworks/u)
     .always()
     .thenJson(200, {
-      fullSupport: [
-        'eip155:1',
-        'eip155:137',
-        'eip155:56',
-        'eip155:59144',
-        'eip155:8453',
-        'eip155:10',
-        'eip155:42161',
-        'eip155:534352',
-        'eip155:1337',
-        'eip155:1338',
-      ],
-      partialSupport: ['eip155:42220', 'eip155:43114'],
+      fullSupport: [1, 137, 56, 59144, 8453, 10, 42161, 534352, 1337, 1338],
+      partialSupport: { balances: [42220, 43114] },
     });
 
   await mockServer
@@ -103,9 +80,7 @@ describe('MetaMask onboarding', function () {
   it("Creates a new wallet, sets up a secure password, and doesn't complete the onboarding process and refreshes the page", async function () {
     await withFixtures(
       {
-        fixtures: new FixtureBuilderV2({ onboarding: true })
-          .withAssetsController({ assetsInfo: NATIVE_ASSETS_INFO })
-          .build(),
+        fixtures: new FixtureBuilderV2({ onboarding: true }).build(),
         title: this.test?.fullTitle(),
       },
       async ({ driver }: { driver: Driver }) => {
@@ -188,18 +163,6 @@ describe('MetaMask onboarding', function () {
             eip155: {
               '0x1': true,
             },
-          })
-          .withCurrencyController({
-            currencyRates: {
-              ETH: {
-                conversionDate: Date.now(),
-                conversionRate: MOCK_ETH_PRICE,
-                usdConversionRate: MOCK_ETH_PRICE,
-              },
-            },
-          })
-          .withAssetsController({
-            assetsPrice: getMockAssetsPrice(MOCK_ETH_PRICE),
           })
           .build(),
         testSpecificMock: mockSpotPrices,
@@ -418,7 +381,7 @@ describe('MetaMask onboarding', function () {
             seedPhraseBackedUp: null,
             hasSeenOnboardingCompletionPage: false,
           })
-          .withAnalyticsController({
+          .withMetaMetricsController({
             consentDecisionMade: false,
             optedIn: false,
             analyticsId: null,

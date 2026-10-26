@@ -3,9 +3,6 @@ import {
   type AnalyticsControllerMessenger,
   type AnalyticsControllerState,
 } from '@metamask/analytics-controller';
-import { registerABTestAnalyticsMapping } from '../../../shared/lib/ab-testing/ab-test-analytics';
-import { CHAIN_VALUE_ORDER_AB_TEST_ANALYTICS_MAPPING } from '../../../shared/lib/ab-testing/configs/chain-value-order';
-import { PERPS_TAB_BADGE_AB_TEST_ANALYTICS_MAPPING } from '../../../shared/lib/ab-testing/configs/perps-tab-badge';
 import { generateMetaMetricsId } from '../../../shared/lib/generate-metametrics-id';
 import {
   configureAnalytics,
@@ -27,14 +24,13 @@ import { MessengerClientInitFunction } from './types';
  * @param request.persistedState - The persisted state to use for the
  * controller.
  * @param request.initMessenger
- * @param request.extension - The webextension polyfill instance.
  * @returns The initialized controller.
  */
 export const AnalyticsControllerInit: MessengerClientInitFunction<
   AnalyticsController,
   AnalyticsControllerMessenger,
   AnalyticsControllerInitMessenger
-> = ({ controllerMessenger, initMessenger, persistedState, extension }) => {
+> = ({ controllerMessenger, initMessenger, persistedState }) => {
   const persisted = {
     ...persistedState.AnalyticsController,
   };
@@ -63,15 +59,11 @@ export const AnalyticsControllerInit: MessengerClientInitFunction<
     isEventQueuePersistenceEnabled: true,
     isPreConsentQueueEnabled: true,
     isGeolocationEnabled: true,
-    isEventFragmentsEnabled: true,
   });
-  registerABTestAnalyticsMapping(CHAIN_VALUE_ORDER_AB_TEST_ANALYTICS_MAPPING);
-  registerABTestAnalyticsMapping(PERPS_TAB_BADGE_AB_TEST_ANALYTICS_MAPPING);
   controller.init();
 
   configureAnalytics({
     messenger: initMessenger,
-    extension,
   });
 
   return { messengerClient: controller };

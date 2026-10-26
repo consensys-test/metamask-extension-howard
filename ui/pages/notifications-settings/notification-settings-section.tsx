@@ -31,19 +31,22 @@ import { NotificationsSettingsPerAccount } from './notifications-settings-per-ac
 import type { NotificationWalletGroup } from './notifications-settings-helpers';
 import type { NotificationsSettingsSectionConfig } from './notifications-settings-types';
 
+type WalletActivityAccount =
+  NotificationPreferences['walletActivity']['accounts'][number];
 type SectionType = NotificationsSettingsSectionConfig['type'];
 
 type AccountSettingsProps = {
   data?: Record<string, boolean>;
   initialLoading: boolean;
-  error: string | null;
   accountsBeingUpdated: string[];
   update: (addresses: string[]) => Promise<void>;
 };
 
 type SectionContentProps = {
+  preferences: NotificationPreferences;
   notificationAccountGroups: NotificationWalletGroup[];
   accountSettingsProps: AccountSettingsProps;
+  refetchNotificationPreferences: () => Promise<unknown>;
 };
 
 type NotificationSettingsSectionProps = {
@@ -56,7 +59,20 @@ type NotificationSettingsSectionProps = {
     key: NotificationPreferenceChannelKey,
     value: boolean,
   ) => Promise<void>;
+  refetchNotificationPreferences: () => Promise<unknown>;
 };
+
+const getWalletActivityAccountsByAddress = (
+  preferences: NotificationPreferences,
+): Map<string, WalletActivityAccount> =>
+  new Map(
+    preferences.walletActivity.accounts.map(
+      (account: WalletActivityAccount) => [
+        account.address.toLowerCase(),
+        account,
+      ],
+    ),
+  );
 
 const SETTINGS_TYPE_BY_SECTION: Record<SectionType, string> = {
   walletActivity: 'wallet_activity',
@@ -71,8 +87,10 @@ type PendingAccountToggle = {
 };
 
 const WalletActivitySectionContent = ({
+  preferences,
   notificationAccountGroups,
   accountSettingsProps,
+  refetchNotificationPreferences,
 }: SectionContentProps) => {
   const t = useI18nContext();
   const { listNotifications } = useMetamaskNotificationsContext();
@@ -86,15 +104,10 @@ const WalletActivitySectionContent = ({
   const accountToggleGenerationRef = useRef<Record<string, number>>({});
   const accountToggleWriteChainRef = useRef<Promise<void>>(Promise.resolve());
 
-  // Account settings live in the Trigger API, which reports an unreadable
-  // config as a failure rather than "every account disabled". Surface that
-  // failure instead of showing switches in the wrong position — but only when
-  // there is no earlier successful read to fall back on.
-  const hasAccountSettings =
-    Object.keys(accountSettingsProps.data ?? {}).length > 0;
-  const accountSettingsError = hasAccountSettings
-    ? null
-    : accountSettingsProps.error;
+  const walletAccountsByAddress = useMemo(
+    () => getWalletActivityAccountsByAddress(preferences),
+    [preferences],
+  );
 
   const accountAddresses = useMemo(
     () =>
@@ -110,9 +123,14 @@ const WalletActivitySectionContent = ({
 
   const isAccountEnabled = useCallback(
     (address: string) => {
-      return accountSettingsProps.data?.[address.toLowerCase()] ?? false;
+      const lowerAddress = address.toLowerCase();
+      return (
+        accountSettingsProps.data?.[lowerAddress] ??
+        walletAccountsByAddress.get(lowerAddress)?.enabled ??
+        false
+      );
     },
-    [accountSettingsProps.data],
+    [accountSettingsProps.data, walletAccountsByAddress],
   );
 
   const getAccountEnabledValue = useCallback(
@@ -164,6 +182,7 @@ const WalletActivitySectionContent = ({
         return;
       }
       await refetchAccountSettings();
+      await refetchNotificationPreferences();
       trackWalletActivityAccountsAggregateToggle(newState);
       listNotifications();
     } finally {
@@ -174,6 +193,7 @@ const WalletActivitySectionContent = ({
     hasEnabledAccount,
     listNotifications,
     refetchAccountSettings,
+    refetchNotificationPreferences,
     setUpdatingAllAccounts,
     switchAccountNotifications,
     trackWalletActivityAccountsAggregateToggle,
@@ -211,6 +231,7 @@ const WalletActivitySectionContent = ({
         try {
           await switchAccountNotifications([address], nextValue);
           await refetchAccountSettings();
+          await refetchNotificationPreferences();
           listNotifications();
           if (aggregateTransition !== null) {
             trackWalletActivityAccountsAggregateToggle(aggregateTransition);
@@ -240,6 +261,7 @@ const WalletActivitySectionContent = ({
       getAccountEnabledValue,
       listNotifications,
       refetchAccountSettings,
+      refetchNotificationPreferences,
       switchAccountNotifications,
       trackWalletActivityAccountsAggregateToggle,
     ],
@@ -250,113 +272,109 @@ const WalletActivitySectionContent = ({
   }
 
   const shouldDisableAccountSwitches =
-    accountSettingsProps.initialLoading ||
-    updatingAllAccounts ||
-    Boolean(accountSettingsError);
+    accountSettingsProps.initialLoading || updatingAllAccounts;
   const shouldDisableToggleAllAccounts =
     shouldDisableAccountSwitches ||
     accountSettingsProps.accountsBeingUpdated.length > 0 ||
     Object.keys(pendingAccountToggles).length > 0;
 
   return (
-    <Box
-      flexDirection={BoxFlexDirection.Column}
-      alignItems={BoxAlignItems.Stretch}
-      gap={4}
-      data-testid="notifications-settings-per-account"
-    >
-      <Box flexDirection={BoxFlexDirection.Column} gap={1}>
-        <Box
-          flexDirection={BoxFlexDirection.Row}
-          justifyContent={BoxJustifyContent.Between}
-          alignItems={BoxAlignItems.Stretch}
-          gap={4}
-        >
-          <Text
-            variant={TextVariant.BodyMd}
-            fontWeight={FontWeight.Medium}
-            color={TextColor.TextDefault}
-          >
-            {t('notificationsSettingsSelectAccounts')}
-          </Text>
-          <button
-            className="border-0 bg-transparent p-0 text-primary-default cursor-pointer"
-            data-testid="notifications-settings-toggle-all-accounts"
-            disabled={shouldDisableToggleAllAccounts}
-            onClick={toggleAllAccounts}
-          >
-            <Text
-              variant={TextVariant.BodyMd}
-              fontWeight={FontWeight.Medium}
-              color={TextColor.PrimaryDefault}
-            >
-              {hasEnabledAccount
-                ? t('notificationsSettingsDeselectAll')
-                : t('selectAll')}
-            </Text>
-          </button>
-        </Box>
-        <Text
-          variant={TextVariant.BodyMd}
-          fontWeight={FontWeight.Regular}
-          color={TextColor.TextAlternative}
-        >
-          {t('notificationsSettingsSelectAccountsDescription')}
-        </Text>
-        {accountSettingsError ? (
-          <Text color={TextColor.ErrorDefault} variant={TextVariant.BodySm}>
-            {t('notificationsSettingsAccountsLoadError')}
-          </Text>
-        ) : null}
-      </Box>
-      {accountToggleError && (
-        <Text color={TextColor.ErrorDefault}>
-          {t('notificationsSettingsBoxError')}
-        </Text>
-      )}
+    <>
+      <Box className="w-full h-px border-t border-muted" />
       <Box
         flexDirection={BoxFlexDirection.Column}
         alignItems={BoxAlignItems.Stretch}
         gap={4}
+        data-testid="notifications-settings-per-account"
       >
-        {notificationAccountGroups.map((walletGroup) => (
+        <Box flexDirection={BoxFlexDirection.Column} gap={1}>
           <Box
-            key={walletGroup.walletId}
-            flexDirection={BoxFlexDirection.Column}
+            flexDirection={BoxFlexDirection.Row}
+            justifyContent={BoxJustifyContent.Between}
             alignItems={BoxAlignItems.Stretch}
-            gap={2}
+            gap={4}
           >
             <Text
               variant={TextVariant.BodyMd}
               fontWeight={FontWeight.Medium}
-              color={TextColor.TextAlternative}
+              color={TextColor.TextDefault}
             >
-              {walletGroup.walletName}
+              {t('notificationsSettingsSelectAccounts')}
             </Text>
-            {walletGroup.accounts.map((account) => (
-              <NotificationsSettingsPerAccount
-                key={account.id}
-                address={account.address}
-                name={account.name}
-                disabledSwitch={shouldDisableAccountSwitches}
-                isLoading={
-                  Boolean(
-                    pendingAccountToggles[account.address.toLowerCase()],
-                  ) ||
-                  accountSettingsProps.accountsBeingUpdated.includes(
-                    account.address,
-                  )
-                }
-                isEnabled={getAccountEnabledValue(account.address)}
-                onToggle={(nextValue: boolean) =>
-                  handleToggleAccountNotifications(account.address, nextValue)
-                }
-              />
-            ))}
+            <button
+              className="border-0 bg-transparent p-0 text-primary-default cursor-pointer"
+              data-testid="notifications-settings-toggle-all-accounts"
+              disabled={shouldDisableToggleAllAccounts}
+              onClick={toggleAllAccounts}
+            >
+              <Text
+                variant={TextVariant.BodyMd}
+                fontWeight={FontWeight.Medium}
+                color={TextColor.PrimaryDefault}
+              >
+                {hasEnabledAccount
+                  ? t('notificationsSettingsDeselectAll')
+                  : t('selectAll')}
+              </Text>
+            </button>
           </Box>
-        ))}
+          <Text
+            variant={TextVariant.BodyMd}
+            fontWeight={FontWeight.Regular}
+            color={TextColor.TextAlternative}
+          >
+            {t('notificationsSettingsSelectAccountsDescription')}
+          </Text>
+        </Box>
+        {accountToggleError && (
+          <Text color={TextColor.ErrorDefault}>
+            {t('notificationsSettingsBoxError')}
+          </Text>
+        )}
+        <Box
+          flexDirection={BoxFlexDirection.Column}
+          alignItems={BoxAlignItems.Stretch}
+          gap={4}
+        >
+          {notificationAccountGroups.map((walletGroup) => (
+            <Box
+              key={walletGroup.walletId}
+              flexDirection={BoxFlexDirection.Column}
+              alignItems={BoxAlignItems.Stretch}
+              gap={2}
+            >
+              <Text
+                variant={TextVariant.BodyMd}
+                fontWeight={FontWeight.Medium}
+                color={TextColor.TextAlternative}
+              >
+                {walletGroup.walletName}
+              </Text>
+              {walletGroup.accounts.map((account) => (
+                <NotificationsSettingsPerAccount
+                  key={account.id}
+                  address={account.address}
+                  name={account.name}
+                  disabledSwitch={shouldDisableAccountSwitches}
+                  isLoading={
+                    Boolean(
+                      pendingAccountToggles[account.address.toLowerCase()],
+                    ) ||
+                    accountSettingsProps.accountsBeingUpdated.includes(
+                      account.address,
+                    )
+                  }
+                  isEnabled={getAccountEnabledValue(account.address)}
+                  onToggle={(nextValue: boolean) =>
+                    handleToggleAccountNotifications(account.address, nextValue)
+                  }
+                />
+              ))}
+            </Box>
+          ))}
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 };
 
@@ -393,6 +411,7 @@ export function NotificationSettingsSection({
   notificationAccountGroups,
   accountSettingsProps,
   updatePreference,
+  refetchNotificationPreferences,
 }: NotificationSettingsSectionProps) {
   const t = useI18nContext();
   const { listNotifications } = useMetamaskNotificationsContext();
@@ -409,7 +428,6 @@ export function NotificationSettingsSection({
         >)
       : preferences[section.type];
   const SectionContent = SECTION_CONTENT_BY_TYPE[section.type];
-  const showChannelToggles = section.type !== 'walletActivity';
 
   const handleTogglePreference = useCallback(
     async (key: NotificationPreferenceChannelKey) => {
@@ -461,39 +479,39 @@ export function NotificationSettingsSection({
       gap={6}
       data-testid={`notifications-settings-section-content-${section.type}`}
     >
-      {showChannelToggles ? (
-        <Box
-          flexDirection={BoxFlexDirection.Column}
-          alignItems={BoxAlignItems.Stretch}
-          gap={4}
+      <Box
+        flexDirection={BoxFlexDirection.Column}
+        alignItems={BoxAlignItems.Stretch}
+        gap={4}
+      >
+        <NotificationsSettingsBox
+          value={sectionPreferences.pushNotificationsEnabled}
+          onToggle={() => handleTogglePreference('pushNotificationsEnabled')}
+          error={preferenceError}
+          dataTestId={`${section.type}-push-notifications`}
         >
-          <NotificationsSettingsBox
-            value={sectionPreferences.pushNotificationsEnabled}
-            onToggle={() => handleTogglePreference('pushNotificationsEnabled')}
-            error={preferenceError}
-            dataTestId={`${section.type}-push-notifications`}
-          >
-            <NotificationsSettingsType
-              title={t('notificationsSettingsPushNotifications')}
-            />
-          </NotificationsSettingsBox>
-          <NotificationsSettingsBox
-            value={sectionPreferences.inAppNotificationsEnabled}
-            onToggle={() => handleTogglePreference('inAppNotificationsEnabled')}
-            error={preferenceError}
-            dataTestId={`${section.type}-in-app-notifications`}
-          >
-            <NotificationsSettingsType
-              title={t('notificationsSettingsInAppNotifications')}
-            />
-          </NotificationsSettingsBox>
-        </Box>
-      ) : null}
+          <NotificationsSettingsType
+            title={t('notificationsSettingsPushNotifications')}
+          />
+        </NotificationsSettingsBox>
+        <NotificationsSettingsBox
+          value={sectionPreferences.inAppNotificationsEnabled}
+          onToggle={() => handleTogglePreference('inAppNotificationsEnabled')}
+          error={preferenceError}
+          dataTestId={`${section.type}-in-app-notifications`}
+        >
+          <NotificationsSettingsType
+            title={t('notificationsSettingsInAppNotifications')}
+          />
+        </NotificationsSettingsBox>
+      </Box>
 
       {SectionContent && (
         <SectionContent
+          preferences={preferences}
           notificationAccountGroups={notificationAccountGroups}
           accountSettingsProps={accountSettingsProps}
+          refetchNotificationPreferences={refetchNotificationPreferences}
         />
       )}
     </Box>

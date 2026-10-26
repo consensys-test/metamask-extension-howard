@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  TransactionType,
-  type TransactionMeta,
-} from '@metamask/transaction-controller';
-import {
-  TransactionPayStrategy,
-  type TransactionPayTotals,
-} from '@metamask/transaction-pay-controller';
+import type { TransactionMeta } from '@metamask/transaction-controller';
 import configureMockStore from 'redux-mock-store';
 import { genUnapprovedContractInteractionConfirmation } from '../../../../../../test/data/confirmations/contract-interaction';
 import { getMockConfirmStateForTransaction } from '../../../../../../test/data/confirmations/helper';
@@ -15,14 +8,9 @@ import { enLocale as messages } from '../../../../../../test/lib/i18n-helpers';
 import * as useTransactionCustomAmountModule from '../../../hooks/transactions/useTransactionCustomAmount';
 import * as useTransactionCustomAmountAlertsModule from '../../../hooks/transactions/useTransactionCustomAmountAlerts';
 import * as useAutomaticTransactionPayTokenModule from '../../../hooks/pay/useAutomaticTransactionPayToken';
-import * as useIsMoneyAccountFlagDefaultModule from '../../../hooks/pay/useIsMoneyAccountFlagDefault';
 import * as useTransactionPayMetricsModule from '../../../hooks/pay/useTransactionPayMetrics';
 import * as useTransactionPayAvailableTokensModule from '../../../hooks/pay/useTransactionPayAvailableTokens';
 import * as useTransactionPayDataModule from '../../../hooks/pay/useTransactionPayData';
-import * as useTransactionPayTokenModule from '../../../hooks/pay/useTransactionPayToken';
-import * as useTransactionPayWithdrawModule from '../../../hooks/pay/useTransactionPayWithdraw';
-import * as usePayWithNoFeeTokenModule from '../../../hooks/pay/usePayWithNoFeeToken';
-import * as useAccountNoFundsAlertModule from '../../../hooks/alerts/transactions/useAccountNoFundsAlert';
 import {
   CustomAmountInfo,
   CustomAmountInfoSkeleton,
@@ -31,36 +19,21 @@ import {
 jest.mock('../../../hooks/transactions/useTransactionCustomAmount');
 jest.mock('../../../hooks/transactions/useTransactionCustomAmountAlerts');
 jest.mock('../../../hooks/pay/useAutomaticTransactionPayToken');
-jest.mock('../../../hooks/pay/useDefaultPaySelectedSection');
-jest.mock('../../../hooks/pay/useIsMoneyAccountFlagDefault');
-jest.mock('../../../hooks/pay/useTransactionPayPostQuote');
-jest.mock('../../../hooks/pay/useTransactionPayWithdraw');
 jest.mock('../../../hooks/pay/useTransactionPayMetrics');
 jest.mock('../../../hooks/pay/useTransactionPayAvailableTokens');
 jest.mock('../../../hooks/pay/useTransactionPayData');
-jest.mock('../../../hooks/pay/useTransactionPayToken');
-jest.mock('../../../hooks/pay/usePayWithNoFeeToken');
-jest.mock('../../../hooks/alerts/transactions/useAccountNoFundsAlert');
 jest.mock('../../transactions/custom-amount/custom-amount', () => ({
   CustomAmount: ({
     amountFiat,
     disabled,
-    isLoading,
   }: {
     amountFiat: string;
     disabled?: boolean;
-    isLoading?: boolean;
-  }) =>
-    isLoading ? (
-      <div data-testid="custom-amount-skeleton" />
-    ) : (
-      <div
-        data-testid="custom-amount"
-        data-disabled={String(Boolean(disabled))}
-      >
-        {amountFiat}
-      </div>
-    ),
+  }) => (
+    <div data-testid="custom-amount" data-disabled={String(Boolean(disabled))}>
+      {amountFiat}
+    </div>
+  ),
   CustomAmountSkeleton: () => <div data-testid="custom-amount-skeleton" />,
 }));
 jest.mock('../../pay-token-amount/pay-token-amount', () => ({
@@ -73,9 +46,6 @@ jest.mock('../../rows/pay-with-row/pay-with-row', () => ({
   PayWithRow: () => <div data-testid="pay-with-row" />,
   PayWithRowSkeleton: () => <div data-testid="pay-with-row-skeleton" />,
 }));
-jest.mock('../../rows/perps-account-picker-row', () => ({
-  PerpsAccountPickerRow: () => <div data-testid="perps-account-picker-row" />,
-}));
 jest.mock('../../rows/bridge-fee-row/bridge-fee-row', () => ({
   BridgeFeeRow: () => <div data-testid="bridge-fee-row" />,
 }));
@@ -85,37 +55,17 @@ jest.mock('../../rows/bridge-time-row/bridge-time-row', () => ({
 jest.mock('../../rows/total-row/total-row', () => ({
   TotalRow: () => <div data-testid="total-row" />,
 }));
-// `ReceiveRow` is intentionally left unmocked: it renders either
-// `receive-row-skeleton` or `receive-row` depending on quote-pending state, and
-// the Perps Withdraw cases below assert on that distinction.
 
 const MOCK_TRANSACTION_META =
   genUnapprovedContractInteractionConfirmation() as TransactionMeta;
-
-// Withdraws are batches, so the money-account type sits on a nested transaction.
-const MOCK_MONEY_ACCOUNT_WITHDRAW_TRANSACTION_META = {
-  ...MOCK_TRANSACTION_META,
-  type: TransactionType.batch,
-  nestedTransactions: [
-    { type: TransactionType.moneyAccountWithdraw },
-    { type: TransactionType.tokenMethodTransfer },
-  ],
-} as TransactionMeta;
-
 const mockStore = configureMockStore([]);
 
 const DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN = {
   amountFiat: '100',
   amountHuman: '50',
   amountHumanDebounced: '50',
-  hasAmount: true,
   hasInput: false,
-  isDepositPrefillEnabled: false,
-  isDepositPrefillLoading: false,
-  isDepositPrefilled: false,
-  isDepositPrefillSkipped: false,
   isInputChanged: false,
-  isQuoteDerivedAmountLoading: false,
   updatePendingAmount: jest.fn(),
   updatePendingAmountPercentage: jest.fn(),
 };
@@ -132,14 +82,11 @@ const MOCK_AVAILABLE_TOKEN = {
 };
 
 const DEFAULT_ALERTS_HOOK_RETURN: {
-  alertContent?: React.ReactNode;
   alertMessage?: string;
-  hasAlert: boolean;
   hideResults: boolean;
   disableUpdate: boolean;
 } = {
   alertMessage: undefined,
-  hasAlert: false,
   hideResults: false,
   disableUpdate: false,
 };
@@ -152,54 +99,30 @@ const MOCK_PRIMARY_REQUIRED_TOKEN = {
 
 function render(
   options: {
-    amountDetails?: (amountFiat: string) => React.ReactNode;
     disableAutomaticToken?: boolean;
     disablePay?: boolean;
-    disablePercentageButtons?: boolean;
-    displayPercentageButtons?: boolean;
     hidePayTokenAmount?: boolean;
     availableTokens?: (typeof MOCK_AVAILABLE_TOKEN)[];
-    accountNoFundsAlert?: { key: string }[];
     customAmountHookReturn?: typeof DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN;
     alertsHookReturn?: typeof DEFAULT_ALERTS_HOOK_RETURN;
-    transactionMeta?: TransactionMeta;
     isQuotesLoading?: boolean;
-    isPostQuote?: boolean;
     hasQuotes?: boolean;
-    hasPositiveRequiredAmount?: boolean;
-    isNativePayToken?: boolean;
-    isNoFeePayToken?: boolean;
-    totals?: TransactionPayTotals;
     sourceAmounts?: { targetTokenAddress: string }[];
     requiredTokens?: { address: string; skipIfBalance: boolean }[];
     primaryRequiredToken?: typeof MOCK_PRIMARY_REQUIRED_TOKEN | undefined;
-    withdraw?: { isWithdraw: boolean; canSelectWithdrawToken: boolean };
-    isDefaultMoneyAccount?: boolean;
   } = {},
 ) {
   const {
-    amountDetails,
     disableAutomaticToken,
     disablePay = false,
-    disablePercentageButtons,
-    displayPercentageButtons = false,
     hidePayTokenAmount = false,
     availableTokens = [MOCK_AVAILABLE_TOKEN],
-    accountNoFundsAlert = [],
     customAmountHookReturn = DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
     alertsHookReturn = DEFAULT_ALERTS_HOOK_RETURN,
-    transactionMeta = MOCK_TRANSACTION_META,
     isQuotesLoading = false,
-    isPostQuote = false,
     hasQuotes = false,
-    hasPositiveRequiredAmount = true,
-    isNativePayToken = false,
-    isNoFeePayToken = false,
-    totals,
     sourceAmounts = [],
     requiredTokens = [],
-    withdraw = { isWithdraw: false, canSelectWithdrawToken: false },
-    isDefaultMoneyAccount = false,
   } = options;
   const primaryRequiredToken = Object.prototype.hasOwnProperty.call(
     options,
@@ -221,9 +144,6 @@ function render(
     )
     .mockReturnValue(undefined);
   jest
-    .mocked(useIsMoneyAccountFlagDefaultModule.useIsMoneyAccountFlagDefault)
-    .mockReturnValue(isDefaultMoneyAccount);
-  jest
     .mocked(useTransactionPayMetricsModule.useTransactionPayMetrics)
     .mockReturnValue(undefined);
   jest
@@ -236,41 +156,11 @@ function render(
       >,
     );
   jest
-    .mocked(useAccountNoFundsAlertModule.useAccountNoFundsAlert)
-    .mockReturnValue(accountNoFundsAlert as never);
-  jest
     .mocked(useTransactionPayDataModule.useTransactionPayQuotes)
-    .mockReturnValue(
-      hasQuotes
-        ? [{ strategy: TransactionPayStrategy.Relay } as never]
-        : undefined,
-    );
+    .mockReturnValue(hasQuotes ? [{} as never] : undefined);
   jest
-    .mocked(useTransactionPayDataModule.useTransactionPayTotals)
-    .mockReturnValue(totals);
-  const isMoneyAccountWithdraw = Boolean(
-    transactionMeta.nestedTransactions?.some(
-      (nested) => nested.type === TransactionType.moneyAccountWithdraw,
-    ),
-  );
-  let isQuotePending = isQuotesLoading;
-  if (transactionMeta.type === TransactionType.perpsWithdraw) {
-    isQuotePending =
-      hasPositiveRequiredAmount && (isQuotesLoading || !isPostQuote);
-  } else if (isMoneyAccountWithdraw) {
-    isQuotePending = isQuotesLoading || !primaryRequiredToken;
-  }
-  jest
-    .mocked(useTransactionPayDataModule.useIsTransactionPayQuotePending)
-    .mockReturnValue(isQuotePending);
-  jest
-    .mocked(useTransactionPayDataModule.useTransactionPayHasExecutableQuote)
-    .mockReturnValue(hasQuotes);
-  jest
-    .mocked(
-      useTransactionPayDataModule.useTransactionPayHasPositiveRequiredAmount,
-    )
-    .mockReturnValue(hasPositiveRequiredAmount);
+    .mocked(useTransactionPayDataModule.useIsTransactionPayLoading)
+    .mockReturnValue(isQuotesLoading);
   jest
     .mocked(useTransactionPayDataModule.useTransactionPayRequiredTokens)
     .mockReturnValue(
@@ -292,30 +182,13 @@ function render(
         typeof useTransactionPayDataModule.useTransactionPayPrimaryRequiredToken
       >,
     );
-  jest
-    .mocked(useTransactionPayTokenModule.useTransactionPayToken)
-    .mockReturnValue({
-      isNative: isNativePayToken,
-      payToken: MOCK_AVAILABLE_TOKEN as never,
-      setPayToken: jest.fn(),
-    });
-  jest.mocked(usePayWithNoFeeTokenModule.usePayWithNoFeeToken).mockReturnValue({
-    isNoFeeToken: () => isNoFeePayToken,
-    renderNoFeeTag: () => null,
-  });
-  jest
-    .mocked(useTransactionPayWithdrawModule.useTransactionPayWithdraw)
-    .mockReturnValue(withdraw);
 
-  const state = getMockConfirmStateForTransaction(transactionMeta);
+  const state = getMockConfirmStateForTransaction(MOCK_TRANSACTION_META);
 
   return renderWithConfirmContextProvider(
     <CustomAmountInfo
-      amountDetails={amountDetails}
       disableAutomaticToken={disableAutomaticToken}
       disablePay={disablePay}
-      disablePercentageButtons={disablePercentageButtons}
-      displayPercentageButtons={displayPercentageButtons}
       hidePayTokenAmount={hidePayTokenAmount}
     />,
     mockStore(state),
@@ -330,128 +203,6 @@ describe('CustomAmountInfo', () => {
   it('renders custom amount component', () => {
     const { getByTestId } = render();
     expect(getByTestId('custom-amount')).toBeInTheDocument();
-  });
-
-  it('shows amount skeleton while deposit prefill is loading', () => {
-    const { getByTestId, queryByTestId } = render({
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        amountFiat: '0',
-        isDepositPrefillEnabled: true,
-        isDepositPrefillLoading: true,
-        isDepositPrefilled: false,
-      },
-    });
-
-    expect(getByTestId('custom-amount-skeleton')).toBeInTheDocument();
-    expect(queryByTestId('custom-amount')).not.toBeInTheDocument();
-  });
-
-  it('shows $0 instead of the amount skeleton when deposit prefill is skipped', () => {
-    // A money-account deposit with no funded pay token can never commit a
-    // prefill, so the field must settle at $0 with a usable keypad rather than
-    // sitting behind the skeleton forever.
-    const { getByTestId, queryByTestId } = render({
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        amountFiat: '0',
-        isDepositPrefillEnabled: true,
-        isDepositPrefillLoading: false,
-        isDepositPrefilled: false,
-        isDepositPrefillSkipped: true,
-      },
-    });
-
-    expect(getByTestId('custom-amount')).toHaveTextContent('0');
-    expect(queryByTestId('custom-amount-skeleton')).not.toBeInTheDocument();
-  });
-
-  it('does not show amount skeleton for deposit prefill loading when account has no funds', () => {
-    const { getByTestId, queryByTestId } = render({
-      accountNoFundsAlert: [{ key: 'accountNoFunds' }],
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        amountFiat: '0',
-        isDepositPrefillEnabled: true,
-        isDepositPrefillLoading: true,
-        isDepositPrefilled: false,
-      },
-    });
-
-    expect(getByTestId('custom-amount')).toBeInTheDocument();
-    expect(queryByTestId('custom-amount-skeleton')).not.toBeInTheDocument();
-  });
-
-  it('withholds the stale amount from alerts while deposit prefill is loading', () => {
-    // `amountFiat` still holds the previously selected token's amount while
-    // prefill recomputes. Passing it on would compare it against the new
-    // token's balance and momentarily show "Insufficient funds".
-    render({
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        amountFiat: '100',
-        isDepositPrefillEnabled: true,
-        isDepositPrefillLoading: true,
-        isDepositPrefilled: false,
-      },
-    });
-
-    expect(
-      useTransactionCustomAmountAlertsModule.useTransactionCustomAmountAlerts,
-    ).toHaveBeenCalledWith({ pendingFiatAmount: undefined });
-  });
-
-  it('passes the amount to alerts once the field has settled', () => {
-    render({
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        amountFiat: '100',
-        isDepositPrefillEnabled: true,
-        isDepositPrefillLoading: false,
-        isDepositPrefilled: true,
-      },
-    });
-
-    expect(
-      useTransactionCustomAmountAlertsModule.useTransactionCustomAmountAlerts,
-    ).toHaveBeenCalledWith({ pendingFiatAmount: '100' });
-  });
-
-  it('keeps the amount visible when deposit prefill is enabled but not loading', () => {
-    const { getByTestId, queryByTestId } = render({
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        amountFiat: '123',
-        isDepositPrefillEnabled: true,
-        isDepositPrefillLoading: false,
-        isDepositPrefilled: false,
-      },
-    });
-
-    expect(getByTestId('custom-amount')).toHaveTextContent('123');
-    expect(queryByTestId('custom-amount-skeleton')).not.toBeInTheDocument();
-  });
-
-  it('shows amount skeleton while the quote the amount comes from is loading', () => {
-    const { getByTestId, queryByTestId } = render({
-      customAmountHookReturn: {
-        ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-        isQuoteDerivedAmountLoading: true,
-      },
-    });
-
-    expect(getByTestId('custom-amount-skeleton')).toBeInTheDocument();
-    expect(queryByTestId('custom-amount')).not.toBeInTheDocument();
-  });
-
-  it('renders amount details under the amount input', () => {
-    const { getByTestId } = render({
-      amountDetails: (amountFiat) => (
-        <div data-testid="amount-details">{amountFiat}</div>
-      ),
-    });
-
-    expect(getByTestId('amount-details')).toHaveTextContent('100');
   });
 
   it('calls useAutomaticTransactionPayToken with disable false when both props unset', () => {
@@ -478,18 +229,6 @@ describe('CustomAmountInfo', () => {
 
   it('calls useAutomaticTransactionPayToken with disable true when disablePay is true', () => {
     render({ disablePay: true });
-    expect(
-      useAutomaticTransactionPayTokenModule.useAutomaticTransactionPayToken,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        disable: true,
-      }),
-    );
-  });
-
-  it('calls useAutomaticTransactionPayToken with disable true when Money Account is the flag default', () => {
-    render({ isDefaultMoneyAccount: true });
-
     expect(
       useAutomaticTransactionPayTokenModule.useAutomaticTransactionPayToken,
     ).toHaveBeenCalledWith(
@@ -548,12 +287,6 @@ describe('CustomAmountInfo', () => {
 
       expect(queryByTestId('pay-with-row')).not.toBeInTheDocument();
     });
-
-    it('renders the perps account picker row', () => {
-      const { getByTestId } = render();
-
-      expect(getByTestId('perps-account-picker-row')).toBeInTheDocument();
-    });
   });
 
   describe('input disabled state', () => {
@@ -590,36 +323,9 @@ describe('CustomAmountInfo', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('does not render the skeleton for a withdraw when no primary required token is resolved', () => {
-      const { getByTestId, queryByTestId } = render({
-        disablePay: false,
-        primaryRequiredToken: undefined,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(getByTestId('custom-amount-info')).toBeInTheDocument();
-      expect(
-        queryByTestId('custom-amount-info-skeleton'),
-      ).not.toBeInTheDocument();
-    });
-
     it('renders the full UI once a primary required token is resolved', () => {
       const { getByTestId, queryByTestId } = render({
         disablePay: false,
-      });
-
-      expect(getByTestId('custom-amount-info')).toBeInTheDocument();
-      expect(
-        queryByTestId('custom-amount-info-skeleton'),
-      ).not.toBeInTheDocument();
-    });
-
-    it('does not render the skeleton for a money-account withdraw without a required token', () => {
-      const { getByTestId, queryByTestId } = render({
-        disablePay: false,
-        primaryRequiredToken: undefined,
-        transactionMeta: MOCK_MONEY_ACCOUNT_WITHDRAW_TRANSACTION_META,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: false },
       });
 
       expect(getByTestId('custom-amount-info')).toBeInTheDocument();
@@ -634,128 +340,18 @@ describe('CustomAmountInfo', () => {
     expect(getByTestId('pay-with-row')).toBeInTheDocument();
   });
 
-  it('keeps the pay with selector mounted when no tokens are available yet', () => {
-    const { getByTestId } = render({ availableTokens: [] });
-    expect(getByTestId('pay-with-row')).toBeInTheDocument();
+  it('does not render any pay with selector when no tokens available', () => {
+    const { queryByTestId } = render({ availableTokens: [] });
+    expect(queryByTestId('pay-with-row')).not.toBeInTheDocument();
   });
 
   describe('percentage buttons', () => {
-    // The shortcuts are opted into by the money-account flows via the
-    // displayPercentageButtons prop.
-    const renderMoneyAccount = (options: Parameters<typeof render>[0] = {}) =>
-      render({
-        ...options,
-        displayPercentageButtons: true,
-      });
-
-    it('is not rendered when displayPercentageButtons is not set', () => {
+    it('does not render percentage buttons', () => {
       const { queryByTestId } = render();
 
       expect(queryByTestId('percentage-buttons')).not.toBeInTheDocument();
-    });
-
-    it('renders 10%, 25%, 50%, and 90% by default', () => {
-      const { getByTestId, queryByTestId } = renderMoneyAccount();
-
-      expect(getByTestId('percentage-buttons')).toBeInTheDocument();
-      expect(getByTestId('percentage-button-10')).toBeInTheDocument();
-      expect(getByTestId('percentage-button-25')).toBeInTheDocument();
-      expect(getByTestId('percentage-button-50')).toBeInTheDocument();
-      expect(getByTestId('percentage-button-90')).toBeInTheDocument();
+      expect(queryByTestId('percentage-button-25')).not.toBeInTheDocument();
       expect(queryByTestId('percentage-button-100')).not.toBeInTheDocument();
-    });
-
-    it('replaces 90% with Max for no-fee (fixed-spread) tokens', () => {
-      const { getByTestId, queryByTestId } = renderMoneyAccount({
-        isNoFeePayToken: true,
-      });
-
-      expect(getByTestId('percentage-button-100')).toHaveTextContent('Max');
-      expect(queryByTestId('percentage-button-90')).not.toBeInTheDocument();
-    });
-
-    it('keeps 90% for tokens that are not no-fee', () => {
-      const { getByTestId, queryByTestId } = renderMoneyAccount({
-        isNoFeePayToken: false,
-      });
-
-      expect(getByTestId('percentage-button-90')).toBeInTheDocument();
-      expect(queryByTestId('percentage-button-100')).not.toBeInTheDocument();
-    });
-
-    it('always shows Max on withdraw, irrespective of the selected token', () => {
-      const { getByTestId, queryByTestId } = renderMoneyAccount({
-        isNoFeePayToken: false,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: false },
-      });
-
-      expect(getByTestId('percentage-button-100')).toHaveTextContent('Max');
-      expect(queryByTestId('percentage-button-90')).not.toBeInTheDocument();
-    });
-
-    it('always shows Max on withdraw when the pay token is native', () => {
-      const { getByTestId, queryByTestId } = renderMoneyAccount({
-        isNoFeePayToken: false,
-        isNativePayToken: true,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: false },
-      });
-
-      expect(getByTestId('percentage-button-100')).toHaveTextContent('Max');
-      expect(queryByTestId('percentage-button-90')).not.toBeInTheDocument();
-    });
-
-    it('keeps 90% when the no-fee token is native', () => {
-      const { getByTestId, queryByTestId } = renderMoneyAccount({
-        isNoFeePayToken: true,
-        isNativePayToken: true,
-      });
-
-      expect(getByTestId('percentage-button-90')).toBeInTheDocument();
-      expect(queryByTestId('percentage-button-100')).not.toBeInTheDocument();
-    });
-
-    it('applies the selected percentage to the amount', () => {
-      const updatePendingAmountPercentage = jest.fn();
-      const { getByTestId } = renderMoneyAccount({
-        customAmountHookReturn: {
-          ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-          updatePendingAmountPercentage,
-        },
-      });
-
-      getByTestId('percentage-button-50').click();
-
-      expect(updatePendingAmountPercentage).toHaveBeenCalledWith(50);
-    });
-
-    it('disables percentage buttons when no tokens are available', () => {
-      const updatePendingAmountPercentage = jest.fn();
-      const { getByTestId } = renderMoneyAccount({
-        availableTokens: [],
-        customAmountHookReturn: {
-          ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-          updatePendingAmountPercentage,
-        },
-      });
-
-      expect(getByTestId('percentage-button-50')).toBeDisabled();
-      getByTestId('percentage-button-50').click();
-      expect(updatePendingAmountPercentage).not.toHaveBeenCalled();
-    });
-
-    it('disables percentage buttons when disablePercentageButtons is true', () => {
-      const updatePendingAmountPercentage = jest.fn();
-      const { getByTestId } = renderMoneyAccount({
-        disablePercentageButtons: true,
-        customAmountHookReturn: {
-          ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-          updatePendingAmountPercentage,
-        },
-      });
-
-      expect(getByTestId('percentage-button-50')).toBeDisabled();
-      getByTestId('percentage-button-50').click();
-      expect(updatePendingAmountPercentage).not.toHaveBeenCalled();
     });
   });
 
@@ -776,38 +372,6 @@ describe('CustomAmountInfo', () => {
       expect(getByTestId('total-row')).toBeInTheDocument();
     });
 
-    it('renders the receive row for input-based totals', () => {
-      const { getByTestId, queryByTestId } = render({
-        hasQuotes: true,
-        totals: {
-          isInputBased: true,
-          targetAmount: { fiat: '95', usd: '95' },
-        } as TransactionPayTotals,
-      });
-
-      expect(getByTestId('receive-row')).toBeInTheDocument();
-      expect(queryByTestId('total-row')).not.toBeInTheDocument();
-    });
-
-    it('keeps the total row for output-based totals', () => {
-      const { getByTestId, queryByTestId } = render({
-        hasQuotes: true,
-        totals: {
-          isInputBased: false,
-        } as TransactionPayTotals,
-      });
-
-      expect(getByTestId('total-row')).toBeInTheDocument();
-      expect(queryByTestId('receive-row')).not.toBeInTheDocument();
-    });
-
-    it('keeps the total row when totals are missing', () => {
-      const { getByTestId, queryByTestId } = render({ hasQuotes: true });
-
-      expect(getByTestId('total-row')).toBeInTheDocument();
-      expect(queryByTestId('receive-row')).not.toBeInTheDocument();
-    });
-
     it('does not render result rows when no quotes and not loading', () => {
       const { queryByTestId } = render({
         hasQuotes: false,
@@ -816,200 +380,12 @@ describe('CustomAmountInfo', () => {
 
       expect(queryByTestId('bridge-fee-row')).not.toBeInTheDocument();
     });
-
-    it('renders the total without a fee row for disablePay withdraws', () => {
-      const { getByTestId, queryByTestId } = render({
-        disablePay: true,
-        hasQuotes: false,
-        isQuotesLoading: false,
-      });
-
-      expect(getByTestId('total-row')).toBeInTheDocument();
-      expect(queryByTestId('bridge-fee-row')).not.toBeInTheDocument();
-    });
-
-    it('does not render result rows before an amount is entered', () => {
-      const { queryByTestId } = render({
-        customAmountHookReturn: {
-          ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-          hasAmount: false,
-        },
-        hasQuotes: true,
-      });
-
-      expect(queryByTestId('bridge-fee-row')).not.toBeInTheDocument();
-      expect(queryByTestId('bridge-time-row')).not.toBeInTheDocument();
-      expect(queryByTestId('total-row')).not.toBeInTheDocument();
-    });
-
-    it('does not render result rows before an amount is entered while quotes load', () => {
-      const { queryByTestId } = render({
-        customAmountHookReturn: {
-          ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-          hasAmount: false,
-        },
-        isQuotesLoading: true,
-      });
-
-      expect(queryByTestId('bridge-fee-row')).not.toBeInTheDocument();
-      expect(queryByTestId('bridge-time-row')).not.toBeInTheDocument();
-      expect(queryByTestId('total-row')).not.toBeInTheDocument();
-    });
-
-    it('does not render Perps Withdraw result rows before an amount is entered even when the required amount is positive', () => {
-      const transactionMeta = {
-        ...genUnapprovedContractInteractionConfirmation(),
-        type: TransactionType.perpsWithdraw,
-      } as TransactionMeta;
-
-      const { queryByTestId } = render({
-        customAmountHookReturn: {
-          ...DEFAULT_CUSTOM_AMOUNT_HOOK_RETURN,
-          hasAmount: false,
-        },
-        transactionMeta,
-        hasPositiveRequiredAmount: true,
-        hasQuotes: true,
-        isPostQuote: true,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(queryByTestId('bridge-fee-row')).not.toBeInTheDocument();
-      expect(queryByTestId('bridge-time-row')).not.toBeInTheDocument();
-      expect(queryByTestId('receive-row')).not.toBeInTheDocument();
-    });
-
-    it('renders Perps Withdraw result rows while post-quote setup is pending', () => {
-      const transactionMeta = {
-        ...genUnapprovedContractInteractionConfirmation(),
-        type: TransactionType.perpsWithdraw,
-      } as TransactionMeta;
-
-      const { queryByTestId } = render({
-        transactionMeta,
-        hasQuotes: true,
-        isPostQuote: false,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(queryByTestId('bridge-fee-row')).toBeInTheDocument();
-      expect(queryByTestId('bridge-time-row')).toBeInTheDocument();
-      expect(queryByTestId('receive-row-skeleton')).toBeInTheDocument();
-      expect(queryByTestId('receive-row')).not.toBeInTheDocument();
-    });
-
-    it('does not render Perps Withdraw result rows before an amount is entered', () => {
-      const transactionMeta = {
-        ...genUnapprovedContractInteractionConfirmation(),
-        type: TransactionType.perpsWithdraw,
-      } as TransactionMeta;
-
-      const { queryByTestId } = render({
-        transactionMeta,
-        hasPositiveRequiredAmount: false,
-        hasQuotes: true,
-        isPostQuote: false,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(queryByTestId('bridge-fee-row')).not.toBeInTheDocument();
-      expect(queryByTestId('bridge-time-row')).not.toBeInTheDocument();
-      expect(queryByTestId('receive-row-skeleton')).not.toBeInTheDocument();
-    });
-
-    it('renders Perps Withdraw result rows when the post-quote route is ready', () => {
-      const transactionMeta = {
-        ...genUnapprovedContractInteractionConfirmation(),
-        type: TransactionType.perpsWithdraw,
-      } as TransactionMeta;
-
-      const { getByTestId } = render({
-        transactionMeta,
-        hasQuotes: true,
-        isPostQuote: true,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(getByTestId('bridge-fee-row')).toBeInTheDocument();
-      expect(getByTestId('bridge-time-row')).toBeInTheDocument();
-      expect(getByTestId('receive-row')).toBeInTheDocument();
-    });
-
-    it('renders the receive row for a withdraw when post-quote is enabled', () => {
-      const { getByTestId, queryByTestId } = render({
-        hasQuotes: true,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(getByTestId('receive-row')).toBeInTheDocument();
-      expect(queryByTestId('total-row')).not.toBeInTheDocument();
-    });
-
-    it('renders the money-account withdraw receive row as a skeleton until the typed amount reaches Pay', () => {
-      const { getByTestId, queryByTestId } = render({
-        hasQuotes: true,
-        primaryRequiredToken: undefined,
-        transactionMeta: MOCK_MONEY_ACCOUNT_WITHDRAW_TRANSACTION_META,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(getByTestId('receive-row-skeleton')).toBeInTheDocument();
-      expect(queryByTestId('receive-row')).not.toBeInTheDocument();
-    });
-
-    it('renders the money-account withdraw receive row once the quoted amount is committed', () => {
-      const { getByTestId, queryByTestId } = render({
-        hasQuotes: true,
-        transactionMeta: MOCK_MONEY_ACCOUNT_WITHDRAW_TRANSACTION_META,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: true },
-      });
-
-      expect(getByTestId('receive-row')).toBeInTheDocument();
-      expect(queryByTestId('receive-row-skeleton')).not.toBeInTheDocument();
-    });
-
-    it('renders the total row for a withdraw when post-quote is disabled', () => {
-      const { getByTestId, queryByTestId } = render({
-        hasQuotes: true,
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: false },
-      });
-
-      expect(getByTestId('total-row')).toBeInTheDocument();
-      expect(queryByTestId('receive-row')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('withdraw amount input', () => {
-    it('keeps the amount input enabled without wallet tokens when post-quote is disabled', () => {
-      const { getByTestId } = render({
-        availableTokens: [],
-        withdraw: { isWithdraw: true, canSelectWithdrawToken: false },
-      });
-
-      expect(getByTestId('custom-amount')).toHaveAttribute(
-        'data-disabled',
-        'false',
-      );
-    });
-
-    it('disables the amount input without wallet tokens for non-withdraw flows', () => {
-      const { getByTestId } = render({
-        availableTokens: [],
-        withdraw: { isWithdraw: false, canSelectWithdrawToken: false },
-      });
-
-      expect(getByTestId('custom-amount')).toHaveAttribute(
-        'data-disabled',
-        'true',
-      );
-    });
   });
 
   it('does not render alert body text when reason and message are the same', () => {
     const { queryByText } = render({
       alertsHookReturn: {
         alertMessage: undefined,
-        hasAlert: true,
         hideResults: true,
         disableUpdate: false,
       },
@@ -1024,7 +400,6 @@ describe('CustomAmountInfo', () => {
     const { getByText } = render({
       alertsHookReturn: {
         alertMessage: messages.alertNoPayTokenQuotesMessage.message,
-        hasAlert: true,
         hideResults: true,
         disableUpdate: false,
       },
@@ -1033,23 +408,6 @@ describe('CustomAmountInfo', () => {
     expect(
       getByText(messages.alertNoPayTokenQuotesMessage.message),
     ).toBeInTheDocument();
-  });
-
-  it('renders alert content instead of body text when provided', () => {
-    const { getByTestId, queryByText } = render({
-      alertsHookReturn: {
-        alertContent: <div data-testid="alert-content" />,
-        alertMessage: messages.alertNoPayTokenQuotesMessage.message,
-        hasAlert: true,
-        hideResults: true,
-        disableUpdate: false,
-      },
-    });
-
-    expect(getByTestId('alert-content')).toBeInTheDocument();
-    expect(
-      queryByText(messages.alertNoPayTokenQuotesMessage.message),
-    ).not.toBeInTheDocument();
   });
 
   describe('overrideCenterContent', () => {
@@ -1078,13 +436,10 @@ describe('CustomAmountInfo', () => {
           typeof useTransactionPayAvailableTokensModule.useTransactionPayAvailableTokens
         >);
       jest
-        .mocked(useAccountNoFundsAlertModule.useAccountNoFundsAlert)
-        .mockReturnValue([]);
-      jest
         .mocked(useTransactionPayDataModule.useTransactionPayQuotes)
         .mockReturnValue([]);
       jest
-        .mocked(useTransactionPayDataModule.useIsTransactionPayQuotePending)
+        .mocked(useTransactionPayDataModule.useIsTransactionPayLoading)
         .mockReturnValue(false);
       jest
         .mocked(useTransactionPayDataModule.useTransactionPayRequiredTokens)
@@ -1099,25 +454,6 @@ describe('CustomAmountInfo', () => {
         .mockReturnValue({ skipIfBalance: false } as ReturnType<
           typeof useTransactionPayDataModule.useTransactionPayPrimaryRequiredToken
         >);
-      jest
-        .mocked(useTransactionPayTokenModule.useTransactionPayToken)
-        .mockReturnValue({
-          isNative: false,
-          payToken: undefined,
-          setPayToken: jest.fn(),
-        });
-      jest
-        .mocked(usePayWithNoFeeTokenModule.usePayWithNoFeeToken)
-        .mockReturnValue({
-          isNoFeeToken: () => false,
-          renderNoFeeTag: () => null,
-        });
-      jest
-        .mocked(useTransactionPayWithdrawModule.useTransactionPayWithdraw)
-        .mockReturnValue({
-          isWithdraw: false,
-          canSelectWithdrawToken: false,
-        });
 
       const state = getMockConfirmStateForTransaction(MOCK_TRANSACTION_META);
 
@@ -1140,7 +476,7 @@ describe('CustomAmountInfo', () => {
 describe('CustomAmountInfoSkeleton', () => {
   it('renders skeleton components', () => {
     const state = getMockConfirmStateForTransaction(MOCK_TRANSACTION_META);
-    const { getByTestId, queryByTestId } = renderWithConfirmContextProvider(
+    const { getByTestId } = renderWithConfirmContextProvider(
       <CustomAmountInfoSkeleton />,
       mockStore(state),
     );
@@ -1148,18 +484,5 @@ describe('CustomAmountInfoSkeleton', () => {
     expect(getByTestId('custom-amount-info-skeleton')).toBeInTheDocument();
     expect(getByTestId('custom-amount-skeleton')).toBeInTheDocument();
     expect(getByTestId('pay-token-amount-skeleton')).toBeInTheDocument();
-    expect(
-      queryByTestId('percentage-buttons-skeleton'),
-    ).not.toBeInTheDocument();
-  });
-
-  it('renders the percentage buttons skeleton when the flow displays them', () => {
-    const state = getMockConfirmStateForTransaction(MOCK_TRANSACTION_META);
-    const { getByTestId } = renderWithConfirmContextProvider(
-      <CustomAmountInfoSkeleton displayPercentageButtons />,
-      mockStore(state),
-    );
-
-    expect(getByTestId('percentage-buttons-skeleton')).toBeInTheDocument();
   });
 });

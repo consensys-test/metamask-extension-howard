@@ -90,34 +90,32 @@ export function checkPendingAbort(
 /**
  * Detects a retry-generation bump and, when it advanced, moves every entry
  * from `seenSet` into `staleSet` and clears `seenSet`. Shared by both tracking
- * strategies so the bump handling stays consistent. Pure with respect to the
- * last-seen generation: the caller owns persisting the returned value.
+ * strategies so the bump handling stays consistent.
  *
  * @param retryGenerationRef - External ref bumped on retry (undefined disables).
- * @param lastSeenGeneration - The last-seen generation value to compare against.
+ * @param lastSeenGenerationRef - Mutable ref tracking the last-seen generation; updated in place.
  * @param seenSet - The currently-seen IDs/batch IDs (mutated: cleared on bump).
  * @param staleSet - The stale IDs/batch IDs (mutated: receives seen entries on bump).
- * @returns The new last-seen generation when a bump was detected and applied,
- * otherwise `null`.
+ * @returns True if a bump was detected and applied.
  */
 export function applyRetryGenerationBump(
   retryGenerationRef: React.RefObject<number | undefined> | undefined,
-  lastSeenGeneration: number,
+  lastSeenGenerationRef: React.MutableRefObject<number>,
   seenSet: Set<string>,
   staleSet: Set<string>,
-): number | null {
+): boolean {
   if (
     !retryGenerationRef ||
-    retryGenerationRef.current === lastSeenGeneration
+    retryGenerationRef.current === lastSeenGenerationRef.current
   ) {
-    return null;
+    return false;
   }
-  const newLastSeenGeneration = retryGenerationRef.current ?? 0;
+  lastSeenGenerationRef.current = retryGenerationRef.current ?? 0;
   for (const id of seenSet) {
     staleSet.add(id);
   }
   seenSet.clear();
-  return newLastSeenGeneration;
+  return true;
 }
 
 /**

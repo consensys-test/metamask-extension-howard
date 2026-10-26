@@ -31,7 +31,6 @@ const SendContainer = ({ children }: { children: React.ReactNode }) => {
       height={BlockSize.Full}
       justifyContent={JustifyContent.center}
       style={{ flex: '1 0 auto', minHeight: 0 }}
-      data-testid="parent-selector-send-page"
       width={BlockSize.Full}
     >
       <Box

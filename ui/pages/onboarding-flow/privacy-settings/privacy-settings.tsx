@@ -11,7 +11,6 @@ import {
   ButtonIcon,
   ButtonIconSize,
   Icon,
-  IconSize,
   TextColor,
   TextVariant,
   IconColor,
@@ -20,7 +19,6 @@ import {
   BoxAlignItems,
   FontWeight,
   TextButton,
-  TextAlign,
 } from '@metamask/design-system-react';
 import { addUrlProtocolPrefix } from '../../../../shared/lib/url-utils';
 import { useOnboardingSearchParams } from '../hooks/useOnboardingSearchParams';
@@ -36,7 +34,6 @@ import {
   TRANSACTION_SIMULATIONS_LEARN_MORE_LINK,
 } from '../../../../shared/lib/ui-utils';
 import ZENDESK_URLS from '../../../helpers/constants/zendesk-url';
-import { getIsBasicFunctionalityConsolidationEnabledInBuild } from '../../../../shared/lib/environment';
 
 import { useAnalytics } from '../../../hooks/useAnalytics';
 import { ONBOARDING_COMPLETION_ROUTE } from '../../../helpers/constants/routes';
@@ -108,10 +105,6 @@ export default function PrivacySettings() {
   } = defaultState;
   const useExternalNameSources = useSelector(getUseExternalNameSources);
   const isSocialLoginFlow = useSelector(getIsSocialLoginFlow);
-  const isBasicFunctionalityConsolidationEnabled =
-    getIsBasicFunctionalityConsolidationEnabledInBuild();
-  const isSocialLoginBasicFunctionalityLocked =
-    isSocialLoginFlow && isBasicFunctionalityConsolidationEnabled;
   const dataCollectionForMarketing = useSelector(getDataCollectionForMarketing);
 
   const [turnOn4ByteResolution, setTurnOn4ByteResolution] =
@@ -148,19 +141,15 @@ export default function PrivacySettings() {
   const { isFromReminder } = useOnboardingSearchParams();
 
   const handleSubmit = () => {
-    // When consolidation is on, child prefs are owned by Basic Functionality
-    // and applied at onboarding completion via toggleBasicFunctionality.
-    if (!isBasicFunctionalityConsolidationEnabled) {
-      dispatch(setUse4ByteResolution(turnOn4ByteResolution));
-      dispatch(setUseTokenDetection(turnOnTokenDetection));
-      dispatch(
-        setUseMultiAccountBalanceChecker(isMultiAccountBalanceCheckerEnabled),
-      );
-      dispatch(setUseCurrencyRateCheck(turnOnCurrencyRateCheck));
-      dispatch(setUseAddressBarEnsResolution(addressBarResolution));
-      setUseTransactionSimulations(isTransactionSimulationsEnabled);
-      setUseExternalNameSources(turnOnExternalNameSources);
-    }
+    dispatch(setUse4ByteResolution(turnOn4ByteResolution));
+    dispatch(setUseTokenDetection(turnOnTokenDetection));
+    dispatch(
+      setUseMultiAccountBalanceChecker(isMultiAccountBalanceCheckerEnabled),
+    );
+    dispatch(setUseCurrencyRateCheck(turnOnCurrencyRateCheck));
+    dispatch(setUseAddressBarEnsResolution(addressBarResolution));
+    setUseTransactionSimulations(isTransactionSimulationsEnabled);
+    setUseExternalNameSources(turnOnExternalNameSources);
 
     if (ipfsURL && !ipfsError) {
       const { host } = new URL(addUrlProtocolPrefix(ipfsURL) as string);
@@ -178,9 +167,7 @@ export default function PrivacySettings() {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           is_basic_functionality_enabled: externalServicesOnboardingToggleState,
           // eslint-disable-next-line @typescript-eslint/naming-convention
-          turnon_token_detection: isBasicFunctionalityConsolidationEnabled
-            ? externalServicesOnboardingToggleState
-            : turnOnTokenDetection,
+          turnon_token_detection: turnOnTokenDetection,
         })
         .build(),
     );
@@ -229,20 +216,15 @@ export default function PrivacySettings() {
   const items = [
     { id: 1, title: t('general'), subtitle: t('generalDescription') },
     { id: 2, title: t('assets'), subtitle: t('assetsDescription') },
-    // When consolidated, Security only has MetaMetrics (social). Hide it for SRP.
-    ...(!isBasicFunctionalityConsolidationEnabled || isSocialLoginFlow
-      ? [
-          {
-            id: 3,
-            title: isSocialLoginFlow
-              ? t('securityDefaultSettingsSocialLogin')
-              : t('security'),
-            subtitle: isSocialLoginFlow
-              ? t('securitySocialLoginDefaultSettingsDescription')
-              : t('securityDescription'),
-          },
-        ]
-      : []),
+    {
+      id: 3,
+      title: isSocialLoginFlow
+        ? t('securityDefaultSettingsSocialLogin')
+        : t('security'),
+      subtitle: isSocialLoginFlow
+        ? t('securitySocialLoginDefaultSettingsDescription')
+        : t('securityDescription'),
+    },
   ];
 
   const handleDataCollectionForMarketing = async (value: boolean) => {
@@ -256,10 +238,7 @@ export default function PrivacySettings() {
 
   return (
     <>
-      <Box
-        className="privacy-settings"
-        data-testid="parent-selector-onboarding-privacy-settings"
-      >
+      <Box className="privacy-settings" data-testid="privacy-settings">
         <Box
           className={classnames('container', {
             'show-detail': showDetail,
@@ -269,7 +248,7 @@ export default function PrivacySettings() {
           <Box className="list-view">
             <Box
               className="privacy-settings__header"
-              marginTop={2}
+              marginTop={6}
               marginBottom={6}
               flexDirection={BoxFlexDirection.Column}
               justifyContent={BoxJustifyContent.Start}
@@ -282,7 +261,7 @@ export default function PrivacySettings() {
                 <ButtonIcon
                   iconName={IconName.ArrowLeft}
                   ariaLabel="Back"
-                  size={ButtonIconSize.Md}
+                  size={ButtonIconSize.Lg}
                   data-testid="privacy-settings-back-button"
                   onClick={handleSubmit}
                 />
@@ -292,78 +271,74 @@ export default function PrivacySettings() {
                   justifyContent={BoxJustifyContent.Center}
                   className="w-full"
                 >
-                  <Text
-                    variant={TextVariant.HeadingSm}
-                    textAlign={TextAlign.Center}
-                  >
+                  <Text variant={TextVariant.HeadingMd}>
                     {t('defaultSettingsTitle')}
                   </Text>
                 </Box>
                 <Box className="privacy-settings__empty-space" />
               </Box>
               <Text
-                variant={TextVariant.BodyMd}
-                color={TextColor.TextAlternative}
-                className="mt-4"
+                variant={TextVariant.BodyLg}
+                fontWeight={FontWeight.Medium}
+                className="mt-5"
               >
                 {t('defaultSettingsSubTitle')}
               </Text>
-              <TextButton asChild className="mt-1 self-start">
-                <a
-                  href={ZENDESK_URLS.PRIVACY_BEST_PRACTICES}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t('learnMoreAboutPrivacy')}
-                </a>
-              </TextButton>
+              <a
+                href={ZENDESK_URLS.PRIVACY_BEST_PRACTICES}
+                target="_blank"
+                rel="noreferrer"
+                key="learnMoreAboutPrivacy"
+                style={{
+                  fontSize: 'var(--font-size-5)',
+                }}
+              >
+                {t('learnMoreAboutPrivacy')}
+              </a>
             </Box>
             <Box>
               <Box
+                marginTop={4}
+                marginBottom={4}
                 className="privacy-settings__categories-list list-none"
-                gap={6}
-                flexDirection={BoxFlexDirection.Column}
                 asChild
               >
                 <ul>
                   {items.map((item) => (
                     <Box
-                      asChild
+                      marginTop={5}
+                      marginBottom={5}
                       key={item.id}
-                      className="categories-item w-full border-0 bg-transparent p-0 text-left"
+                      className="categories-item"
+                      onClick={() => handleItemSelected(item)}
                     >
-                      <button
-                        type="button"
-                        aria-label={item.title}
+                      <Box
+                        flexDirection={BoxFlexDirection.Row}
+                        alignItems={BoxAlignItems.Start}
+                        justifyContent={BoxJustifyContent.Between}
                         data-testid={`category-item-${item.title}`}
-                        onClick={() => handleItemSelected(item)}
                       >
-                        <Box
-                          flexDirection={BoxFlexDirection.Row}
-                          alignItems={BoxAlignItems.Start}
-                          justifyContent={BoxJustifyContent.Between}
-                        >
-                          <Text
-                            variant={TextVariant.BodyMd}
-                            fontWeight={FontWeight.Medium}
-                          >
-                            {item.title}
-                          </Text>
-                          <Icon
-                            name={IconName.ArrowRight}
-                            size={IconSize.Md}
-                            color={IconColor.IconDefault}
-                            aria-hidden
-                          />
-                        </Box>
                         <Text
-                          className="description"
-                          variant={TextVariant.BodyMd}
-                          color={TextColor.TextAlternative}
+                          variant={TextVariant.BodyLg}
+                          fontWeight={FontWeight.Medium}
                         >
-                          {item.subtitle}
+                          {item.title}
                         </Text>
-                      </button>
+                        <ButtonIcon
+                          iconName={IconName.ArrowRight}
+                          ariaLabel="Next"
+                          size={ButtonIconSize.Lg}
+                          color={IconColor.IconDefault}
+                          onClick={() => handleItemSelected(item)}
+                        />
+                      </Box>
+                      <Text
+                        className="description"
+                        variant={TextVariant.BodyMd}
+                        color={TextColor.TextAlternative}
+                      >
+                        {item.subtitle}
+                      </Text>
                     </Box>
                   ))}
                 </ul>
@@ -378,17 +353,16 @@ export default function PrivacySettings() {
           >
             <Box
               className="privacy-settings__header"
-              marginTop={2}
-              marginBottom={6}
+              marginTop={6}
+              marginBottom={5}
               flexDirection={BoxFlexDirection.Row}
               justifyContent={BoxJustifyContent.Between}
-              alignItems={BoxAlignItems.Center}
             >
               <ButtonIcon
                 data-testid="category-back-button"
                 iconName={IconName.ArrowLeft}
                 ariaLabel="Back"
-                size={ButtonIconSize.Md}
+                size={ButtonIconSize.Lg}
                 onClick={handleBack}
               />
               <Box
@@ -397,10 +371,7 @@ export default function PrivacySettings() {
                 justifyContent={BoxJustifyContent.Center}
                 className="w-full"
               >
-                <Text
-                  variant={TextVariant.HeadingSm}
-                  textAlign={TextAlign.Center}
-                >
+                <Text variant={TextVariant.HeadingLg}>
                   {selectedItem?.title}
                 </Text>
               </Box>
@@ -416,11 +387,7 @@ export default function PrivacySettings() {
                   <Setting
                     dataTestId="basic-functionality-toggle"
                     value={externalServicesOnboardingToggleState}
-                    disabled={isSocialLoginBasicFunctionalityLocked}
                     setValue={(toggledValue) => {
-                      if (isSocialLoginBasicFunctionalityLocked) {
-                        return;
-                      }
                       if (toggledValue) {
                         dispatch(onboardingToggleBasicFunctionalityOn());
                         trackEvent(
@@ -581,31 +548,27 @@ export default function PrivacySettings() {
               ) : null}
               {selectedItem?.id === 2 ? (
                 <>
-                  {!isBasicFunctionalityConsolidationEnabled && (
-                    <>
-                      <Setting
-                        value={turnOnTokenDetection}
-                        setValue={setTurnOnTokenDetection}
-                        title={t('turnOnTokenDetection')}
-                        description={t('useTokenDetectionPrivacyDesc')}
-                      />
-                      <Setting
-                        value={isTransactionSimulationsEnabled}
-                        setValue={setTransactionSimulationsEnabled}
-                        title={t('simulationsSettingSubHeader')}
-                        description={t('simulationsSettingDescription', [
-                          <a
-                            key="learn_more_link"
-                            href={TRANSACTION_SIMULATIONS_LEARN_MORE_LINK}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {t('learnMoreUpperCase')}
-                          </a>,
-                        ])}
-                      />
-                    </>
-                  )}
+                  <Setting
+                    value={turnOnTokenDetection}
+                    setValue={setTurnOnTokenDetection}
+                    title={t('turnOnTokenDetection')}
+                    description={t('useTokenDetectionPrivacyDesc')}
+                  />
+                  <Setting
+                    value={isTransactionSimulationsEnabled}
+                    setValue={setTransactionSimulationsEnabled}
+                    title={t('simulationsSettingSubHeader')}
+                    description={t('simulationsSettingDescription', [
+                      <a
+                        key="learn_more_link"
+                        href={TRANSACTION_SIMULATIONS_LEARN_MORE_LINK}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {t('learnMoreUpperCase')}
+                      </a>,
+                    ])}
+                  />
                   <Setting
                     title={t('onboardingAdvancedPrivacyIPFSTitle')}
                     showToggle={false}
@@ -638,125 +601,111 @@ export default function PrivacySettings() {
                       </>
                     }
                   />
-                  {!isBasicFunctionalityConsolidationEnabled && (
-                    <>
-                      <Setting
-                        value={turnOnCurrencyRateCheck}
-                        setValue={setTurnOnCurrencyRateCheck}
-                        title={t('currencyRateCheckToggle')}
-                        dataTestId="currency-rate-check-toggle"
-                        description={t('currencyRateCheckToggleDescription', [
-                          <a
-                            key="coingecko_link"
-                            href={COINGECKO_LINK}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {t('coingecko')}
-                          </a>,
-                          <a
-                            key="cryptocompare_link"
-                            href={CRYPTOCOMPARE_LINK}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {t('cryptoCompare')}
-                          </a>,
-                          <a
-                            key="privacy_policy_link"
-                            href={PRIVACY_POLICY_LINK}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            {t('privacyMsg')}
-                          </a>,
-                        ])}
-                      />
-                      <Setting
-                        value={addressBarResolution}
-                        setValue={setAddressBarResolution}
-                        title={t('ensDomainsSettingTitle')}
-                        description={
-                          <>
+                  <Setting
+                    value={turnOnCurrencyRateCheck}
+                    setValue={setTurnOnCurrencyRateCheck}
+                    title={t('currencyRateCheckToggle')}
+                    dataTestId="currency-rate-check-toggle"
+                    description={t('currencyRateCheckToggleDescription', [
+                      <a
+                        key="coingecko_link"
+                        href={COINGECKO_LINK}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {t('coingecko')}
+                      </a>,
+                      <a
+                        key="cryptocompare_link"
+                        href={CRYPTOCOMPARE_LINK}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {t('cryptoCompare')}
+                      </a>,
+                      <a
+                        key="privacy_policy_link"
+                        href={PRIVACY_POLICY_LINK}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {t('privacyMsg')}
+                      </a>,
+                    ])}
+                  />
+                  <Setting
+                    value={addressBarResolution}
+                    setValue={setAddressBarResolution}
+                    title={t('ensDomainsSettingTitle')}
+                    description={
+                      <>
+                        <Text
+                          variant={TextVariant.BodySm}
+                          color={TextColor.TextAlternative}
+                        >
+                          {t('ensDomainsSettingDescriptionIntroduction')}
+                        </Text>
+                        <Box
+                          marginTop={4}
+                          marginBottom={4}
+                          className="pl-4"
+                          style={{ listStyleType: 'circle' }}
+                          asChild
+                        >
+                          <ul>
                             <Text
                               variant={TextVariant.BodySm}
-                              color={TextColor.TextAlternative}
-                            >
-                              {t('ensDomainsSettingDescriptionIntroduction')}
-                            </Text>
-                            <Box
-                              marginTop={4}
-                              marginBottom={4}
-                              className="pl-4"
-                              style={{ listStyleType: 'circle' }}
                               asChild
-                            >
-                              <ul>
-                                <Text
-                                  variant={TextVariant.BodySm}
-                                  asChild
-                                  color={TextColor.TextAlternative}
-                                >
-                                  <li>
-                                    {t('ensDomainsSettingDescriptionPart1')}
-                                  </li>
-                                </Text>
-                                <Text
-                                  variant={TextVariant.BodySm}
-                                  asChild
-                                  color={TextColor.TextAlternative}
-                                >
-                                  <li>
-                                    {t('ensDomainsSettingDescriptionPart2')}
-                                  </li>
-                                </Text>
-                              </ul>
-                            </Box>
-                            <Text
-                              variant={TextVariant.BodySm}
                               color={TextColor.TextAlternative}
                             >
-                              {t('ensDomainsSettingDescriptionOutroduction')}
+                              <li>{t('ensDomainsSettingDescriptionPart1')}</li>
                             </Text>
-                          </>
-                        }
-                      />
-                      <Setting
-                        value={isMultiAccountBalanceCheckerEnabled}
-                        setValue={setMultiAccountBalanceCheckerEnabled}
-                        title={t('useMultiAccountBalanceChecker')}
-                        description={t(
-                          'useMultiAccountBalanceCheckerSettingDescription',
-                        )}
-                      />
-                    </>
-                  )}
+                            <Text
+                              variant={TextVariant.BodySm}
+                              asChild
+                              color={TextColor.TextAlternative}
+                            >
+                              <li>{t('ensDomainsSettingDescriptionPart2')}</li>
+                            </Text>
+                          </ul>
+                        </Box>
+                        <Text
+                          variant={TextVariant.BodySm}
+                          color={TextColor.TextAlternative}
+                        >
+                          {t('ensDomainsSettingDescriptionOutroduction')}
+                        </Text>
+                      </>
+                    }
+                  />
+                  <Setting
+                    value={isMultiAccountBalanceCheckerEnabled}
+                    setValue={setMultiAccountBalanceCheckerEnabled}
+                    title={t('useMultiAccountBalanceChecker')}
+                    description={t(
+                      'useMultiAccountBalanceCheckerSettingDescription',
+                    )}
+                  />
                 </>
               ) : null}
               {selectedItem?.id === 3 ? (
                 <>
-                  {!isBasicFunctionalityConsolidationEnabled && (
-                    <>
-                      <Setting
-                        value={turnOn4ByteResolution}
-                        setValue={setTurnOn4ByteResolution}
-                        title={t('use4ByteResolution')}
-                        description={t('toggleDecodeDescription')}
-                      />
-                      <Setting
-                        value={turnOnExternalNameSources}
-                        setValue={setTurnOnExternalNameSources}
-                        title={t('externalNameSourcesSetting')}
-                        description={t('externalNameSourcesSettingDescription')}
-                      />
-                    </>
-                  )}
+                  <Setting
+                    value={turnOn4ByteResolution}
+                    setValue={setTurnOn4ByteResolution}
+                    title={t('use4ByteResolution')}
+                    description={t('toggleDecodeDescription')}
+                  />
+                  <Setting
+                    value={turnOnExternalNameSources}
+                    setValue={setTurnOnExternalNameSources}
+                    title={t('externalNameSourcesSetting')}
+                    description={t('externalNameSourcesSettingDescription')}
+                  />
                   {isSocialLoginFlow && (
                     <>
                       <MetametricsToggle
-                        dataCollectionForMarketing={
-                          dataCollectionForMarketing === true
-                        }
+                        dataCollectionForMarketing={dataCollectionForMarketing}
                         setDataCollectionForMarketing={
                           handleDataCollectionForMarketing
                         }

@@ -123,7 +123,7 @@ async function mockLineaAndMusd(mockServer: Mockttp) {
       .always()
       .thenJson(200, {
         fullSupport: [],
-        partialSupport: [],
+        partialSupport: { balances: [] },
       }),
     await mockServer
       .forGet(/https:\/\/tokens\.api\.cx\.metamask\.io\/v3\/assets/u)
@@ -196,7 +196,7 @@ describe('Network Manager', function (this: Suite) {
         title: this.test?.fullTitle(),
       },
       async ({ driver }: { driver: Driver }) => {
-        await login(driver);
+        await login(driver, { validateBalance: false });
         const selectNetworkModal = new SelectNetworkModal(driver);
         const networkFilter = new NetworkFilter(driver);
         await networkFilter.open();
@@ -217,7 +217,7 @@ describe('Network Manager', function (this: Suite) {
         title: this.test?.fullTitle(),
       },
       async ({ driver }: { driver: Driver }) => {
-        await login(driver, { expectedBalance: '$0.00' });
+        await login(driver, { validateBalance: false });
         const selectNetworkModal = new SelectNetworkModal(driver);
         const networkFilter = new NetworkFilter(driver);
         await networkFilter.open();
@@ -239,7 +239,7 @@ describe('Network Manager', function (this: Suite) {
         title: this.test?.fullTitle(),
       },
       async ({ driver }: { driver: Driver }) => {
-        await login(driver);
+        await login(driver, { validateBalance: false });
         const selectNetworkModal = new SelectNetworkModal(driver);
         const networkFilter = new NetworkFilter(driver);
         await networkFilter.open();
@@ -278,7 +278,10 @@ describe('Network Manager', function (this: Suite) {
         testSpecificMock: mockLineaAndMusd,
       },
       async ({ driver }: { driver: Driver }) => {
-        await login(driver);
+        await login(driver, {
+          validateBalance: false,
+          waitForNonEvmAccounts: false,
+        });
         const tokensTab = new TokensTab(driver);
         const selectNetworkModal = new SelectNetworkModal(driver);
         const networkFilter = new NetworkFilter(driver);
@@ -331,7 +334,9 @@ describe('Network Manager', function (this: Suite) {
         title: this.test?.fullTitle(),
       },
       async ({ driver }: { driver: Driver }) => {
-        await login(driver);
+        await login(driver, { validateBalance: false });
+
+        await driver.delay(1000);
 
         // Add network via dapp
         const testDapp = new TestDapp(driver);
@@ -413,7 +418,9 @@ describe('Network Manager', function (this: Suite) {
         title: this.test?.fullTitle(),
       },
       async ({ driver }: { driver: Driver }) => {
-        await login(driver);
+        await login(driver, { validateBalance: false });
+
+        await driver.delay(1000);
 
         // Add custom network via dapp
         const testDapp = new TestDapp(driver);

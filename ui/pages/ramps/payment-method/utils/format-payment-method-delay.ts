@@ -103,9 +103,6 @@ function translateDelayToken(
 /**
  * Formats a payment method delay array for display (e.g. "5 - 10 mins").
  *
- * When the less-than token translates to the "<" glyph, it is glued to the
- * next part (e.g. "<15 mins"); wordier translations keep their spacing.
- *
  * @param delay - Delay bounds in minutes, when present.
  * @param t - i18n translate function.
  * @returns Localized delay label, or null when unavailable.
@@ -120,11 +117,5 @@ export function formatPaymentMethodDelay(
 
   return timeToDescription(delay)
     .map((token) => translateDelayToken(token, t))
-    .reduce((acc, part, index, parts) => {
-      if (index === 0) {
-        return part;
-      }
-      const glue = parts[index - 1] === '<';
-      return glue ? `${acc}${part}` : `${acc} ${part}`;
-    }, '');
+    .join(' ');
 }

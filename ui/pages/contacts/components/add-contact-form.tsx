@@ -137,26 +137,21 @@ export function AddContactForm({ onCancel, onSuccess }: AddContactFormProps) {
   }, [selectedChainId, enteredDomainName, input, dispatch]);
 
   useEffect(() => {
-    if (qrCodeData?.type !== 'address' || !qrCodeData?.values?.address) {
-      return;
-    }
-
-    const scannedAddress = qrCodeData.values.address.toLowerCase();
-    const addresses = [
-      ...(domainResolutions?.map(
-        (r: { resolvedAddress: string }) => r.resolvedAddress,
-      ) ?? []),
-      selectedAddress,
-    ]
-      .filter(Boolean)
-      .map((addr: string) => addr.toLowerCase());
-
-    if (!addresses.includes(scannedAddress)) {
-      queueMicrotask(() => {
+    if (qrCodeData?.type === 'address' && qrCodeData?.values?.address) {
+      const scannedAddress = qrCodeData.values.address.toLowerCase();
+      const addresses = [
+        ...(domainResolutions?.map(
+          (r: { resolvedAddress: string }) => r.resolvedAddress,
+        ) ?? []),
+        selectedAddress,
+      ]
+        .filter(Boolean)
+        .map((addr: string) => addr.toLowerCase());
+      if (!addresses.includes(scannedAddress)) {
         setInput(scannedAddress);
         validate(scannedAddress);
-      });
-      dispatch(qrCodeDetected(null as never));
+        dispatch(qrCodeDetected(null as never));
+      }
     }
   }, [qrCodeData, domainResolutions, selectedAddress, validate, dispatch]);
 
@@ -409,7 +404,7 @@ export function AddContactForm({ onCancel, onSuccess }: AddContactFormProps) {
           variant={ButtonVariant.Secondary}
           size={ButtonSize.Lg}
           onClick={onCancel}
-          className="flex-1"
+          className="flex-1 rounded-xl"
           data-testid="page-container-footer-cancel"
         >
           {t('cancel')}
@@ -419,7 +414,7 @@ export function AddContactForm({ onCancel, onSuccess }: AddContactFormProps) {
           size={ButtonSize.Lg}
           isDisabled={isSaveDisabled}
           onClick={handleSubmit}
-          className="flex-1"
+          className="flex-1 rounded-xl"
           data-testid="page-container-footer-next"
         >
           {t('save')}

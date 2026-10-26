@@ -108,11 +108,7 @@ export function NotificationsSettingsTypes({
         <SettingsSelectItem
           key={section.type}
           label={section.title}
-          value={
-            section.type === 'walletActivity'
-              ? ''
-              : getStatusText(t, preferences?.[section.type])
-          }
+          value={getStatusText(t, preferences?.[section.type])}
           to={getNotificationsSettingsSectionRoute(section.type)}
           dataTestId={`notifications-settings-section-${section.type}`}
           startAccessory={

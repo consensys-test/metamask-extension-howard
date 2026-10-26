@@ -1,11 +1,9 @@
 import React from 'react';
+import { Provider } from 'react-redux';
 import configureMockStore from 'redux-mock-store';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-import {
-  en as messages,
-  renderWithProvider,
-} from '../../../../test/lib/render-helpers-navigate';
+import { en as messages } from '../../../../test/lib/render-helpers-navigate';
 import { TokenManagementCell } from './token-management-cell';
 
 const mockStore = configureMockStore()({
@@ -21,7 +19,11 @@ const mockStore = configureMockStore()({
 });
 
 const renderCell = (props: React.ComponentProps<typeof TokenManagementCell>) =>
-  renderWithProvider(<TokenManagementCell {...props} />, mockStore);
+  render(
+    <Provider store={mockStore}>
+      <TokenManagementCell {...props} />
+    </Provider>,
+  );
 
 describe('TokenManagementCell', () => {
   it('renders the primary and secondary labels', () => {
@@ -34,7 +36,9 @@ describe('TokenManagementCell', () => {
       testIdSuffix: 'musd',
     });
 
-    expect(screen.getByText('MetaMask USD')).toBeInTheDocument();
+    expect(
+      screen.getByText(messages.musdMetaMaskUsd.message),
+    ).toBeInTheDocument();
     expect(screen.getByText('200.23 mUSD')).toBeInTheDocument();
   });
 
@@ -109,76 +113,6 @@ describe('TokenManagementCell', () => {
     });
 
     expect(onToggle).not.toHaveBeenCalled();
-  });
-
-  it('renders the verified badge for a Verified safety result', () => {
-    renderCell({
-      symbol: 'MUSD',
-      primaryLabel: 'MetaMask USD',
-      safetyResult: 'Verified',
-      isOn: true,
-      onToggle: jest.fn(),
-      testIdSuffix: 'musd',
-    });
-
-    expect(
-      screen.getByLabelText(messages.securityTrustVerified.message),
-    ).toBeInTheDocument();
-  });
-
-  it('renders the risky badge for a Warning safety result', () => {
-    renderCell({
-      symbol: 'MUSD',
-      primaryLabel: 'MetaMask USD',
-      safetyResult: 'Warning',
-      isOn: true,
-      onToggle: jest.fn(),
-      testIdSuffix: 'musd',
-    });
-
-    expect(
-      screen.getByText(messages.securityTrustRisky.message),
-    ).toBeInTheDocument();
-  });
-
-  it('renders the malicious badge for a Malicious safety result', () => {
-    renderCell({
-      symbol: 'MUSD',
-      primaryLabel: 'MetaMask USD',
-      safetyResult: 'Malicious',
-      isOn: true,
-      onToggle: jest.fn(),
-      testIdSuffix: 'musd',
-    });
-
-    expect(
-      screen.getByText(messages.securityTrustMalicious.message),
-    ).toBeInTheDocument();
-  });
-
-  it('renders no badge for a Benign result', () => {
-    renderCell({
-      symbol: 'MUSD',
-      primaryLabel: 'MetaMask USD',
-      safetyResult: 'Benign',
-      isOn: true,
-      onToggle: jest.fn(),
-      testIdSuffix: 'musd',
-    });
-
-    expect(screen.queryByTestId('security-badge')).not.toBeInTheDocument();
-  });
-
-  it('renders no badge when there is no security data', () => {
-    renderCell({
-      symbol: 'MUSD',
-      primaryLabel: 'MetaMask USD',
-      isOn: true,
-      onToggle: jest.fn(),
-      testIdSuffix: 'musd',
-    });
-
-    expect(screen.queryByTestId('security-badge')).not.toBeInTheDocument();
   });
 
   it('omits the toggle when showToggle is false', () => {
