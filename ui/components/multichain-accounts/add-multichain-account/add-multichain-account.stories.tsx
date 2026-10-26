@@ -1,5 +1,5 @@
 import React from 'react';
-import { StoryFn, Meta } from '@storybook/react-webpack5';
+import { StoryFn, Meta } from '@storybook/react';
 import { AddMultichainAccount } from './add-multichain-account';
 import { AddMultichainAccountProps } from './add-multichain-account';
 

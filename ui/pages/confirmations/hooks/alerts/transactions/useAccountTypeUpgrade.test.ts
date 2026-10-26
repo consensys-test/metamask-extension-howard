@@ -52,7 +52,7 @@ describe('useAccountTypeUpgrade', () => {
       {
         field: 'accountTypeUpgrade',
         key: RowAlertKey.AccountTypeUpgrade,
-        content: expect.objectContaining({ type: AccountTypeMessage }),
+        content: AccountTypeMessage(),
         reason: 'Account type',
         severity: Severity.Info,
       },
@@ -65,7 +65,7 @@ describe('useAccountTypeUpgrade', () => {
       {
         field: 'accountTypeUpgrade',
         key: RowAlertKey.AccountTypeUpgrade,
-        content: expect.objectContaining({ type: AccountTypeMessage }),
+        content: AccountTypeMessage(),
         reason: 'Account type',
         severity: Severity.Info,
       },

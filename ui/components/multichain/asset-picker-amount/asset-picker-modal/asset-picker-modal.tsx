@@ -1,7 +1,6 @@
 import React, {
   useState,
   useCallback,
-  useDeferredValue,
   useMemo,
   useEffect,
   useRef,
@@ -11,15 +10,18 @@ import type { Token } from '@metamask/assets-controllers';
 import { isCaipChainId, isStrictHexString, type Hex } from '@metamask/utils';
 import { zeroAddress } from 'ethereumjs-util';
 import {
-  AvatarToken,
-  AvatarTokenSize,
   Modal,
+  ModalContent,
   ModalOverlay,
   ModalHeader,
-  ModalContent,
-} from '@metamask/design-system-react';
-import { Box, Text, PickerNetwork } from '../../../component-library';
+  Box,
+  AvatarTokenSize,
+  AvatarToken,
+  Text,
+  PickerNetwork,
+} from '../../../component-library';
 import {
+  BorderRadius,
   TextVariant,
   TextAlign,
   Display,
@@ -27,6 +29,8 @@ import {
   JustifyContent,
 } from '../../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
+import { useDeferredValue } from '../../../../hooks/useDeferredValue';
+
 import { AssetType } from '../../../../../shared/constants/transaction';
 import {
   getAllTokens,
@@ -153,14 +157,9 @@ export function AssetPickerModal({
   const allNetworksToUse = networks ?? Object.values(allNetworks ?? {});
   const isEvm = useMultichainSelector(getMultichainIsEvm);
 
-  const selectedNetworkChainId = selectedNetwork?.chainId;
-  const [prevSelectedNetworkChainId, setPrevSelectedNetworkChainId] = useState(
-    selectedNetworkChainId,
-  );
-  if (selectedNetworkChainId !== prevSelectedNetworkChainId) {
-    setPrevSelectedNetworkChainId(selectedNetworkChainId);
+  useEffect(() => {
     setSearchQuery('');
-  }
+  }, [selectedNetwork?.chainId]);
 
   const nativeCurrencyImage = useMultichainSelector(getMultichainCurrencyImage);
   const nativeCurrency = useMultichainSelector(getMultichainNativeCurrency);
@@ -455,19 +454,11 @@ export function AssetPickerModal({
       <ModalOverlay />
       <ModalContent modalDialogProps={{ padding: 0 }}>
         <ModalHeader
-          {...({
-            closeButtonProps: { ariaLabel: t('close') },
-            onClose: () => {
-              setSearchQuery('');
-              onClose();
-            },
-            ...(asset
-              ? {}
-              : {
-                  onBack: onBack as () => void,
-                  backButtonProps: { ariaLabel: t('back') },
-                }),
-          } as React.ComponentProps<typeof ModalHeader>)}
+          onClose={() => {
+            setSearchQuery('');
+            onClose();
+          }}
+          onBack={asset ? undefined : onBack}
         >
           <Text variant={TextVariant.headingSm} textAlign={TextAlign.Center}>
             {header}
@@ -481,6 +472,7 @@ export function AssetPickerModal({
             marginInline="auto"
           >
             <AvatarToken
+              borderRadius={BorderRadius.full}
               src={sendingAsset.image}
               name={sendingAsset.symbol}
               size={AvatarTokenSize.Xs}

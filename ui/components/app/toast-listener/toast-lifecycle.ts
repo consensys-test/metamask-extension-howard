@@ -1,21 +1,9 @@
-type ToastPhase = 'approvedOrSigned' | 'pending' | 'terminal';
+type ToastPhase = 'pending' | 'terminal';
 
 const toastPhaseById = new Map<string, ToastPhase>();
 
-export function setApprovedOrSignedToastPhase(id: string) {
-  if (toastPhaseById.has(id)) {
-    return;
-  }
-
-  toastPhaseById.set(id, 'approvedOrSigned');
-}
-
 export function shouldShowPendingToast(id: string) {
-  const phase = toastPhaseById.get(id);
-  const isApprovedOrSignedOrUndefined =
-    phase === 'approvedOrSigned' || phase === undefined;
-
-  if (!isApprovedOrSignedOrUndefined) {
+  if (toastPhaseById.get(id) !== undefined) {
     return false;
   }
 
@@ -24,11 +12,7 @@ export function shouldShowPendingToast(id: string) {
 }
 
 export function shouldShowTerminalToast(id: string) {
-  const phase = toastPhaseById.get(id);
-  const isApprovedOrSignedOrPending =
-    phase === 'approvedOrSigned' || phase === 'pending';
-
-  if (!isApprovedOrSignedOrPending) {
+  if (toastPhaseById.get(id) !== 'pending') {
     return false;
   }
 

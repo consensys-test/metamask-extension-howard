@@ -82,7 +82,7 @@ describe('Import SRP', () => {
       mockStore,
     );
 
-    const importSrpTestId = queryByTestId('parent-selector-onboarding-srp');
+    const importSrpTestId = queryByTestId('import-srp');
     expect(importSrpTestId).toBeInTheDocument();
 
     const confirmSrpButton = queryByTestId('import-srp-confirm');

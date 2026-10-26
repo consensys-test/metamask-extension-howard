@@ -9,35 +9,16 @@ type TransactionGroup = {
   };
   initialTransaction?: {
     chainId?: string;
-    txParams?: {
-      from?: string;
-    };
   };
 };
 
 /**
- * Builds the earliest-nonce map key for a chain + sender pair. Nonce spaces are
- * per sender, so money-account and selected-account pending txs on the same
- * chain must not share a single earliest nonce.
- *
- * @param chainId - Chain ID.
- * @param from - Sender address.
- * @returns Normalized `chainId:from` key.
- */
-export function getEarliestNonceKey(
-  chainId: string,
-  from: string | undefined,
-): string {
-  return `${chainId}:${(from ?? '').toLowerCase()}`;
-}
-
-/**
- * Calculates the earliest (lowest) pending nonce per chain and sender. Only
- * groups whose primaryTransaction has a pending status are considered;
+ * Calculates the earliest (lowest) nonce per chain for pending transactions.
+ * Only groups whose primaryTransaction has a pending status are considered;
  * confirmed locals that remain in the list for display are ignored.
  *
  * @param transactionGroups - Array of transaction groups (pending and non-pending)
- * @returns Map of `chainId:from` to earliest pending nonce value (as number)
+ * @returns Map of chainId to earliest pending nonce value (as number)
  */
 export function useEarliestNonceByChain(
   transactionGroups: TransactionGroup[],
@@ -48,7 +29,6 @@ export function useEarliestNonceByChain(
     transactionGroups.forEach((txGroup) => {
       const { nonce, primaryTransaction } = txGroup;
       const chainId = txGroup.initialTransaction?.chainId;
-      const from = txGroup.initialTransaction?.txParams?.from;
 
       if (
         !nonce ||
@@ -60,10 +40,9 @@ export function useEarliestNonceByChain(
       }
 
       const nonceValue = Number(hexToDecimal(nonce));
-      const key = getEarliestNonceKey(chainId, from);
 
-      if (!(key in nonceMap) || nonceValue < nonceMap[key]) {
-        nonceMap[key] = nonceValue;
+      if (!(chainId in nonceMap) || nonceValue < nonceMap[chainId]) {
+        nonceMap[chainId] = nonceValue;
       }
     });
 
@@ -72,28 +51,22 @@ export function useEarliestNonceByChain(
 }
 
 /**
- * Checks if a transaction has the earliest pending nonce for its chain and
- * sender.
+ * Checks if a transaction has the earliest nonce for its chain.
  *
  * @param nonce - Transaction nonce (hex string)
  * @param chainId - Chain ID
- * @param from - Sender address
- * @param earliestNonceByChainAndSender - Map of `chainId:from` to earliest nonce
- * @returns True if this transaction has the earliest nonce for its sender
+ * @param earliestNonceByChain - Map of chainId to earliest nonce
+ * @returns True if this transaction has the earliest nonce
  */
 export function isTransactionEarliestNonce(
   nonce: string | undefined,
   chainId: string | undefined,
-  from: string | undefined,
-  earliestNonceByChainAndSender: Record<string, number>,
+  earliestNonceByChain: Record<string, number>,
 ): boolean {
   if (!nonce || !chainId) {
     return false;
   }
 
   const nonceValue = Number(hexToDecimal(nonce));
-  return (
-    nonceValue ===
-    earliestNonceByChainAndSender[getEarliestNonceKey(chainId, from)]
-  );
+  return nonceValue === earliestNonceByChain[chainId];
 }

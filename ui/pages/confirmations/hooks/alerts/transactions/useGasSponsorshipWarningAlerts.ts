@@ -1,8 +1,12 @@
-import { TransactionMeta } from '@metamask/transaction-controller';
+'use no memo';
+
+import {
+  SimulationData,
+  TransactionMeta,
+} from '@metamask/transaction-controller';
 import type { Hex } from '@metamask/utils';
 import { useMemo } from 'react';
 import { CHAIN_IDS } from '../../../../../../shared/constants/network';
-import { MONAD_RESERVE_BALANCE_MON } from '../../../../../../shared/lib/monad-reserve-balance';
 import {
   AlertActionKey,
   RowAlertKey,
@@ -11,13 +15,18 @@ import { Alert } from '../../../../../ducks/confirm-alerts/confirm-alerts';
 import { Severity } from '../../../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useConfirmContext } from '../../../context/confirm';
-import { useIsMonadReserveViolation } from './useIsMonadReserveViolation';
+import { useIsGaslessSupported } from '../../gas/useIsGaslessSupported';
 
 type SponsorshipWarningRule = {
   messageKey: string;
   titleKey: string;
   minBalance: string;
   nativeCurrency: string;
+  matchers: string[];
+};
+
+type SimulationDataWithCallTraceErrors = SimulationData & {
+  callTraceErrors?: string[];
 };
 
 const GAS_SPONSORSHIP_WARNING_RULES: Partial<
@@ -26,42 +35,79 @@ const GAS_SPONSORSHIP_WARNING_RULES: Partial<
   [CHAIN_IDS.MONAD]: {
     messageKey: 'gasSponsorshipReserveBalanceWarning',
     titleKey: 'alertMinimumReserve',
-    minBalance: MONAD_RESERVE_BALANCE_MON,
+    minBalance: '10',
     nativeCurrency: 'MON',
-  },
-  [CHAIN_IDS.MONAD_TESTNET]: {
-    messageKey: 'gasSponsorshipReserveBalanceWarning',
-    titleKey: 'alertMinimumReserve',
-    minBalance: MONAD_RESERVE_BALANCE_MON,
-    nativeCurrency: 'MON',
+    matchers: ['reserve balance violation'],
   },
 };
 
 /**
- * Hook that returns an alert when a Monad reserve-balance requirement would be
- * violated (protocol rule, not only gas-sponsorship UX).
+ * Checks if the callTraceErrors match any sponsorship warning rules for the given chain.
  *
- * Sources:
- * - Simulation `callTraceErrors` / `simulationFails` containing
- * `"reserve balance violation"`
- * - Proactive check: `balance - value < 10 MON` (gas may come from the reserve)
+ * @param callTraceErrors - Array of error messages from simulation
+ * @param chainId - The chain ID of the transaction
+ * @returns True if a matching rule is found, false otherwise
+ */
+function hasGasSponsorshipWarning(
+  callTraceErrors: string[] | undefined,
+  chainId: Hex,
+): boolean {
+  if (!callTraceErrors?.length) {
+    return false;
+  }
+
+  const rule = GAS_SPONSORSHIP_WARNING_RULES[chainId];
+  if (!rule) {
+    return false;
+  }
+
+  const normalizedErrors = callTraceErrors.map((error) => error.toLowerCase());
+  return rule.matchers.some((matcher) =>
+    normalizedErrors.some((error) => error.includes(matcher)),
+  );
+}
+
+/**
+ * Hook that returns an alert when gas sponsorship fails due to reserve balance requirements.
  *
- * Shown whenever the reserve would fail, including when gas is sponsored.
+ * This hook checks for specific error patterns in the transaction simulation's callTraceErrors
+ * and displays a warning alert when sponsorship is unavailable due to insufficient reserve balance.
  *
- * @returns An array containing a blocking danger alert if reserve would fail
+ * Currently configured for Monad network which requires a minimum of 10 MON in the account
+ * for gas sponsorship to work.
+ *
+ * @returns An array containing a warning alert if sponsorship failed, empty array otherwise
  */
 export function useGasSponsorshipWarningAlerts(): Alert[] {
   const t = useI18nContext();
   const { currentConfirmation } = useConfirmContext<TransactionMeta>();
-  const chainId = currentConfirmation?.chainId;
-  const hasWarning = useIsMonadReserveViolation();
+  const { chainId, isGasFeeSponsored, simulationData } =
+    currentConfirmation ?? {};
+  const { isSupported: isGaslessSupported } = useIsGaslessSupported();
+
+  const callTraceErrors = (
+    simulationData as SimulationDataWithCallTraceErrors | undefined
+  )?.callTraceErrors;
+
+  // Use primitive boolean to avoid object reference changes on every render
+  const hasWarning = useMemo(
+    () =>
+      chainId ? hasGasSponsorshipWarning(callTraceErrors, chainId) : false,
+    [callTraceErrors, chainId],
+  );
+
+  // Only show warning when:
+  // 1. We have a warning match from configured rules
+  // 2. Gas fee is NOT currently sponsored (the warning explains why)
+  // 3. Gasless is supported on this network (otherwise sponsorship wouldn't be expected)
+  const shouldShow = hasWarning && !isGasFeeSponsored && isGaslessSupported;
 
   return useMemo(() => {
-    if (!hasWarning || !chainId) {
+    if (!shouldShow || !chainId) {
       return [];
     }
 
-    const rule = GAS_SPONSORSHIP_WARNING_RULES[chainId as Hex];
+    const rule = GAS_SPONSORSHIP_WARNING_RULES[chainId];
     if (!rule) {
       return [];
     }
@@ -87,5 +133,5 @@ export function useGasSponsorshipWarningAlerts(): Alert[] {
         showArrow: false,
       },
     ];
-  }, [hasWarning, chainId, t]);
+  }, [shouldShow, chainId, t]);
 }

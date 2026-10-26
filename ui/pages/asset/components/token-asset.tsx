@@ -1,7 +1,7 @@
 import { Token } from '@metamask/assets-controllers';
 import { NetworkConfiguration } from '@metamask/network-controller';
 import { CaipAssetType, Hex, isCaipChainId } from '@metamask/utils';
-import React, { useState } from 'react';
+import React from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { InternalAccount } from '@metamask/keyring-internal-api';
@@ -15,8 +15,9 @@ import { getURLHostName } from '../../../helpers/utils/util';
 import { getFungibleAssetBlockExplorerLink } from '../../../helpers/utils/multichain/blockExplorer';
 import { getTokenList, selectERC20TokensByChain } from '../../../selectors';
 import { getAllMultichainNetworkConfigurations } from '../../../selectors/multichain/networks';
+import { showModal } from '../../../store/actions';
 import { getInternalAccountBySelectedAccountGroupAndCaip } from '../../../selectors/multichain-accounts/account-tree';
-import { HideTokenConfirmationModal } from '../../../components/app/modals/hide-token-confirmation-modal/hide-token-confirmation-modal';
+import { useDispatch } from '../../../store/hooks';
 import AssetOptions from './asset-options';
 import AssetPage from './asset-page';
 
@@ -32,9 +33,7 @@ const TokenAsset = ({
   chainId: Hex;
 }) => {
   const { address: hexOrCaipAddress, assetId, symbol, isERC721, image } = token;
-
-  // TODO: refactor AssetPage to be CAIP compliant by default.
-  const address = hexOrCaipAddress || assetId;
+  const address = assetId || hexOrCaipAddress;
 
   const tokenList = useSelector(getTokenList);
   const allNetworks: {
@@ -56,19 +55,19 @@ const TokenAsset = ({
   const erc20TokensByChain = useSelector(selectERC20TokensByChain);
 
   const navigate = useNavigate();
-  const [isHideTokenModalOpen, setIsHideTokenModalOpen] = useState(false);
+  const dispatch = useDispatch();
   const { trackEvent, createEventBuilder } = useAnalytics();
 
   // Fetch token data from tokenList
   const tokenData = Object.values(tokenList).find(
     (t) =>
       isEqualCaseInsensitive(t.symbol, symbol) &&
-      isEqualCaseInsensitive(t.address, address ?? ''),
+      isEqualCaseInsensitive(t.address, address),
   );
 
   // If not found in tokenList, try erc20TokensByChain
   const tokenDataFromChain =
-    address && erc20TokensByChain?.[chainId]?.data?.[address.toLowerCase()];
+    erc20TokensByChain?.[chainId]?.data?.[address.toLowerCase()];
 
   const name = tokenData?.name || tokenDataFromChain?.name || symbol;
   const iconUrl =
@@ -88,55 +87,47 @@ const TokenAsset = ({
     })?.url ?? '';
 
   return (
-    <>
-      <AssetPage
-        asset={{
-          chainId,
-          type: AssetType.token,
-          address: address ?? '',
-          symbol,
-          name,
-          decimals: token.decimals,
-          image: iconUrl,
-          aggregators,
-          isERC721,
-        }}
-        optionsButton={
-          <AssetOptions
-            isNativeAsset={false}
-            onRemove={() => setIsHideTokenModalOpen(true)}
-            onClickBlockExplorer={() => {
-              trackEvent(
-                createEventBuilder('Clicked Block Explorer Link')
-                  .addCategory(MetaMetricsEventCategory.Navigation)
-                  .addProperties({
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    link_type: 'Token Tracker',
-                    action: 'Token Options',
-                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    block_explorer_domain: getURLHostName(blockExplorerLink),
-                  })
-                  .build(),
-              );
-              global.platform.openTab({ url: blockExplorerLink });
-            }}
-            token={token}
-          />
-        }
-      />
-      <HideTokenConfirmationModal
-        token={{
-          ...token,
-          address: address ?? '',
-          image: iconUrl,
-        }}
-        isOpen={isHideTokenModalOpen}
-        onClose={() => setIsHideTokenModalOpen(false)}
-        navigate={navigate}
-      />
-    </>
+    <AssetPage
+      asset={{
+        chainId,
+        type: AssetType.token,
+        address,
+        symbol,
+        name,
+        decimals: token.decimals,
+        image: iconUrl,
+        aggregators,
+        isERC721,
+      }}
+      optionsButton={
+        <AssetOptions
+          isNativeAsset={false}
+          onRemove={() =>
+            dispatch(
+              showModal({ name: 'HIDE_TOKEN_CONFIRMATION', token, navigate }),
+            )
+          }
+          onClickBlockExplorer={() => {
+            trackEvent(
+              createEventBuilder('Clicked Block Explorer Link')
+                .addCategory(MetaMetricsEventCategory.Navigation)
+                .addProperties({
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  link_type: 'Token Tracker',
+                  action: 'Token Options',
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  block_explorer_domain: getURLHostName(blockExplorerLink),
+                })
+                .build(),
+            );
+            global.platform.openTab({ url: blockExplorerLink });
+          }}
+          token={token}
+        />
+      }
+    />
   );
 };
 

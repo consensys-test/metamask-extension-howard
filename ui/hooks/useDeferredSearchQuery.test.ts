@@ -1,13 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { useDeferredSearchQuery } from './useDeferredSearchQuery';
 
-jest.mock('react', () => ({
-  ...jest.requireActual('react'),
+jest.mock('./useDeferredValue', () => ({
   useDeferredValue: jest.fn((value: string) => value),
 }));
 
 const mockUseDeferredValue = jest.mocked(
-  jest.requireMock('react').useDeferredValue,
+  jest.requireMock('./useDeferredValue').useDeferredValue,
 );
 
 describe('useDeferredSearchQuery', () => {

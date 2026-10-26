@@ -74,7 +74,7 @@ describe('Error Page', function () {
     await withFixtures(
       {
         fixtures: new FixtureBuilderV2()
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,
@@ -119,7 +119,7 @@ describe('Error Page', function () {
     await withFixtures(
       {
         fixtures: new FixtureBuilderV2()
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,

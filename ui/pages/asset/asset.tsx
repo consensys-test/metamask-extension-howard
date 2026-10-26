@@ -107,10 +107,7 @@ const Asset = () => {
   ]);
 
   return (
-    <ScrollContainer
-      className="main-container asset__container"
-      data-testid="asset-page-scroll-container"
-    >
+    <ScrollContainer className="main-container asset__container">
       {renderContent()}
     </ScrollContainer>
   );

@@ -1,13 +1,16 @@
 import React from 'react';
-import { AvatarToken, AvatarTokenSize } from '@metamask/design-system-react';
 
 import { NotificationDetail } from '../notification-detail';
 import {
+  AvatarTokenSize,
+  AvatarToken,
   BadgeWrapper,
   BadgeWrapperPosition,
   Text,
 } from '../../component-library';
 import {
+  BackgroundColor,
+  BorderColor,
   FontWeight,
   TextVariant,
   TextColor,
@@ -65,7 +68,9 @@ export const NotificationDetailAsset = ({
     <AvatarToken
       src={icon.badge?.src}
       size={AvatarTokenSize.Sm}
-      className="bg-info-default border-2 border-background-default"
+      backgroundColor={BackgroundColor.infoDefault}
+      borderColor={BorderColor.backgroundDefault}
+      borderWidth={2}
     />
   );
 
@@ -76,13 +81,15 @@ export const NotificationDetailAsset = ({
     >
       <AvatarToken
         src={icon.src}
-        className="notification-detail-asset__icon border-solid border-border-muted"
+        borderColor={BorderColor.borderMuted}
+        className="notification-detail-asset__icon"
       />
     </BadgeWrapper>
   ) : (
     <AvatarToken
       src={icon.src}
-      className="notification-detail-asset__icon border-solid border-border-muted"
+      borderColor={BorderColor.borderMuted}
+      className="notification-detail-asset__icon"
     />
   );
 

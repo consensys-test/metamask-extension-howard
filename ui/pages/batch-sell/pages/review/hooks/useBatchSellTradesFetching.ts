@@ -25,10 +25,7 @@ export const useBatchSellTradesFetching = (
 ) => {
   const dispatch = useDispatch();
   const latestArgsRef = useRef({ data, entries, chain });
-
-  useEffect(() => {
-    latestArgsRef.current = { data, entries, chain };
-  }, [data, entries, chain]);
+  latestArgsRef.current = { data, entries, chain };
 
   const debouncedDispatch = useRef(
     debounce((quotes, chainId: string) => {

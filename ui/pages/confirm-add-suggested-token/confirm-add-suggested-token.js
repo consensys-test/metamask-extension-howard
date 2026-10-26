@@ -190,10 +190,7 @@ const ConfirmAddSuggestedToken = () => {
   }, [suggestedTokens.length, navigate, mostRecentOverviewPage]);
 
   return (
-    <div
-      className={classNames}
-      data-testid="parent-selector-add-token-confirmation"
-    >
+    <div className={classNames}>
       <Nav confirmationId={approvalId} />
       <div className="page-container__header">
         <div className="page-container__title">{t('addSuggestedTokens')}</div>
@@ -228,10 +225,7 @@ const ConfirmAddSuggestedToken = () => {
                   </div>
                 </div>
                 <div className="confirm-add-suggested-token__balance">
-                  <TokenBalance
-                    token={asset}
-                    data-testid="confirm-add-suggested-token-balance"
-                  />
+                  <TokenBalance token={asset} />
                 </div>
               </div>
             );

@@ -83,5 +83,4 @@ export type AccountListStats = {
   pinnedCount: number;
   hiddenCount: number;
   totalAccounts: number;
-  totalWallets: number;
 };

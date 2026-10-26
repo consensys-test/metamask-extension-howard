@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getAccountLink } from '@metamask/etherscan-link';
 import { Snap } from '@metamask/snaps-utils';
 import { useSelector } from 'react-redux';
@@ -46,13 +46,15 @@ export default function KeyringRemovalSnapWarning({
   isOpen: boolean;
 }) {
   const t = useI18nContext();
-  const hasNoAccounts = keyringAccounts.length === 0;
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const displayConfirmation = hasNoAccounts || showConfirmation;
   const [confirmedRemoval, setConfirmedRemoval] = useState(false);
   const [confirmationInput, setConfirmationInput] = useState('');
   const [error, setError] = useState(false);
   const chainId = useSelector(getCurrentChainId);
+
+  useEffect(() => {
+    setShowConfirmation(keyringAccounts.length === 0);
+  }, [keyringAccounts]);
 
   const validateConfirmationInput = (input: string): boolean => {
     setError(false);
@@ -76,7 +78,7 @@ export default function KeyringRemovalSnapWarning({
         >
           <ModalHeader
             onBack={() => {
-              if (displayConfirmation) {
+              if (showConfirmation) {
                 setShowConfirmation(false);
               } else {
                 onBack();
@@ -97,7 +99,7 @@ export default function KeyringRemovalSnapWarning({
             <BannerAlert severity={BannerAlertSeverity.Warning}>
               {t('backupKeyringSnapReminder')}
             </BannerAlert>
-            {displayConfirmation === false ? (
+            {showConfirmation === false ? (
               <>
                 <Box
                   display={Display.Flex}
@@ -156,7 +158,7 @@ export default function KeyringRemovalSnapWarning({
           <ModalFooter
             onCancel={onCancel}
             onSubmit={async () => {
-              if (!displayConfirmation) {
+              if (!showConfirmation) {
                 setShowConfirmation(true);
                 return;
               }
@@ -166,9 +168,9 @@ export default function KeyringRemovalSnapWarning({
             }}
             submitButtonProps={{
               id: 'popoverRemoveSnapButton',
-              danger: displayConfirmation,
-              disabled: displayConfirmation && !confirmedRemoval,
-              children: displayConfirmation ? t('removeSnap') : t('continue'),
+              danger: showConfirmation,
+              disabled: showConfirmation && !confirmedRemoval,
+              children: showConfirmation ? t('removeSnap') : t('continue'),
             }}
             cancelButtonProps={{
               variant: ButtonVariant.Secondary,

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import {
   Box,
@@ -85,16 +85,14 @@ export const CancelOrderModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGeoBlockModalOpen, setIsGeoBlockModalOpen] = useState(false);
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
+  useEffect(() => {
     if (isOpen) {
       setIsSubmitting(false);
       setError(null);
       setIsGeoBlockModalOpen(false);
     }
-  }
+  }, [isOpen]);
 
   const displayName = getDisplaySymbol(order.symbol);
   const formattedDate = useMemo(() => {

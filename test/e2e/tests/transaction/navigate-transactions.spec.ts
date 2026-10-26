@@ -103,7 +103,7 @@ describe('Navigate transactions', function () {
         await createRedesignedMultipleTransactions(driver, TRANSACTION_COUNT);
 
         const navigation = new Confirmation(driver);
-        await navigation.clickFooterButton({ button: 'cancel' });
+        await navigation.clickFooterCancelButton();
 
         await navigation.checkPageNumbers(1, 3);
       },
@@ -127,7 +127,7 @@ describe('Navigate transactions', function () {
         await createRedesignedMultipleTransactions(driver, TRANSACTION_COUNT);
 
         const navigation = new Confirmation(driver);
-        await navigation.clickFooterButton({ button: 'confirm' });
+        await navigation.clickFooterConfirmButton();
 
         await navigation.checkPageNumbers(1, 3);
       },

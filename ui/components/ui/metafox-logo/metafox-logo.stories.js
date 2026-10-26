@@ -7,6 +7,9 @@ export default {
   title: 'Components/UI/MetaFoxLogo',
 
   argTypes: {
+    onClick: {
+      action: 'onClick',
+    },
     unsetIconHeight: {
       control: 'boolean',
     },

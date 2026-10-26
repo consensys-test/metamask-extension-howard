@@ -1,7 +1,10 @@
 import { ERC1155, ERC721 } from '@metamask/controller-utils';
 
 import { EVM_NATIVE_ASSET } from '../../../../test/data/send/assets';
-import { findNetworkClientIdByChainId } from '../../../store/actions';
+import {
+  findNetworkClientIdByChainId,
+  getLayer1GasFeeValue,
+} from '../../../store/actions';
 import { Asset } from '../types/send';
 import {
   prepareEVMTransaction,
@@ -11,6 +14,7 @@ import {
   formatToFixedDecimals,
   convertedCurrency,
   navigateToSendRoute,
+  getLayer1GasFees,
   trimTrailingZeros,
   removeAdditionalDecimalPlaces,
   getFractionLength,
@@ -23,6 +27,7 @@ jest.mock('../../../store/actions', () => {
   return {
     ...jest.requireActual('../../../store/actions'),
     findNetworkClientIdByChainId: jest.fn().mockResolvedValue('mainnet'),
+    getLayer1GasFeeValue: jest.fn(),
   };
 });
 
@@ -228,6 +233,21 @@ describe('Send - utils', () => {
       expect(removeAdditionalDecimalPlaces('100.12345', 8)).toEqual(
         '100.12345',
       );
+    });
+  });
+
+  describe('getLayer1GasFees', () => {
+    it('call action getLayer1GasFeeValue with correct parameters', () => {
+      getLayer1GasFees({
+        asset: EVM_NATIVE_ASSET,
+        chainId: '0x1',
+        from: '0x123',
+        value: '0x64',
+      });
+      expect(getLayer1GasFeeValue).toHaveBeenCalledWith({
+        chainId: '0x1',
+        transactionParams: { from: '0x123', value: '0x56bc75e2d63100000' },
+      });
     });
   });
 

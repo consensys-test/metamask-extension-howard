@@ -56,10 +56,7 @@ describe('Request Queuing - Extension and Dapp on different networks.', function
         // Confirm transaction
         const transactionConfirmation = new TransactionConfirmation(driver);
         await transactionConfirmation.checkPageIsLoaded();
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
 
         // Switch back to the extension
         await driver.switchToWindowWithTitle(

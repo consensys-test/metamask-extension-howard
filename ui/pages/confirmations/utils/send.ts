@@ -11,6 +11,7 @@ import { Numeric, NumericBase } from '../../../../shared/lib/Numeric';
 import {
   addTransactionAndRouteToConfirmationPage,
   findNetworkClientIdByChainId,
+  getLayer1GasFeeValue,
 } from '../../../store/actions';
 import { Asset } from '../types/send';
 import {
@@ -216,6 +217,26 @@ export const submitEvmTransaction = async ({
     networkClientId,
     type: transactionType,
   });
+};
+
+export const getLayer1GasFees = async ({
+  asset,
+  chainId,
+  from,
+  value,
+}: {
+  asset: Asset;
+  chainId: Hex;
+  from: Hex;
+  value: string;
+}): Promise<Hex | undefined> => {
+  return (await getLayer1GasFeeValue({
+    chainId,
+    transactionParams: {
+      value: fromTokenMinimalUnits(value, asset.decimals),
+      from,
+    },
+  })) as Hex | undefined;
 };
 
 export function isValidPositiveNumericString(str: string) {

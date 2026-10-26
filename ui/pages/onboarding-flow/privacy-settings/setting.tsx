@@ -10,6 +10,11 @@ import {
   TextColor,
   FontWeight,
 } from '@metamask/design-system-react';
+import {
+  TextVariant as TextVariantComponent,
+  TextColor as TextColorComponent,
+} from '../../../helpers/constants/design-system';
+import { Text as TextComponent } from '../../../components/component-library';
 import ToggleButton from '../../../components/ui/toggle-button';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 
@@ -72,14 +77,14 @@ export const Setting = ({
           </Box>
         ) : null}
       </Box>
-      <Text
-        variant={TextVariant.BodySm}
-        color={TextColor.TextAlternative}
-        asChild
+      <TextComponent
+        variant={TextVariantComponent.bodySm}
+        color={TextColorComponent.textAlternative}
+        as="div"
         className="w-full"
       >
-        <div>{description}</div>
-      </Text>
+        {description}
+      </TextComponent>
     </Box>
   );
 };

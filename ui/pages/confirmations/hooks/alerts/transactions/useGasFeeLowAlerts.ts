@@ -1,3 +1,5 @@
+'use no memo';
+
 import { useMemo } from 'react';
 import { TransactionMeta } from '@metamask/transaction-controller';
 import { Severity } from '../../../../../helpers/constants/design-system';
@@ -37,5 +39,5 @@ export function useGasFeeLowAlerts(): Alert[] {
         severity: Severity.Warning,
       },
     ];
-  }, [isLowEstimate, t]);
+  }, [isLowEstimate]);
 }

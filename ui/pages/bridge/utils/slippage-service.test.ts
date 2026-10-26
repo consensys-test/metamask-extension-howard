@@ -238,7 +238,7 @@ describe('Slippage Service', () => {
     describe('Edge cases', () => {
       it('returns bridge default when fromChain is null', () => {
         const context: SlippageContext = {
-          fromToken: undefined,
+          fromToken: null as never,
           toToken: mockWETH(),
         };
 
@@ -248,7 +248,7 @@ describe('Slippage Service', () => {
 
       it('returns bridge default when fromChain is undefined', () => {
         const context: SlippageContext = {
-          fromToken: undefined,
+          fromToken: null as never,
           toToken: mockWETH(),
         };
 
@@ -259,7 +259,7 @@ describe('Slippage Service', () => {
       it('returns bridge default when toChain is missing', () => {
         const context: SlippageContext = {
           fromToken: mockWETH(),
-          toToken: undefined,
+          toToken: null as never,
         };
 
         const result = calculateSlippage(context);
@@ -294,8 +294,8 @@ describe('Slippage Service', () => {
 
       it('handles missing tokens gracefully', () => {
         const context: SlippageContext = {
-          fromToken: undefined,
-          toToken: undefined,
+          fromToken: null as never,
+          toToken: null as never,
         };
 
         const result = calculateSlippage(context);
@@ -318,7 +318,7 @@ describe('Slippage Service', () => {
     it('returns correct reason for incomplete swap', () => {
       const context: SlippageContext = {
         fromToken: mockWETH(),
-        toToken: undefined,
+        toToken: null as never,
       };
 
       const reason = getSlippageReason(context);
@@ -389,8 +389,8 @@ describe('Slippage Service', () => {
 
     it('returns correct reason when no chain', () => {
       const context: SlippageContext = {
-        fromToken: undefined,
-        toToken: undefined,
+        fromToken: null as never,
+        toToken: null as never,
       };
 
       const reason = getSlippageReason(context);

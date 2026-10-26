@@ -68,7 +68,7 @@ const OfficialLinkButton = ({
 }) => (
   <button
     type="button"
-    className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-muted px-3 py-2 rounded-full"
+    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-muted px-3 py-2"
     onClick={onClick}
     data-testid={testId}
   >
@@ -678,10 +678,7 @@ const SecurityTrustPage = () => {
     );
 
   return (
-    <ScrollContainer
-      className="main-container asset__container"
-      data-testid="asset-page-scroll-container"
-    >
+    <ScrollContainer className="main-container asset__container">
       {pageContent}
     </ScrollContainer>
   );

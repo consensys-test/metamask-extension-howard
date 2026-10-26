@@ -22,7 +22,7 @@ import {
 } from '../../../../../components/app/confirm/info/row/row';
 import { ConfirmInfoRowText } from '../../../../../components/app/confirm/info/row/text';
 import {
-  useIsTransactionPayQuotePending,
+  useIsTransactionPayLoading,
   useTransactionPayQuotes,
   useTransactionPayTotals,
 } from '../../../hooks/pay/useTransactionPayData';
@@ -30,13 +30,8 @@ import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useFiatFormatter } from '../../../../../hooks/useFiatFormatter';
 import { useConfirmContext } from '../../../context/confirm';
 import { isPerpsWithdrawTransaction } from '../../../../../../shared/lib/transactions.utils';
-import { getUserPaidNetworkFeeUsd } from '../../../hooks/pay/sponsored-network-fees';
-import {
-  useIsPaidByMetaMask,
-  useSponsoredNetworkFeeFlags,
-  type SponsoredNetworkFeeFlags,
-} from '../../../hooks/pay/useIsPaidByMetaMask';
 import { InfoPopoverTooltip } from '../../info-popover-tooltip';
+import { useIsPaidByMetaMask } from '../../../hooks/pay/useIsPaidByMetaMask';
 
 export type BridgeFeeRowProps = {
   variant?: ConfirmInfoRowSize;
@@ -53,12 +48,11 @@ export function BridgeFeeRow({
 }: BridgeFeeRowProps) {
   const t = useI18nContext();
   const formatFiat = useFiatFormatter({ overrideCurrency: 'usd' });
-  const isLoading = useIsTransactionPayQuotePending();
+  const isLoading = useIsTransactionPayLoading();
   const quotes = useTransactionPayQuotes();
   const totals = useTransactionPayTotals();
   const { currentConfirmation } = useConfirmContext<TransactionMeta>();
   const isPaidByMetaMask = useIsPaidByMetaMask();
-  const sponsoredNetworkFees = useSponsoredNetworkFeeFlags();
 
   const isPerpsWithdraw = isPerpsWithdrawTransaction(currentConfirmation);
 
@@ -71,10 +65,11 @@ export function BridgeFeeRow({
 
     const totalFee = new BigNumber(totals.fees.provider?.usd ?? '0')
       .plus(totals.fees.metaMask?.usd ?? '0')
-      .plus(getUserPaidNetworkFeeUsd(totals.fees, sponsoredNetworkFees));
+      .plus(totals.fees.sourceNetwork?.estimate?.usd ?? '0')
+      .plus(totals.fees.targetNetwork?.usd ?? '0');
 
     return formatFiat(totalFee.toNumber());
-  }, [totals, formatFiat, sponsoredNetworkFees]);
+  }, [totals, formatFiat]);
 
   const metamaskFeeUsd = useMemo(() => {
     const raw = new BigNumber(totals?.fees?.metaMask?.usd ?? '0');
@@ -102,7 +97,6 @@ export function BridgeFeeRow({
       metamaskFeeFormatted: metamaskFeeUsd,
       includeMetamaskFee: isSmall,
       useProviderFeeLabel: isPerpsWithdraw,
-      sponsoredNetworkFees,
     });
   }, [
     isPaidByMetaMask,
@@ -114,7 +108,6 @@ export function BridgeFeeRow({
     metamaskFeeUsd,
     isSmall,
     isPerpsWithdraw,
-    sponsoredNetworkFees,
   ]);
 
   if (isLoading) {
@@ -225,7 +218,6 @@ type BuildTooltipLinesArgs = {
   metamaskFeeFormatted: string;
   includeMetamaskFee: boolean;
   useProviderFeeLabel?: boolean;
-  sponsoredNetworkFees: SponsoredNetworkFeeFlags;
 };
 
 function buildTooltipLines({
@@ -236,12 +228,10 @@ function buildTooltipLines({
   metamaskFeeFormatted,
   includeMetamaskFee,
   useProviderFeeLabel,
-  sponsoredNetworkFees,
 }: BuildTooltipLinesArgs): string[] {
-  const userPaidNetworkFee = getUserPaidNetworkFeeUsd(
-    totals.fees,
-    sponsoredNetworkFees,
-  );
+  const networkFee = new BigNumber(
+    totals.fees.sourceNetwork?.estimate?.usd ?? '0',
+  ).plus(totals.fees.targetNetwork?.usd ?? '0');
 
   const providerFeeUsd = new BigNumber(totals.fees.provider?.usd ?? '0');
 
@@ -252,10 +242,8 @@ function buildTooltipLines({
     lines.push('');
   }
 
-  // Sponsorship is communicated by the row value, so the tooltip only breaks
-  // down amounts the user pays. Cross-chain deposits keep user-paid source gas.
   lines.push(
-    `${t('networkFee')}: ${formatFiat(userPaidNetworkFee.toNumber())}`,
+    `${t('networkFee')}: ${formatFiat(networkFee.toNumber())}`,
     `${useProviderFeeLabel ? t('providerFee') : t('bridgeFee')}: ${formatFiat(
       providerFeeUsd.toNumber(),
     )}`,

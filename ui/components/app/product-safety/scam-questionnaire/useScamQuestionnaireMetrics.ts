@@ -42,7 +42,7 @@ function useValueAtRisk(): number | undefined {
   }, [balanceChanges]);
 }
 
-export function useScamQuestionnaireMetrics(trigger: string) {
+export function useScamQuestionnaireMetrics() {
   const { trackEvent, createEventBuilder } = useAnalytics();
   const valueAtRisk = useValueAtRisk();
 
@@ -57,7 +57,6 @@ export function useScamQuestionnaireMetrics(trigger: string) {
           .addProperties({
             ...properties,
             questionnaire_version: QUESTIONNAIRE_VERSION,
-            questionnaire_trigger: trigger,
           })
           .build(),
       );
@@ -74,7 +73,7 @@ export function useScamQuestionnaireMetrics(trigger: string) {
         }),
 
       trackContactSupport: (answers: Answers) =>
-        fire(MetaMetricsEventName.ScamQuestionnaireSupportContacted, {
+        fire(MetaMetricsEventName.ScamQuestionnaireContactSupport, {
           ...getAnswerRecord(answers),
           red_flag_count: getRedFlagCount(answers),
           simulation_sending_assets_total_value: valueAtRisk,
@@ -94,5 +93,5 @@ export function useScamQuestionnaireMetrics(trigger: string) {
           simulation_sending_assets_total_value: valueAtRisk,
         }),
     };
-  }, [createEventBuilder, trigger, trackEvent, valueAtRisk]);
+  }, [createEventBuilder, trackEvent, valueAtRisk]);
 }

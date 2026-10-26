@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Hex } from '@metamask/utils';
 import { TransactionMeta } from '@metamask/transaction-controller';
 import {
@@ -32,21 +32,33 @@ export const GasPriceInput = ({
     currentConfirmation?.txParams?.gasPrice as string,
   ).toString();
   const [value, setValue] = useState(initialGasPrice);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const error = useMemo(() => validateGasPrice(value, t), [t, value]);
+  const validateGasPriceCallback = useCallback(
+    (valueToBeValidated: string): string | undefined => {
+      const validationError = validateGasPrice(valueToBeValidated, t);
+      setError(validationError);
+      return validationError;
+    },
+    [t],
+  );
 
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = event.target.value;
-      const validationError = validateGasPrice(newValue, t);
+      const validationError = validateGasPriceCallback(newValue);
       setValue(newValue);
       if (!validationError) {
         const updatedGasPrice = decGWEIToHexWEI(newValue) as Hex;
         onChange(updatedGasPrice);
       }
     },
-    [onChange, t],
+    [onChange, validateGasPriceCallback],
   );
+
+  useEffect(() => {
+    validateGasPriceCallback(value);
+  }, [validateGasPriceCallback, value]);
 
   useEffect(() => {
     onErrorChange(error);

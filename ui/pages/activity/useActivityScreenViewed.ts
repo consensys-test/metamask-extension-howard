@@ -41,10 +41,7 @@ export const useActivityScreenViewed = ({
   // Keep the latest metric values without making them effect dependencies so
   // the event always captures the state at the moment the list settles.
   const metricsRef = useRef({ isEmpty, pendingLength, networkFilter });
-
-  useEffect(() => {
-    metricsRef.current = { isEmpty, pendingLength, networkFilter };
-  }, [isEmpty, pendingLength, networkFilter]);
+  metricsRef.current = { isEmpty, pendingLength, networkFilter };
 
   const hasTrackedRef = useRef(false);
 
@@ -73,5 +70,5 @@ export const useActivityScreenViewed = ({
         })
         .build(),
     );
-  }, [filter, isSettled, trackEvent, createEventBuilder, entryPoint]);
+  }, [filter, isSettled, trackEvent, entryPoint]);
 };

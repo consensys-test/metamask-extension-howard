@@ -1,4 +1,4 @@
-import { isDeepLinkHost } from '../../../shared/lib/deep-links/common';
+import { DEEP_LINK_HOST } from '../../../shared/lib/deep-links/constants';
 import { NavigationOrigin, parse } from '../../../shared/lib/deep-links/parse';
 
 export function isInternalRouteHref(href: string): boolean {
@@ -8,6 +8,10 @@ export function isInternalRouteHref(href: string): boolean {
 function toInternalHref(path: string, query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `${path}?${queryString}` : path;
+}
+
+function isDeepLinkHost(hostname: string): boolean {
+  return hostname === DEEP_LINK_HOST || hostname.endsWith(`.${DEEP_LINK_HOST}`);
 }
 
 /**

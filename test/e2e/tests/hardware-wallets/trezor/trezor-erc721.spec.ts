@@ -94,7 +94,7 @@ describe('Trezor Hardware', function (this: Suite) {
         await testDappPage.clickERC721MintButton();
         await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
         const mintConfirmation = new TransactionConfirmation(driver);
-        await mintConfirmation.clickFooterButton({ button: 'confirm' });
+        await mintConfirmation.clickFooterConfirmButton();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );
@@ -159,7 +159,7 @@ describe('Trezor Hardware', function (this: Suite) {
         await testDappPage.clickERC721ApproveButton();
         await driver.switchToWindowWithTitle(WINDOW_TITLES.Dialog);
         const approveConfirmation = new TransactionConfirmation(driver);
-        await approveConfirmation.clickFooterButton({ button: 'confirm' });
+        await approveConfirmation.clickFooterConfirmButton();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );
@@ -220,9 +220,7 @@ describe('Trezor Hardware', function (this: Suite) {
         await setApprovalForAllConfirmation.checkSetApprovalForAllTitle();
         await setApprovalForAllConfirmation.checkSetApprovalForAllSubHeading();
         await setApprovalForAllConfirmation.clickScrollToBottomButton();
-        await setApprovalForAllConfirmation.clickFooterButton({
-          button: 'confirm',
-        });
+        await setApprovalForAllConfirmation.clickFooterConfirmButton();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );

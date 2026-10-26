@@ -1,5 +1,4 @@
 import { Text } from '@metamask/design-system-react';
-import { isObject } from '@metamask/utils';
 import browser from 'webextension-polyfill';
 import React, { useEffect, useState } from 'react';
 
@@ -46,9 +45,7 @@ const MigrateToSplitStateTest = () => {
 
       setEnabled(toEnabledString(splitStateMigrationEnabled));
       setStorageKind(
-        isObject(meta) && typeof meta.storageKind === 'string'
-          ? meta.storageKind
-          : 'data',
+        typeof meta?.storageKind === 'string' ? meta.storageKind : 'data',
       );
       setMaxAccounts(
         splitStateMigrationMaxAccounts === undefined

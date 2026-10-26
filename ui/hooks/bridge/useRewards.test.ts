@@ -201,8 +201,8 @@ describe('useRewards', () => {
     mockGetInternalAccountBySelectedAccountGroupAndCaip.mockReturnValue(
       mockSelectedAccount,
     );
-    mockSelectRewardsEnabled.mockReturnValue(true);
-    mockSelectRewardsAccountLinkedTimestamp.mockReturnValue(null);
+    mockSelectRewardsEnabled.mockReturnValue(true as never);
+    mockSelectRewardsAccountLinkedTimestamp.mockReturnValue(null as never);
     mockGetRewardsCandidateSubscriptionId.mockReturnValue(
       jest.fn().mockResolvedValue('subscription-id'),
     );
@@ -442,7 +442,7 @@ describe('useRewards', () => {
     });
 
     it('should not estimate points when currentChainId is missing', async () => {
-      mockUseMultichainSelector.mockReturnValue(null);
+      mockUseMultichainSelector.mockReturnValue(null as never);
 
       const { result } = renderHookWithProvider(
         () => useRewards({ activeQuote: mockActiveQuote }),
@@ -457,7 +457,7 @@ describe('useRewards', () => {
     });
 
     it('should not estimate points when rewardsEnabled is false', async () => {
-      mockSelectRewardsEnabled.mockReturnValue(false);
+      mockSelectRewardsEnabled.mockReturnValue(false as never);
 
       const { result } = renderHookWithProvider(
         () => useRewards({ activeQuote: mockActiveQuote }),
@@ -652,7 +652,7 @@ describe('useRewards', () => {
     });
 
     it('should handle rewardsEnabled being false', async () => {
-      mockSelectRewardsEnabled.mockReturnValue(false);
+      mockSelectRewardsEnabled.mockReturnValue(false as never);
 
       const { result } = renderHookWithProvider(
         () =>

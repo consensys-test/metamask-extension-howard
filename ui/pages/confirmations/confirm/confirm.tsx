@@ -31,10 +31,7 @@ const Confirm = ({ confirmationId }: { confirmationId?: string }) => {
           <TransactionModalContextProvider>
             <ConfirmAlerts>
               <>
-                <Page
-                  className="confirm_wrapper"
-                  data-testid="parent-selector-confirmation-page"
-                >
+                <Page className="confirm_wrapper">
                   <ConfirmNav />
                   <Header />
                   <SmartTransactionsBannerAlert marginType="noTop" />

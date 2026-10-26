@@ -50,8 +50,7 @@ const getMetaMaskStateWithUnapprovedContractDeployment = ({
     analyticsId: 'test-metametrics-id',
     consentDecisionMade: true,
     optedIn: true,
-    optedInToMarketing: false,
-    marketingConsentDecisionMade: true,
+    dataCollectionForMarketing: false,
     preferences: {
       ...mockMetaMaskState.preferences,
       showConfirmationAdvancedDetails,

@@ -3,8 +3,8 @@ import { Driver } from '../../webdriver/driver';
 import { withFixtures } from '../../helpers';
 import FixtureBuilderV2 from '../../fixtures/fixture-builder-v2';
 import { login } from '../../page-objects/flows/login.flow';
-import AccountListPage from '../../page-objects/pages/accounts/list-page';
-import HeaderNavbar from '../../page-objects/pages/home/header-navbar';
+import AccountListPage from '../../page-objects/pages/account-list-page';
+import HeaderNavbar from '../../page-objects/pages/header-navbar';
 
 // Hide/unhide is not available in BIP44 stage 2
 describe('Account list - hide/unhide functionality', function (this: Suite) {
@@ -22,14 +22,11 @@ describe('Account list - hide/unhide functionality', function (this: Suite) {
         const accountListPage = new AccountListPage(driver);
         await accountListPage.checkPageIsLoaded();
         await accountListPage.hideAccount();
-        await accountListPage.checkAccountIsNotDisplayedInAccountList(
-          'Account 1',
-        );
+        await accountListPage.checkHiddenAccountsListExists();
 
-        // unhide account from the manage accounts mode
-        await accountListPage.enterManageAccountsMode();
-        await accountListPage.revealHiddenAccount();
-        await accountListPage.exitManageAccountsMode();
+        // unhide account
+        await accountListPage.openHiddenAccountsList();
+        await accountListPage.unhideAccount();
         await accountListPage.checkAccountDisplayedInAccountList();
       },
     );

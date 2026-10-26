@@ -1,5 +1,5 @@
 import React from 'react';
-import { StoryObj, Meta } from '@storybook/react-webpack5';
+import { StoryObj, Meta } from '@storybook/react';
 import { Provider } from 'react-redux';
 import {
   Caip25CaveatType,

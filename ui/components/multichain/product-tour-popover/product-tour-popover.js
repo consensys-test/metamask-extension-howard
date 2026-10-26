@@ -4,11 +4,7 @@ import PropTypes from 'prop-types';
 import {
   Button,
   ButtonBaseSize,
-  ButtonIcon,
-  ButtonIconSize,
   ButtonVariant,
-  IconColor,
-  IconName,
 } from '@metamask/design-system-react';
 import {
   AlignItems,
@@ -16,12 +12,19 @@ import {
   BlockSize,
   BorderRadius,
   Display,
+  IconColor,
   JustifyContent,
   TextAlign,
   TextColor,
   TextVariant,
 } from '../../../helpers/constants/design-system';
-import { Box, Text } from '../../component-library';
+import {
+  Box,
+  ButtonIcon,
+  ButtonIconSize,
+  IconName,
+  Text,
+} from '../../component-library';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { Menu } from '../../ui/menu';
 
@@ -80,7 +83,7 @@ export const ProductTour = ({
             <ButtonIcon
               iconName={IconName.ArrowLeft}
               size={ButtonIconSize.Sm}
-              iconProps={{ className: IconColor.InfoInverse }}
+              color={IconColor.infoInverse}
               onClick={prevClick}
               className="multichain-product-tour-menu__previous-icon"
               data-testid="multichain-product-tour-menu-popover-prevIcon"

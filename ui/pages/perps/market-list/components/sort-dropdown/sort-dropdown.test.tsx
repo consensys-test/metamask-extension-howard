@@ -3,7 +3,6 @@ import { fireEvent, screen } from '@testing-library/react';
 import { renderWithProvider } from '../../../../../../test/lib/render-helpers-navigate';
 import configureStore from '../../../../../store/store';
 import mockState from '../../../../../../test/data/mock-state.json';
-import { enLocale as messages } from '../../../../../../test/lib/i18n-helpers';
 import { SortDropdown, SORT_FIELD_OPTIONS } from './sort-dropdown';
 
 const mockStore = configureStore({
@@ -61,35 +60,14 @@ describe('SortDropdown', () => {
       });
     });
 
-    it('shows the direction on the selected field rather than in its own section', () => {
-      // Figma 12602:46701 folds the rank into the sort row: one list, and the
-      // field in force carries its direction inline.
+    it('renders direction options in modal', () => {
       renderWithProvider(<SortDropdown {...defaultProps} />, mockStore);
 
-      fireEvent.click(screen.getByTestId('sort-dropdown-button'));
+      const button = screen.getByTestId('sort-dropdown-button');
+      fireEvent.click(button);
 
-      const direction = screen.getByTestId('sort-field-direction');
-
-      expect(direction).toHaveTextContent(
-        messages.perpsSortByHighToLow.message,
-      );
-      expect(screen.getByTestId('sort-field-option-volume')).toContainElement(
-        direction,
-      );
-      expect(
-        screen.queryByTestId('sort-direction-desc'),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId('sort-direction-asc'),
-      ).not.toBeInTheDocument();
-    });
-
-    it('shows the direction only on the field in force', () => {
-      renderWithProvider(<SortDropdown {...defaultProps} />, mockStore);
-
-      fireEvent.click(screen.getByTestId('sort-dropdown-button'));
-
-      expect(screen.getAllByTestId('sort-field-direction')).toHaveLength(1);
+      expect(screen.getByTestId('sort-direction-desc')).toBeInTheDocument();
+      expect(screen.getByTestId('sort-direction-asc')).toBeInTheDocument();
     });
 
     it('renders apply and cancel buttons', () => {
@@ -114,10 +92,8 @@ describe('SortDropdown', () => {
       const button = screen.getByTestId('sort-dropdown-button');
       fireEvent.click(button);
 
-      // Choosing another field keeps the direction; pressing the field already
-      // in force reverses it.
       fireEvent.click(screen.getByTestId('sort-field-option-priceChange'));
-      fireEvent.click(screen.getByTestId('sort-field-option-priceChange'));
+      fireEvent.click(screen.getByTestId('sort-direction-asc'));
       fireEvent.click(screen.getByTestId('sort-modal-apply'));
 
       expect(onChange).toHaveBeenCalledWith('priceChange', 'asc');

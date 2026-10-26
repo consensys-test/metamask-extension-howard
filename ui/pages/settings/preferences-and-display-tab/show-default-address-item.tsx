@@ -6,6 +6,7 @@ import { useI18nContext } from '../../../hooks/useI18nContext';
 import {
   getShowDefaultAddressPreference,
   getDefaultAddressScope,
+  getIsDefaultAddressEnabled,
 } from '../../../selectors';
 import {
   setShowDefaultAddress,
@@ -29,6 +30,7 @@ export const ShowDefaultAddressItem = () => {
   const dispatch = useDispatch();
   const { trackEvent, createEventBuilder } = useAnalytics();
 
+  const isDefaultAddressEnabled = useSelector(getIsDefaultAddressEnabled);
   const showDefaultAddress = useSelector(getShowDefaultAddressPreference);
   const defaultAddressScope = useSelector(
     getDefaultAddressScope,
@@ -70,6 +72,10 @@ export const ShowDefaultAddressItem = () => {
       dispatch(setShowDefaultAddress(true));
     }
   };
+
+  if (!isDefaultAddressEnabled) {
+    return null;
+  }
 
   return (
     <Box flexDirection={BoxFlexDirection.Column} gap={1} marginBottom={3}>

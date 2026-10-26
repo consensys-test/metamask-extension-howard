@@ -15,9 +15,10 @@ import {
 import { getPreferences } from '../../../../../shared/lib/selectors/preferences';
 import {
   getMultichainNativeTokenBalance,
-  selectIsAssetsLoadingForSelectedAccountGroup,
+  selectBalanceBySelectedAccountGroup,
   selectUnifiedBalanceBySelectedAccountGroup,
 } from '../../../../selectors/assets';
+import { getIsAssetsUnifyStateEnabled } from '../../../../selectors/assets-unify-state';
 import * as useMultichainSelectorHook from '../../../../hooks/useMultichainSelector';
 import {
   AccountGroupBalance,
@@ -31,6 +32,9 @@ const MAINNET_CHAIN_ID = '0x1';
 const SOLANA_CHAIN_ID = 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp';
 
 jest.mock('../../../../selectors/assets');
+jest.mock('../../../../selectors/assets-unify-state', () => ({
+  getIsAssetsUnifyStateEnabled: jest.fn(() => false),
+}));
 jest.mock('../../../../selectors');
 jest.mock('../../../../ducks/locale/locale');
 jest.mock('../../../../ducks/metamask/metamask');
@@ -51,7 +55,7 @@ describe('AccountGroupBalance', () => {
     anyEnabledNetworksAreAvailable?: boolean;
     showFiatInTestnets?: boolean;
     privacyMode?: boolean;
-    isAssetsLoading?: boolean;
+    isAssetsUnifyStateEnabled?: boolean;
   };
 
   const arrange = ({
@@ -61,15 +65,19 @@ describe('AccountGroupBalance', () => {
     anyEnabledNetworksAreAvailable = true,
     showFiatInTestnets = false,
     privacyMode = false,
-    isAssetsLoading = false,
+    isAssetsUnifyStateEnabled = false,
   }: ArrangeOptions = {}) => {
     jest
-      .mocked(selectUnifiedBalanceBySelectedAccountGroup)
-      .mockReturnValue(selectedGroupBalance);
+      .mocked(getIsAssetsUnifyStateEnabled)
+      .mockReturnValue(isAssetsUnifyStateEnabled);
+
+    const mockSelectBalanceBySelectedAccountGroup = jest
+      .mocked(selectBalanceBySelectedAccountGroup)
+      .mockReturnValue(isAssetsUnifyStateEnabled ? null : selectedGroupBalance);
 
     jest
-      .mocked(selectIsAssetsLoadingForSelectedAccountGroup)
-      .mockReturnValue(isAssetsLoading);
+      .mocked(selectUnifiedBalanceBySelectedAccountGroup)
+      .mockReturnValue(isAssetsUnifyStateEnabled ? selectedGroupBalance : null);
 
     jest
       .mocked(selectAnyEnabledNetworksAreAvailable)
@@ -105,6 +113,7 @@ describe('AccountGroupBalance', () => {
     } as ReturnType<typeof getMultichainNativeTokenBalance>);
 
     return {
+      mockSelectBalanceBySelectedAccountGroup,
       mockGetPreferences,
       mockGetIntlLocale,
       mockGetCurrentCurrency,
@@ -155,6 +164,18 @@ describe('AccountGroupBalance', () => {
 
   it('renders formatted balance and currency when data available', () => {
     arrange({ selectedGroupBalance: createMockBalance() });
+    actAssertBalanceContent({
+      amount: '$123.45',
+      balance: '1000000000000000000',
+      chainId: MAINNET_CHAIN_ID,
+    });
+  });
+
+  it('uses unified balance selector when assets-unify-state is enabled', () => {
+    arrange({
+      selectedGroupBalance: createMockBalance(),
+      isAssetsUnifyStateEnabled: true,
+    });
     actAssertBalanceContent({
       amount: '$123.45',
       balance: '1000000000000000000',
@@ -243,34 +264,6 @@ describe('AccountGroupBalance', () => {
         (content) => content.includes('99.50') || content.includes('99.5'),
       ),
     ).toBeInTheDocument();
-  });
-
-  it('renders a skeleton instead of a zero balance while assets are first loading', () => {
-    arrange({
-      isAssetsLoading: true,
-      selectedGroupBalance: {
-        ...createMockBalance(),
-        totalBalanceInUserCurrency: 0,
-      },
-    });
-
-    const { getByTestId } = renderComponent();
-
-    expect(getByTestId('account-group-balance-skeleton')).toBeInTheDocument();
-  });
-
-  it('renders a non-zero balance while assets are first loading', () => {
-    arrange({
-      isAssetsLoading: true,
-      selectedGroupBalance: createMockBalance(),
-    });
-
-    const { getByText, queryByTestId } = renderComponent();
-
-    expect(
-      queryByTestId('account-group-balance-skeleton'),
-    ).not.toBeInTheDocument();
-    expect(getByText(/123\.45/u)).toBeInTheDocument();
   });
 
   it('renders skeleton when no networks available and no balance', () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Meta } from '@storybook/react-webpack5';
+import { Meta } from '@storybook/react';
 import { Provider } from 'react-redux';
 
 import { getMockContractInteractionConfirmState } from '../../../../../../../../test/data/confirmations/helper';

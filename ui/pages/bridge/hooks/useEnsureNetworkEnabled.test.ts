@@ -9,7 +9,7 @@ describe('useEnsureNetworkEnabled', () => {
   const arrange = () => {
     const mockAddNetwork = jest
       .spyOn(ActionsModule, 'addNetwork')
-      .mockReturnValue(jest.fn().mockResolvedValue(undefined));
+      .mockReturnValue(jest.fn().mockResolvedValue(undefined) as never);
 
     return { mockAddNetwork };
   };

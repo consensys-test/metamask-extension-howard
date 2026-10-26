@@ -40,7 +40,8 @@ async function runImportScripts() {
 
   const startImportScriptsTime = performance.now();
 
-  await import('./scripts/background');
+  // eslint-disable-next-line import-x/extensions
+  await import('./scripts/background.js');
 
   const endImportScriptsTime = performance.now();
 

@@ -4,7 +4,7 @@ import {
   UIMessengerActions,
   UIMessengerEvents,
 } from '../messengers/ui-messenger';
-import { RouteMessengerProvider } from '../contexts/route-messenger';
+import { RouteWithMessenger } from '../layouts/route-with-messenger';
 
 /**
  * Validate that each element of a tuple is a member of the given union,
@@ -44,8 +44,17 @@ export function defineAllowedRouteCapabilities<
   return capabilities as { actions: ActionTypes; events: EventTypes };
 }
 
+type RouteWithMessengerOptions = {
+  path: string;
+  element: React.ReactNode;
+  capabilities: {
+    actions?: UIMessengerActions['type'][];
+    events?: UIMessengerEvents['type'][];
+  };
+};
+
 /**
- * Create a route object with a {@link RouteMessengerProvider} element that provides
+ * Create a route object with a {@link RouteWithMessenger} element that provides
  * a route messenger with the specified capabilities.
  *
  * @param options - Options bag.
@@ -53,31 +62,22 @@ export function defineAllowedRouteCapabilities<
  * purposes and to ensure that the route messenger's namespace is unique across
  * routes.
  * @param options.element - The element to render for this route. This will be
- * wrapped in a {@link RouteMessengerProvider} component that provides the route
+ * wrapped in a {@link RouteWithMessenger} component that provides the route
  * messenger.
  * @param options.capabilities - Capabilities to delegate from the UI messenger
  * to the route messenger.
- * @param options.capabilities.actions
- * @param options.capabilities.events
  */
 export function createRouteWithMessenger({
   path,
   element,
   capabilities,
-}: {
-  path: string;
-  element: React.ReactNode;
-  capabilities: {
-    actions?: UIMessengerActions['type'][];
-    events?: UIMessengerEvents['type'][];
-  };
-}): RouteObject {
+}: RouteWithMessengerOptions): RouteObject {
   return {
     path,
     element: (
-      <RouteMessengerProvider path={path} capabilities={capabilities}>
+      <RouteWithMessenger path={path} capabilities={capabilities}>
         {element}
-      </RouteMessengerProvider>
+      </RouteWithMessenger>
     ),
   };
 }

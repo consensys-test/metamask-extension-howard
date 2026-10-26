@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { TransactionMeta } from '@metamask/transaction-controller';
 import { NameType } from '@metamask/name-controller';
-import type { Hex } from '@metamask/utils';
 import { Alert } from '../../../../ducks/confirm-alerts/confirm-alerts';
 import { Severity } from '../../../../helpers/constants/design-system';
 import { RowAlertKey } from '../../../../components/app/confirm/info/row/constants';
@@ -53,7 +52,7 @@ export function useAddressTrustSignalAlerts(): Alert[] {
   const { state: trustSignalDisplayState } = useTrustSignal(
     addressToCheck || '',
     NameType.ETHEREUM_ADDRESS,
-    currentConfirmation?.chainId as Hex | undefined,
+    currentConfirmation?.chainId,
   );
 
   return useMemo(() => {
@@ -70,7 +69,7 @@ export function useAddressTrustSignalAlerts(): Alert[] {
         isBlocking: false,
         key: 'trustSignalMalicious',
         message: t('alertMessageAddressTrustSignalMalicious'),
-        reason: t('alertReasonAddressTrustSignalMalicious'),
+        reason: t('nameModalTitleMalicious'),
         severity: Severity.Danger,
       });
     } else if (trustSignalDisplayState === TrustSignalDisplayState.Warning) {
@@ -80,7 +79,7 @@ export function useAddressTrustSignalAlerts(): Alert[] {
         isBlocking: false,
         key: 'trustSignalWarning',
         message: t('alertMessageAddressTrustSignal'),
-        reason: t('alertReasonAddressTrustSignalWarning'),
+        reason: t('nameModalTitleWarning'),
         severity: Severity.Warning,
       });
     }

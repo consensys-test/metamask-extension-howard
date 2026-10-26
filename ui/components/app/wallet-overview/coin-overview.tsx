@@ -13,7 +13,6 @@ import type { Hex } from '@metamask/utils';
 
 import { InternalAccount } from '@metamask/keyring-internal-api';
 import { Box, Skeleton } from '@metamask/design-system-react';
-import { useCoordinatedTrace } from '#ui/hooks/useTraceCoordinator';
 import { ButtonLink, IconName } from '../../component-library';
 import { TextVariant } from '../../../helpers/constants/design-system';
 import { getPortfolioUrl } from '../../../helpers/utils/portfolio';
@@ -29,7 +28,7 @@ import { getMultichainAccountAddressListReceivePagePath } from '../../../pages/m
 import Tooltip from '../../ui/tooltip';
 import UserPreferencedCurrencyDisplay from '../user-preferenced-currency-display';
 import { PRIMARY, SECONDARY } from '../../../helpers/constants/common';
-import { trace, TraceName, TraceOperation } from '../../../../shared/lib/trace';
+import { trace, TraceName } from '../../../../shared/lib/trace';
 import {
   getShouldHideZeroBalanceTokens,
   getIsTestnet,
@@ -37,7 +36,7 @@ import {
   getChainIdsToPoll,
   getDataCollectionForMarketing,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
   getEnabledNetworksByNamespace,
   selectAnyEnabledNetworksAreAvailable,
@@ -64,7 +63,6 @@ import {
   selectAccountGroupBalanceForEmptyState,
   selectAccountGroupBalanceIsLoadedForEmptyState,
   selectBalanceBySelectedAccountGroup,
-  selectIsAssetsLoadingForSelectedAccountGroup,
 } from '../../../selectors/assets';
 import { getSelectedAccountGroup } from '../../../selectors/multichain-accounts/account-tree';
 import { useAccountGroupBalanceDisplay } from '../assets/account-group-balance-change/useAccountGroupBalanceDisplay';
@@ -213,11 +211,13 @@ export const CoinOverview = ({
   const { trackEvent, createEventBuilder } = useAnalytics();
 
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
   const isMetaMetricsEnabled = useMemo(
-    () => consentDecisionMade && isOptedIn,
-    [consentDecisionMade, isOptedIn],
+    () => completedMetaMetricsOnboarding && isOptedIn,
+    [completedMetaMetricsOnboarding, isOptedIn],
   );
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
 
@@ -241,9 +241,6 @@ export const CoinOverview = ({
   const hasBalance = useSelector(selectAccountGroupBalanceForEmptyState);
   const balanceIsLoaded = useSelector(
     selectAccountGroupBalanceIsLoadedForEmptyState,
-  );
-  const isAssetsLoading = useSelector(
-    selectIsAssetsLoadingForSelectedAccountGroup,
   );
   const selectedGroupBalance = useSelector(selectBalanceBySelectedAccountGroup);
   const isTestnet = useSelector(getMultichainIsTestnet);
@@ -290,28 +287,14 @@ export const CoinOverview = ({
 
   const [hasZeroFiatBalanceDelayElapsed, setHasZeroFiatBalanceDelayElapsed] =
     useState(false);
-  const [prevDelayKey, setPrevDelayKey] = useState(enabledNetworksDelayKey);
-  const [prevShouldDelayZeroFiatBalance, setPrevShouldDelayZeroFiatBalance] =
-    useState(shouldDelayZeroFiatBalance);
-
-  if (
-    enabledNetworksDelayKey !== prevDelayKey ||
-    shouldDelayZeroFiatBalance !== prevShouldDelayZeroFiatBalance
-  ) {
-    setPrevDelayKey(enabledNetworksDelayKey);
-    setPrevShouldDelayZeroFiatBalance(shouldDelayZeroFiatBalance);
-    setHasZeroFiatBalanceDelayElapsed(false);
-  }
-
-  const isZeroFiatBalanceDelayStateCurrent =
-    enabledNetworksDelayKey === prevDelayKey &&
-    shouldDelayZeroFiatBalance === prevShouldDelayZeroFiatBalance;
 
   useEffect(() => {
     if (!shouldDelayZeroFiatBalance) {
+      setHasZeroFiatBalanceDelayElapsed(false);
       return undefined;
     }
 
+    setHasZeroFiatBalanceDelayElapsed(false);
     const timeoutId = setTimeout(() => {
       setHasZeroFiatBalanceDelayElapsed(true);
     }, ZERO_FIAT_BALANCE_DELAY_MS);
@@ -322,22 +305,18 @@ export const CoinOverview = ({
   const shouldShowBalanceLoadingState = useMemo(
     () =>
       isEvm &&
-      ((shouldDelayZeroFiatBalance &&
-        (!isZeroFiatBalanceDelayStateCurrent ||
-          !hasZeroFiatBalanceDelayElapsed)) ||
+      ((shouldDelayZeroFiatBalance && !hasZeroFiatBalanceDelayElapsed) ||
         (shouldCheckBalanceState &&
           !hasBalance &&
-          (balanceIsLoading || !balanceIsLoaded || isAssetsLoading))),
+          (balanceIsLoading || !balanceIsLoaded))),
     [
       isEvm,
       shouldDelayZeroFiatBalance,
-      isZeroFiatBalanceDelayStateCurrent,
       hasZeroFiatBalanceDelayElapsed,
       shouldCheckBalanceState,
       hasBalance,
       balanceIsLoading,
       balanceIsLoaded,
-      isAssetsLoading,
     ],
   );
 
@@ -349,19 +328,6 @@ export const CoinOverview = ({
       !shouldShowBalanceLoadingState,
     [isEvm, shouldCheckBalanceState, hasBalance, shouldShowBalanceLoadingState],
   );
-  const balanceReady = !shouldShowBalanceLoadingState;
-
-  useCoordinatedTrace({
-    name: TraceName.HomepageSectionTimeToContent,
-    op: TraceOperation.HomepageSectionPerformance,
-    generationKey: `${selectedAccountGroup ?? 'none'}:${enabledNetworksDelayKey}`,
-    ready: balanceReady,
-    sectionId: 'balance',
-    data: {
-      success: true,
-      contentState: shouldShowBalanceEmptyState ? 'empty' : 'filled',
-    },
-  });
 
   const handleSensitiveToggle = useCallback(() => {
     dispatch(setPrivacyMode(!privacyMode));

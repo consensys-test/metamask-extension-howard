@@ -1,17 +1,10 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useState,
-  useRef,
-  useCallback,
-} from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { CandleData } from '@metamask/perps-controller';
 import type {
   CandlePeriod,
   TimeDuration,
 } from '../../../components/app/perps/constants/chartConfig';
 import { getPerpsStreamManager } from '../../../providers/perps/PerpsStreamManager';
-import { usePerpsStreamManager } from './usePerpsStreamManager';
 
 /**
  * Options for usePerpsLiveCandles hook
@@ -90,40 +83,33 @@ export function usePerpsLiveCandles(
   options: UsePerpsLiveCandlesOptions,
 ): UsePerpsLiveCandlesReturn {
   const { symbol, interval, duration, throttleMs = 1000, onError } = options;
-  const { streamManager } = usePerpsStreamManager();
 
   const [candleData, setCandleData] = useState<CandleData | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const hasReceivedFirstUpdate = useRef(false);
-  const symbolRef = useRef(symbol);
-  const intervalRef = useRef(interval);
 
-  useLayoutEffect(() => {
-    symbolRef.current = symbol;
-    intervalRef.current = interval;
-  }, [symbol, interval]);
+  // Stable refs for the current subscription params (for validation in callbacks)
+  const currentSymbolRef = useRef(symbol);
+  const currentIntervalRef = useRef(interval);
+  currentSymbolRef.current = symbol;
+  currentIntervalRef.current = interval;
 
-  const subscriptionKey = `${symbol}|${interval}|${duration ?? ''}|${throttleMs}`;
-  const [prevSubscriptionKey, setPrevSubscriptionKey] =
-    useState(subscriptionKey);
-
-  if (subscriptionKey !== prevSubscriptionKey) {
-    setPrevSubscriptionKey(subscriptionKey);
+  useEffect(() => {
+    // Reset state when symbol or interval changes
     setCandleData(null);
+    setIsInitialLoading(true);
     setError(null);
-    setIsInitialLoading(Boolean(symbol && interval));
-  }
-
-  useEffect(() => {
     hasReceivedFirstUpdate.current = false;
-  }, [subscriptionKey]);
 
-  useEffect(() => {
-    if (!symbol || !interval || !streamManager) {
+    if (!symbol || !interval) {
+      setCandleData(null);
+      setIsInitialLoading(false);
       return undefined;
     }
+
+    const streamManager = getPerpsStreamManager();
 
     const unsubscribe = streamManager.candles.subscribe({
       symbol,
@@ -134,8 +120,8 @@ export function usePerpsLiveCandles(
         // Validate incoming data matches current subscription
         // (prevents stale data from race conditions during symbol/interval switch)
         if (
-          data.symbol !== symbolRef.current ||
-          data.interval !== intervalRef.current
+          data.symbol !== currentSymbolRef.current ||
+          data.interval !== currentIntervalRef.current
         ) {
           return;
         }
@@ -159,7 +145,7 @@ export function usePerpsLiveCandles(
     return () => {
       unsubscribe();
     };
-  }, [streamManager, symbol, interval, duration, throttleMs, onError]);
+  }, [symbol, interval, duration, throttleMs, onError]);
 
   // Fetch more historical candles (scroll-left load-more)
   const fetchMoreHistory = useCallback(() => {
@@ -169,8 +155,8 @@ export function usePerpsLiveCandles(
 
     setIsLoadingMore(true);
 
-    const manager = getPerpsStreamManager();
-    manager.candles
+    const streamManager = getPerpsStreamManager();
+    streamManager.candles
       .fetchHistoricalCandles(symbol, interval, duration)
       .catch((err: unknown) => {
         console.error('[usePerpsLiveCandles] fetchMoreHistory failed:', err);

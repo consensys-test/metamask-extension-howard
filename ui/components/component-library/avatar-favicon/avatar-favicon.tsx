@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import classnames from 'clsx';
 import { AvatarBase, AvatarBaseProps } from '../avatar-base';
 import { IconName, Icon, IconSize } from '../icon';
@@ -22,12 +22,10 @@ const Favicon = (props: { src?: string; name: string }) => {
   const { src, name } = props;
   const t = useI18nContext();
   const [imageLoadError, setImageLoadError] = useState(false);
-  const [prevSrc, setPrevSrc] = useState(src);
 
-  if (src !== prevSrc) {
-    setPrevSrc(src);
+  useEffect(() => {
     setImageLoadError(false);
-  }
+  }, [src]);
 
   const handleImageError = () => {
     setImageLoadError(true);

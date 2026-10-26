@@ -57,17 +57,8 @@ export const MultichainAggregatedAddressListRow = ({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update `displayText` when the address prop changes
-  const prevAddressRef = useRef<typeof address | undefined>(undefined);
   useEffect(() => {
-    if (prevAddressRef.current === undefined) {
-      prevAddressRef.current = address;
-      return;
-    }
-    if (address === prevAddressRef.current) {
-      return;
-    }
-    prevAddressRef.current = address;
-    queueMicrotask(() => setDisplayText(truncatedAddress));
+    setDisplayText(truncatedAddress);
   }, [address, truncatedAddress]);
 
   // Cleanup timeout when component unmounts
@@ -83,6 +74,10 @@ export const MultichainAggregatedAddressListRow = ({
   const networks = useSelector((state) => getNetworksByScopes(state, chainIds));
 
   const groupName = useMemo(() => {
+    if (networks[0]?.name === 'Bitcoin') {
+      return t('networkNameBitcoinSegwit');
+    }
+
     return chainIds.some((chain) => chain.startsWith('eip155:'))
       ? t('networkNameEthereum')
       : networks[0]?.name;

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Checkbox } from '@metamask/design-system-react';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import {
   BackgroundColor,
@@ -17,6 +16,7 @@ import {
 import {
   AvatarIcon,
   AvatarIconSize,
+  Checkbox,
   Box,
   IconName,
   Text,
@@ -247,13 +247,9 @@ export default function SnapInstallWarning({
             }
           >
             <Checkbox
-              id="snap-install-warning-checkbox"
-              inputProps={{
-                required: true,
-                'data-testid': 'snap-install-warning-checkbox',
-              }}
+              isRequired
               onChange={() => setUserAgree((state) => !state)}
-              isSelected={userAgree}
+              isChecked={userAgree}
               label={
                 <Text as="span">
                   Install{' '}

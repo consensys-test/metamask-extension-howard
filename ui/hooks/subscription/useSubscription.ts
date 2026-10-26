@@ -1,12 +1,5 @@
 import { useSelector } from 'react-redux';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CANCEL_TYPES,
   PAYMENT_TYPES,
@@ -217,11 +210,8 @@ export const useCancelSubscription = (subscription?: Subscription) => {
       }
 
       const subscriptionId = subscription.id;
-      // Missing cancelType defaults to period-end cancellation, matching the
-      // cancel modal's default copy. cancelType is optional since
-      // subscription-controller@10 (required again in the type here only
-      // because the UI compiles against v8).
-      const cancelAtPeriodEnd = cancelType !== CANCEL_TYPES.ALLOWED_IMMEDIATE;
+      const cancelAtPeriodEnd =
+        cancelType === CANCEL_TYPES.ALLOWED_AT_PERIOD_END;
 
       await dispatch(cancelSubscription({ subscriptionId, cancelAtPeriodEnd }));
       trackMembershipCancelledEvent('succeeded');
@@ -240,7 +230,7 @@ export const useUnCancelSubscription = (subscription?: Subscription) => {
     useSubscriptionMetrics();
 
   const trackSubscriptionUncancelRequestEvent = useCallback(
-    (status: 'succeeded' | 'failed', error?: string) => {
+    (status: 'completed' | 'failed', errorMessage?: string) => {
       if (!subscription) {
         return;
       }
@@ -254,8 +244,8 @@ export const useUnCancelSubscription = (subscription?: Subscription) => {
         billingInterval: subscription.interval,
         cryptoPaymentChain,
         cryptoPaymentCurrency,
-        status,
-        error,
+        requestStatus: status,
+        errorMessage,
       });
     },
     [captureShieldSubscriptionRestartRequestEvent, subscription],
@@ -268,7 +258,7 @@ export const useUnCancelSubscription = (subscription?: Subscription) => {
         return;
       }
       await dispatch(unCancelSubscription({ subscriptionId }));
-      trackSubscriptionUncancelRequestEvent('succeeded');
+      trackSubscriptionUncancelRequestEvent('completed');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -959,10 +949,7 @@ export const useSubscriptionError = (): {
 
   // Keep a ref so the unmount-only cleanup can read the latest value
   const shieldSubscriptionErrorRef = useRef(shieldSubscriptionError);
-
-  useLayoutEffect(() => {
-    shieldSubscriptionErrorRef.current = shieldSubscriptionError;
-  }, [shieldSubscriptionError]);
+  shieldSubscriptionErrorRef.current = shieldSubscriptionError;
 
   // Clear shield subscription error when unmounting
   useEffect(() => {

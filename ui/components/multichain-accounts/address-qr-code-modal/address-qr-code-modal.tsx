@@ -77,7 +77,7 @@ export const AddressQRCodeModal = ({
   const t = useI18nContext();
 
   // useCopyToClipboard analysis: Copies one of your public addresses
-  const [, handleCopy] = useCopyToClipboard();
+  const [, handleCopy] = useCopyToClipboard({ clearDelayMs: null });
   const { trackEvent, createEventBuilder } = useAnalytics();
 
   const [addressCopied, setAddressCopied] = useState(false);
@@ -148,11 +148,7 @@ export const AddressQRCodeModal = ({
   }, [createEventBuilder, explorerInfo, trackEvent]);
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      data-testid="parent-selector-address-qr-code-modal"
-    >
+    <Modal isOpen={isOpen} onClose={onClose}>
       <ModalOverlay />
       <ModalContent>
         <ModalHeader

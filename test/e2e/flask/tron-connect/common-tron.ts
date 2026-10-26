@@ -1,10 +1,10 @@
-import { MockedEndpoint, Mockttp } from 'mockttp';
+import { Mockttp } from 'mockttp';
 import FixtureBuilderV2 from '../../fixtures/fixture-builder-v2';
 import { withFixtures } from '../../helpers';
 import { Driver } from '../../webdriver/driver';
 import { login } from '../../page-objects/flows/login.flow';
 import Homepage from '../../page-objects/pages/home/homepage';
-import AccountListPage from '../../page-objects/pages/accounts/list-page';
+import AccountListPage from '../../page-objects/pages/account-list-page';
 import { MultichainNetworks } from '../../../../shared/constants/multichain/networks';
 import { DAPP_PATH } from '../../constants';
 import { mockTronFeatureFlag } from './mocks/feature-flag';
@@ -45,8 +45,6 @@ export const withTronAccountSnap = async (
     dappOptions,
     tronBalance,
     tronAccountResources,
-    additionalMocks,
-    fixtureCustomizer,
   }: {
     title?: string;
     numberOfAccounts?: number;
@@ -56,30 +54,24 @@ export const withTronAccountSnap = async (
     };
     tronBalance?: number;
     tronAccountResources?: AccountResourcesRequestOptions;
-    additionalMocks?: (mockServer: Mockttp) => Promise<MockedEndpoint[]>;
-    fixtureCustomizer?: (builder: FixtureBuilderV2) => FixtureBuilderV2;
   },
   test: (driver: Driver) => Promise<void>,
 ) => {
-  let builder = new FixtureBuilderV2().withEnabledNetworks({
-    tron: {
-      [MultichainNetworks.TRON]: true,
-      [MultichainNetworks.TRON_NILE]: true,
-      [MultichainNetworks.TRON_SHASTA]: true,
-    },
-    eip155: {
-      '0x539': true,
-    },
-  });
-
-  if (fixtureCustomizer) {
-    builder = fixtureCustomizer(builder);
-  }
-
   await withFixtures(
     {
       forceBip44Version: false,
-      fixtures: builder.build(),
+      fixtures: new FixtureBuilderV2()
+        .withEnabledNetworks({
+          tron: {
+            [MultichainNetworks.TRON]: true,
+            [MultichainNetworks.TRON_NILE]: true,
+            [MultichainNetworks.TRON_SHASTA]: true,
+          },
+          eip155: {
+            '0x539': true,
+          },
+        })
+        .build(),
       title,
       dapp: true,
       dappOptions: dappOptions ?? {
@@ -108,7 +100,6 @@ export const withTronAccountSnap = async (
         await mockGetChainParameters(mockServer),
         await mockGetNextMaintenanceTime(mockServer),
         await mockGetContract(mockServer),
-        ...(additionalMocks ? await additionalMocks(mockServer) : []),
       ],
     },
     async ({ driver }: { driver: Driver }) => {

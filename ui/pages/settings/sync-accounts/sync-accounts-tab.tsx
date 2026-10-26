@@ -28,10 +28,7 @@ const SyncAccountsTab = () => {
   };
 
   return (
-    <Page
-      data-testid="parent-selector-sync-accounts-page"
-      className="max-w-[600px]"
-    >
+    <Page data-testid="sync-accounts-page" className="max-w-[600px]">
       <Header
         startAccessory={
           <ButtonIcon

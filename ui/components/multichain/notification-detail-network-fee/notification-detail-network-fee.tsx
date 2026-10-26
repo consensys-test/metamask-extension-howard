@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  AvatarIcon,
-  AvatarIconSeverity,
-  Icon,
-  IconColor,
-  IconName,
-  IconSize,
-} from '@metamask/design-system-react';
-import {
   getNotificationSubtype,
   type OnChainRawNotificationsWithNetworkFields,
 } from '@metamask/notification-services-controller/notification-services';
@@ -24,7 +16,14 @@ import {
 } from '../../../../shared/constants/metametrics';
 
 import { NotificationDetail } from '../notification-detail';
-import { Box, Text } from '../../component-library';
+import {
+  AvatarIcon,
+  Box,
+  Icon,
+  IconName,
+  IconSize,
+  Text,
+} from '../../component-library';
 import {
   AlignItems,
   BackgroundColor,
@@ -34,6 +33,7 @@ import {
   TextVariant,
   TextColor,
   BlockSize,
+  IconColor,
   FlexDirection,
 } from '../../../helpers/constants/design-system';
 import Preloader from '../../ui/icon/preloader/preloader-icon.component';
@@ -127,7 +127,7 @@ const NotificationDetailNetworkFee_ = ({
   const handleClick = () => {
     if (!isOpen) {
       trackEvent(
-        createEventBuilder(MetaMetricsEventName.NotificationDetailItemClicked)
+        createEventBuilder(MetaMetricsEventName.NotificationDetailClicked)
           .addCategory(MetaMetricsEventCategory.NotificationInteraction)
           .addProperties({
             /* eslint-disable @typescript-eslint/naming-convention */
@@ -193,7 +193,8 @@ const NotificationDetailNetworkFee_ = ({
         icon={
           <AvatarIcon
             iconName={IconName.Gas}
-            severity={AvatarIconSeverity.Info}
+            color={TextColor.infoDefault}
+            backgroundColor={BackgroundColor.infoMuted}
           />
         }
         primaryTextLeft={
@@ -234,9 +235,9 @@ const NotificationDetailNetworkFee_ = ({
             </Text>
             <Icon
               name={isOpen ? IconName.ArrowUp : IconName.ArrowDown}
-              color={IconColor.PrimaryDefault}
+              color={IconColor.primaryDefault}
               size={IconSize.Sm}
-              className="mr-1"
+              marginInlineEnd={1}
             />
           </Box>
         }

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Meta, StoryObj } from '@storybook/react-webpack5';
+import type { Meta, StoryObj } from '@storybook/react';
 import AssetOptions from './asset-options';
 
 const meta: Meta<typeof AssetOptions> = {

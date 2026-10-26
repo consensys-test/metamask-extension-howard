@@ -198,16 +198,13 @@ export const MultichainBridgeQuoteCard = ({
   const includedTxFees = getIncludedTxFees(activeQuote);
   const gasFees = getGasFees(activeQuote);
   const totalNetworkFee = getTotalNetworkFee(activeQuote);
-  const relayerFees = sumAmounts(activeQuote.quote.feeData.relayer);
 
   return (
     <>
-      {showAllQuotes && (
-        <BridgeQuotesModal
-          isOpen={showAllQuotes}
-          onClose={() => setShowAllQuotes(false)}
-        />
-      )}
+      <BridgeQuotesModal
+        isOpen={showAllQuotes}
+        onClose={() => setShowAllQuotes(false)}
+      />
       <Column gap={2}>
         {/* Rate and timer */}
         <Row justifyContent={JustifyContent.spaceBetween}>
@@ -248,12 +245,10 @@ export const MultichainBridgeQuoteCard = ({
               variant={TextVariant.bodySm}
               color={TextColor.textAlternative}
             >
-              {activeQuote.quote.priceData?.swapRate
-                ? `1 ${activeQuote.quote.src.asset.symbol} = ${formatTokenAmount(
-                    locale,
-                    activeQuote.quote.priceData.swapRate,
-                  )} ${activeQuote.quote.dest.asset.symbol}`
-                : ''}
+              {`1 ${activeQuote.quote.src.asset.symbol} = ${formatTokenAmount(
+                locale,
+                activeQuote.quote.priceData?.swapRate,
+              )} ${activeQuote.quote.dest.asset.symbol}`}
             </Text>
             <ButtonIcon
               iconName={IconName.ArrowRight}
@@ -368,24 +363,6 @@ export const MultichainBridgeQuoteCard = ({
                 {formatNetworkFee(gasFees?.valueInCurrency, currency)}
               </Text>
             )}
-          </Row>
-        )}
-
-        {relayerFees && (
-          <Row justifyContent={JustifyContent.spaceBetween}>
-            <Text
-              variant={TextVariant.bodySm}
-              color={TextColor.textAlternative}
-            >
-              {t('relayerFee')}
-            </Text>
-            <Text
-              variant={TextVariant.bodySm}
-              color={TextColor.textAlternative}
-              data-testid="relayer-fees"
-            >
-              {formatNetworkFee(relayerFees?.valueInCurrency, currency)}
-            </Text>
           </Row>
         )}
 

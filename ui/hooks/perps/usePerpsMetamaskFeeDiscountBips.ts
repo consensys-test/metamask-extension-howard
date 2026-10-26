@@ -97,20 +97,11 @@ export function usePerpsMetamaskFeeDiscountBips(
   const [discountBips, setDiscountBips] = useState<number | undefined>(
     undefined,
   );
-  const discountKey = `${isVipProgramEnabled}|${selectedAddress ?? ''}|${currentChainId}|${baseFeeBips}`;
-  // Unset so the first mount still runs the sync below (and can hit the cache).
-  const [prevDiscountKey, setPrevDiscountKey] = useState<string | undefined>(
-    undefined,
-  );
-
-  if (discountKey !== prevDiscountKey) {
-    setPrevDiscountKey(discountKey);
-    setDiscountBips(undefined);
-  }
 
   useEffect(() => {
     let cancelled = false;
     if (!isVipProgramEnabled || !selectedAddress) {
+      setDiscountBips(undefined);
       return undefined;
     }
 
@@ -119,6 +110,7 @@ export function usePerpsMetamaskFeeDiscountBips(
       currentChainId,
     );
     if (!caipAccountId) {
+      setDiscountBips(undefined);
       return undefined;
     }
 
@@ -127,16 +119,13 @@ export function usePerpsMetamaskFeeDiscountBips(
       feeDiscountCache?.caipAccountId === caipAccountId &&
       now - feeDiscountCache.timestamp < FEE_DISCOUNT_CACHE_TTL_MS
     ) {
-      const cachedBips = feeDiscountCache.discountBips;
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setDiscountBips(cachedBips);
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
+      setDiscountBips(feeDiscountCache.discountBips);
+      return undefined;
     }
+
+    // Clear the previous account's discount immediately so downstream memos
+    // don't apply a stale discount while the new fetch is in flight.
+    setDiscountBips(undefined);
 
     submitRequestToBackground<number | null>(
       'rewardsGetPerpsDiscountForAccount',

@@ -13,6 +13,7 @@ import React, {
 import PropTypes from 'prop-types';
 import { Location as RouterLocation, NavigateFunction } from 'react-router-dom';
 import { SeedlessOnboardingControllerErrorMessage } from '@metamask/seedless-onboarding-controller';
+import type { PasskeyAuthenticationResponse } from '@metamask/passkey-controller';
 import {
   TextVariant,
   TextColor,
@@ -42,10 +43,8 @@ import Mascot from '../../components/ui/mascot';
 import {
   DEFAULT_ROUTE,
   ONBOARDING_WELCOME_ROUTE,
-  ONBOARDING_PASSKEY_PRF_MIGRATION_ROUTE,
   UNLOCK_ROUTE,
 } from '../../helpers/constants/routes';
-import { getRedirectAfterUnlock } from '../../helpers/utils/redirect-after-unlock';
 import {
   MetaMetricsContextProp,
   MetaMetricsEventCategory,
@@ -67,11 +66,7 @@ import { LOGIN_ERROR } from '../onboarding-flow/welcome/types';
 import ConnectionsRemovedModal from '../../components/app/connections-removed-modal';
 import { captureException } from '../../../shared/lib/sentry';
 import { getCaretCoordinates } from './unlock-page.util';
-import {
-  UnlockPasskeyIconButton,
-  UnlockPasskeySection,
-  type PasskeyUnlockSuccessContext,
-} from './passkey';
+import { UnlockPasskeyIconButton, UnlockPasskeySection } from './passkey';
 import ResetPasswordModal from './reset-password-modal';
 import FormattedCounter from './formatted-counter';
 import { MetamaskWordmarkLogo } from './metamask-wordmark-logo';
@@ -82,8 +77,11 @@ type UnlockPageProps = UnlockPageContext & {
   isUnlocked: boolean;
   isOnboardingCompleted: boolean;
   onSubmit: (password: string) => Promise<void>;
-  navigateAfterUnlock: (context?: PasskeyUnlockSuccessContext) => Promise<void>;
+  navigateAfterUnlock: () => Promise<void>;
   isPasskeyActive: boolean;
+  onUnlockWithPasskey: (
+    authenticationResponse: PasskeyAuthenticationResponse,
+  ) => Promise<void>;
   checkIsSeedlessPasswordOutdated: () => Promise<void>;
   getIsSeedlessOnboardingUserAuthenticated: () => Promise<boolean>;
   forceUpdateMetamaskState: () => Promise<void>;
@@ -128,6 +126,7 @@ type LoginError = {
 
 const FoxAppearAnimation = lazy(
   () =>
+    // @ts-expect-error - Build system resolves without extension, but TS wants .js
     // eslint-disable-next-line import-x/no-restricted-paths -- TODO(ADR-0021): route-isolation backlog
     import('../onboarding-flow/welcome/fox-appear-animation') as Promise<{
       default: ComponentType<
@@ -227,6 +226,10 @@ class UnlockPageBase extends Component<UnlockPageProps, UnlockPageState> {
      * When true, passkey unlock UI defers ceremony to a full extension tab (sidepanel + incompatible AAGUID).
      */
     mustDeferPasskeyToBrowserTab: PropTypes.bool,
+    /**
+     * Completes passkey unlock and navigates after success (same redirect rules as password onSubmit).
+     */
+    onUnlockWithPasskey: PropTypes.func,
   };
 
   state: UnlockPageState = {
@@ -269,7 +272,14 @@ class UnlockPageBase extends Component<UnlockPageProps, UnlockPageState> {
     });
 
     if (isUnlocked) {
-      navigate(getRedirectAfterUnlock(location.state), { replace: true });
+      // Redirect to the intended route if available, otherwise DEFAULT_ROUTE
+      let redirectTo = DEFAULT_ROUTE;
+      const fromLocation = location.state?.from;
+      if (fromLocation?.pathname) {
+        const search = fromLocation.search || '';
+        redirectTo = fromLocation.pathname + search;
+      }
+      navigate(redirectTo, { replace: true });
     }
   }
 
@@ -563,20 +573,6 @@ class UnlockPageBase extends Component<UnlockPageProps, UnlockPageState> {
     this.setState({ isPasswordUnlockMode, error: null });
   };
 
-  handlePasskeyUnlockSuccess = async ({
-    isPasskeyMigrationEligible,
-  }: PasskeyUnlockSuccessContext) => {
-    if (isPasskeyMigrationEligible) {
-      this.props.navigate(ONBOARDING_PASSKEY_PRF_MIGRATION_ROUTE, {
-        replace: true,
-        state: this.props.location.state,
-      });
-      return;
-    }
-
-    await this.props.navigateAfterUnlock();
-  };
-
   handleUnlockPasskeyFromPasswordForm = () => {
     if (this.props.mustDeferPasskeyToBrowserTab) {
       cancelPasskeyCeremony();
@@ -584,6 +580,13 @@ class UnlockPageBase extends Component<UnlockPageProps, UnlockPageState> {
       return;
     }
     this.setPasswordUnlockMode(false);
+  };
+
+  handleUnlockWithPasskey = async (
+    authenticationResponse: PasskeyAuthenticationResponse,
+  ) => {
+    await this.props.onUnlockWithPasskey(authenticationResponse);
+    await this.props.navigateAfterUnlock();
   };
 
   onForgotPasswordOrLoginWithDiffMethods = async () => {
@@ -680,7 +683,6 @@ class UnlockPageBase extends Component<UnlockPageProps, UnlockPageState> {
         backgroundColor={BoxBackgroundColor.BackgroundDefault}
         className="w-full"
         paddingBottom={12} // offset header to center content
-        data-testid="parent-selector-login-page"
       >
         {showResetPasswordModal && (
           <ResetPasswordModal
@@ -845,7 +847,7 @@ class UnlockPageBase extends Component<UnlockPageProps, UnlockPageState> {
                 this.props.mustDeferPasskeyToBrowserTab
               }
               isPasswordInProgress={isSubmitting}
-              onUnlockSuccess={this.handlePasskeyUnlockSuccess}
+              onUnlockWithPasskey={this.handleUnlockWithPasskey}
               onUsePassword={() => this.setPasswordUnlockMode(true)}
             />
           )}

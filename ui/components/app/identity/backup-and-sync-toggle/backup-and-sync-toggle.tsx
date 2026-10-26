@@ -24,7 +24,7 @@ import {
   selectIsBackupAndSyncUpdateLoading,
 } from '../../../../selectors/identity/backup-and-sync';
 import { selectIsMetamaskNotificationsEnabled } from '../../../../selectors/metamask-notifications/metamask-notifications';
-import { enableBasicFunctionality, showModal } from '../../../../store/actions';
+import { showModal, toggleExternalServices } from '../../../../store/actions';
 import ToggleButton from '../../../ui/toggle-button';
 import Preloader from '../../../ui/icon/preloader/preloader-icon.component';
 import {
@@ -155,10 +155,6 @@ export const BackupAndSyncToggle = ({
             BACKUPANDSYNC_FEATURES.contactSyncing,
             false,
           );
-          await setIsBackupAndSyncFeatureEnabled(
-            BACKUPANDSYNC_FEATURES.rampsSyncing,
-            false,
-          );
         } catch (err) {
           console.error('Failed to disable backup and sync features:', err);
         }
@@ -218,10 +214,6 @@ export const BackupAndSyncToggle = ({
         BACKUPANDSYNC_FEATURES.contactSyncing,
         false,
       );
-      await setIsBackupAndSyncFeatureEnabled(
-        BACKUPANDSYNC_FEATURES.rampsSyncing,
-        false,
-      );
       return;
     }
 
@@ -232,7 +224,7 @@ export const BackupAndSyncToggle = ({
         showModal({
           name: CONFIRM_TURN_ON_BACKUP_AND_SYNC_MODAL_NAME,
           enableBackupAndSync: async () => {
-            await dispatch(enableBasicFunctionality());
+            await dispatch(toggleExternalServices(true));
             await setIsBackupAndSyncFeatureEnabled(
               BACKUPANDSYNC_FEATURES.main,
               true,
@@ -243,10 +235,6 @@ export const BackupAndSyncToggle = ({
             );
             await setIsBackupAndSyncFeatureEnabled(
               BACKUPANDSYNC_FEATURES.contactSyncing,
-              true,
-            );
-            await setIsBackupAndSyncFeatureEnabled(
-              BACKUPANDSYNC_FEATURES.rampsSyncing,
               true,
             );
           },
@@ -264,10 +252,6 @@ export const BackupAndSyncToggle = ({
       BACKUPANDSYNC_FEATURES.contactSyncing,
       true,
     );
-    await setIsBackupAndSyncFeatureEnabled(
-      BACKUPANDSYNC_FEATURES.rampsSyncing,
-      true,
-    );
   };
 
   // Onboarding flips the intent flag synchronously so the controller's loading
@@ -276,21 +260,19 @@ export const BackupAndSyncToggle = ({
 
   return (
     <Box
-      marginTop={isOnboarding ? 3 : 4}
-      marginBottom={isOnboarding ? 3 : 4}
-      paddingLeft={isOnboarding ? 0 : 4}
-      paddingRight={isOnboarding ? 0 : 4}
-      className="w-full"
+      marginTop={4}
+      marginBottom={4}
+      paddingLeft={4}
+      paddingRight={4}
+      className="privacy-settings__setting__wrapper"
       id="backup-and-sync-toggle"
       data-testid={backupAndSyncToggleTestIds.container}
     >
       <Box
         flexDirection={BoxFlexDirection.Row}
         justifyContent={BoxJustifyContent.Between}
-        alignItems={BoxAlignItems.Center}
-        marginBottom={isOnboarding ? 4 : 1}
-        className="w-full"
-        gap={4}
+        alignItems={BoxAlignItems.Start}
+        marginBottom={1}
       >
         <Text variant={TextVariant.BodyMd} fontWeight={FontWeight.Medium}>
           {t('backupAndSyncEnable')}
@@ -301,47 +283,52 @@ export const BackupAndSyncToggle = ({
             <Preloader size={36} />
           </Box>
         ) : (
-          <Box data-testid={backupAndSyncToggleTestIds.toggleContainer}>
+          <div
+            className="privacy-settings__setting__toggle"
+            data-testid={backupAndSyncToggleTestIds.toggleContainer}
+          >
             <ToggleButton
               value={displayedBackupAndSyncEnabled}
               onToggle={handleBackupAndSyncToggleSetValue}
               dataTestId={backupAndSyncToggleTestIds.toggleButton}
             />
-          </Box>
+          </div>
         )}
       </Box>
-      <Text
-        variant={isOnboarding ? TextVariant.BodySm : TextVariant.BodyMd}
-        color={TextColor.TextAlternative}
-        asChild
-        className="w-full"
-      >
-        <div>
-          {t('backupAndSyncEnableDescription', [
-            <Text
-              asChild
-              variant={isOnboarding ? TextVariant.BodySm : TextVariant.BodyMd}
-              key="privacy-link"
-              color={TextColor.InfoDefault}
-            >
-              <a
-                href={ZENDESK_URLS.PROFILE_PRIVACY}
-                target="_blank"
-                rel="noopener noreferrer"
+      <div className="privacy-settings__setting__description">
+        <Text
+          variant={TextVariant.BodyMd}
+          color={TextColor.TextAlternative}
+          asChild
+        >
+          <div>
+            {t('backupAndSyncEnableDescription', [
+              <Text
+                asChild
+                variant={TextVariant.BodyMd}
+                key="privacy-link"
+                color={TextColor.InfoDefault}
               >
-                {t('backupAndSyncPrivacyLink')}
-              </a>
-            </Text>,
-          ])}
-          {error && (
-            <Box marginTop={4} paddingBottom={4}>
-              <Text color={TextColor.ErrorDefault} variant={TextVariant.BodySm}>
-                {t('notificationsSettingsBoxError')}
-              </Text>
-            </Box>
-          )}
-        </div>
-      </Text>
+                <a
+                  href={ZENDESK_URLS.PROFILE_PRIVACY}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t('backupAndSyncPrivacyLink')}
+                </a>
+              </Text>,
+            ])}
+          </div>
+        </Text>
+
+        {error && (
+          <Box marginTop={4} paddingBottom={4}>
+            <Text color={TextColor.ErrorDefault} variant={TextVariant.BodySm}>
+              {t('notificationsSettingsBoxError')}
+            </Text>
+          </Box>
+        )}
+      </div>
     </Box>
   );
 };

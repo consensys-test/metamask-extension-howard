@@ -1,6 +1,4 @@
-import addEthereumChain, {
-  type AddEthereumChainHooks,
-} from './add-ethereum-chain';
+import addEthereumChain from './add-ethereum-chain';
 import ethAccounts, { type EthAccountsHooks } from './eth-accounts';
 import getProviderState, {
   type GetProviderStateHooks,
@@ -12,9 +10,7 @@ import requestAccounts, {
   type RequestEthereumAccountsHooks,
 } from './request-accounts';
 import sendMetadata from './send-metadata';
-import switchEthereumChain, {
-  type SwitchEthereumChainHooks,
-} from './switch-ethereum-chain';
+import switchEthereumChain from './switch-ethereum-chain';
 import watchAsset, { type WatchAssetHooks } from './watch-asset';
 import getPermissions, {
   type GetPermissionsHooks,
@@ -25,6 +21,9 @@ import requestPermissions, {
 import revokePermissions, {
   type RevokePermissionsHooks,
 } from './wallet-revokePermissions';
+
+type AddEthereumChainHooks = Record<string, unknown>;
+type SwitchEthereumChainHooks = Record<string, unknown>;
 
 export type HandlerHooks = AddEthereumChainHooks &
   GetProviderStateHooks &

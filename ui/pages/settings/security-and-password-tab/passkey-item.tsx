@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import log from 'loglevel';
@@ -13,6 +13,7 @@ import { SECOND } from '../../../../shared/constants/time';
 import { createSentryError } from '../../../../shared/lib/error';
 import {
   getPasskeyAuthMethodKey,
+  startPasskeyAuthentication,
   cancelPasskeyCeremony,
   isPasskeyCeremonySilentError,
   translatePasskeyError,
@@ -35,10 +36,13 @@ import {
   getIsPasskeyRegistered,
   getIsEnrolledPasskeyIncompatibleWithSidepanel,
 } from '../../../selectors';
-import { forceUpdateMetamaskState } from '../../../store/actions';
+import {
+  forceUpdateMetamaskState,
+  generatePasskeyAuthenticationOptions,
+  removePasskeyWithPasskeyVerification,
+} from '../../../store/actions';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { useAnalytics } from '../../../hooks/useAnalytics';
-import { useRemovePasskeyWithPasskey } from '../../../hooks/passkey/usePasskeyRemoval';
 import { SettingsToggleItem } from '../shared/settings-toggle-item';
 import { SECURITY_ITEMS } from '../search-config';
 import { useDispatch } from '../../../store/hooks';
@@ -55,7 +59,6 @@ const PasskeyItem = () => {
     getPasskeyAuthMethodKey({ specific: true }),
   );
   const dispatch = useDispatch();
-  const removePasskeyWithPasskey = useRemovePasskeyWithPasskey();
   const navigate = useNavigate();
   const { trackEvent, createEventBuilder } = useAnalytics();
 
@@ -70,6 +73,12 @@ const PasskeyItem = () => {
     useState(false);
   const [showPasskeyTroubleshootModal, setShowPasskeyTroubleshootModal] =
     useState(false);
+
+  useEffect(() => {
+    return () => {
+      cancelPasskeyCeremony();
+    };
+  }, []);
 
   const openSecurityAndPasswordInFullScreen = useCallback(() => {
     cancelPasskeyCeremony();
@@ -130,7 +139,10 @@ const PasskeyItem = () => {
         .build(),
     );
     try {
-      await removePasskeyWithPasskey();
+      const authOptions = await generatePasskeyAuthenticationOptions();
+      const authenticationResponse =
+        await startPasskeyAuthentication(authOptions);
+      await removePasskeyWithPasskeyVerification(authenticationResponse);
       await forceUpdateMetamaskState(dispatch);
 
       trackEvent(
@@ -223,7 +235,6 @@ const PasskeyItem = () => {
     isPasskeyRegistered,
     navigate,
     passkeyMethodLabel,
-    removePasskeyWithPasskey,
     t,
     trackEvent,
   ]);

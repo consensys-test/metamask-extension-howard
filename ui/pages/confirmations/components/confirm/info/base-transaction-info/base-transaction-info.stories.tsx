@@ -1,11 +1,10 @@
-import { Meta } from '@storybook/react-webpack5';
+import { Meta } from '@storybook/react';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { getMockContractInteractionConfirmState } from '../../../../../../../test/data/confirmations/helper';
 import configureStore from '../../../../../../store/store';
 import { ConfirmContextProvider } from '../../../../context/confirm';
 import { DappSwapContextProvider } from '../../../../context/dapp-swap';
-import { GasFeeModalContextProvider } from '../../../../context/gas-fee-modal';
 import BaseTransactionInfo from './base-transaction-info';
 
 const store = configureStore(getMockContractInteractionConfirmState());
@@ -17,9 +16,7 @@ const Story = {
     (story: () => Meta<typeof BaseTransactionInfo>) => (
       <Provider store={store}>
         <ConfirmContextProvider>
-          <DappSwapContextProvider>
-            <GasFeeModalContextProvider>{story()}</GasFeeModalContextProvider>
-          </DappSwapContextProvider>
+          <DappSwapContextProvider>{story()}</DappSwapContextProvider>
         </ConfirmContextProvider>
       </Provider>
     ),

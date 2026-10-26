@@ -1,6 +1,5 @@
 import React from 'react';
 import { NotificationServicesController } from '@metamask/notification-services-controller';
-import { AvatarIconSeverity, IconName } from '@metamask/design-system-react';
 import { t } from '../../../../../shared/lib/translate';
 import { type ExtractedNotification, isOfTypeNodeGuard } from '../node-guard';
 import {
@@ -9,16 +8,19 @@ import {
 } from '../types/notifications/notifications';
 import { NotificationListItemIconType } from '../../../../components/multichain/notification-list-item-icon/notification-list-item-icon';
 
+import { shortenAddress } from '../../../../helpers/utils/util';
 import {
   createTextItems,
   getAmount,
   getUsdAmount,
+  formatIsoDateString,
   getNativeCurrencyLogoByChainId,
   getNetworkDetailsFromNotifPayload,
 } from '../../../../helpers/utils/notification.util';
 
 import {
   NotificationListItem,
+  NotificationDetailTitle,
   NotificationDetailBlockExplorerButton,
   NotificationDetailAddress,
   NotificationDetailInfo,
@@ -26,9 +28,15 @@ import {
   NotificationDetailAsset,
   NotificationDetailNetworkFee,
 } from '../../../../components/multichain';
-import { TextVariant } from '../../../../helpers/constants/design-system';
-import { BadgeWrapperPosition } from '../../../../components/component-library';
-import { OnChainNotificationDetailsTitle } from '../notification-details-title';
+import {
+  TextVariant,
+  BackgroundColor,
+  TextColor,
+} from '../../../../helpers/constants/design-system';
+import {
+  BadgeWrapperPosition,
+  IconName,
+} from '../../../../components/component-library';
 
 const { TRIGGER_TYPES } = NotificationServicesController.Constants;
 
@@ -44,13 +52,22 @@ const isERC20Notification = isOfTypeNodeGuard([
 
 const isSent = (n: ERC20Notification) => n.type === TRIGGER_TYPES.ERC20_SENT;
 
+const title = (n: ERC20Notification) =>
+  isSent(n) ? t('notificationItemSentTo') : t('notificationItemReceivedFrom');
+
 const getTitle = (n: ERC20Notification) => {
-  const items = createTextItems([n.template?.title ?? ''], TextVariant.bodySm);
+  const address = shortenAddress(
+    isSent(n) ? n.payload.data.to : n.payload.data.from,
+  );
+  const items = createTextItems([title(n) ?? '', address], TextVariant.bodySm);
   return items;
 };
 
 const getDescription = (n: ERC20Notification) => {
-  const items = createTextItems([n.template?.body ?? ''], TextVariant.bodyMd);
+  const items = createTextItems(
+    [n.payload.data.token.name],
+    TextVariant.bodyMd,
+  );
   return items;
 };
 
@@ -84,7 +101,16 @@ export const components: NotificationComponent<ERC20Notification> = {
     />
   ),
   details: {
-    title: OnChainNotificationDetailsTitle,
+    title: ({ notification }) => (
+      <NotificationDetailTitle
+        title={`${
+          isSent(notification)
+            ? t('notificationItemSent')
+            : t('notificationItemReceived')
+        } ${notification.payload.data.token.symbol}`}
+        date={formatIsoDateString(notification.createdAt)}
+      />
+    ),
     body: {
       type: NotificationComponentType.OnChainBody,
       From: ({ notification }) => (
@@ -107,7 +133,8 @@ export const components: NotificationComponent<ERC20Notification> = {
         <NotificationDetailInfo
           icon={{
             iconName: IconName.Check,
-            severity: AvatarIconSeverity.Success,
+            color: TextColor.successDefault,
+            backgroundColor: BackgroundColor.successMuted,
           }}
           label={t('notificationItemStatus') ?? ''}
           detail={t('notificationItemConfirmed') ?? ''}

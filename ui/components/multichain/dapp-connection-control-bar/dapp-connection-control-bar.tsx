@@ -53,6 +53,7 @@ import { CHAIN_ID_TO_NETWORK_IMAGE_URL_MAP } from '../../../../shared/constants/
 import { getURLHost } from '../../../helpers/utils/util';
 import { getCaip25CaveatValueFromPermissions } from '../../../helpers/utils/caip25-permissions';
 import { hasChainIdSupport } from '../../../../shared/lib/multichain/scope-utils';
+import { usePermittedNetworkToast } from '../../../hooks/multichain-accounts/usePermittedNetworkToast';
 import { DisconnectAllModal } from '../disconnect-all-modal/disconnect-all-modal';
 import { useDispatch } from '../../../store/hooks';
 import { DappBarEVMNetworkSelectorPopover } from './dapp-bar-network-selector-popover';
@@ -71,6 +72,7 @@ export const DappConnectionControlBar = memo(() => {
   const t = useI18nContext();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { dismissPermittedNetworkToast } = usePermittedNetworkToast();
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [isNetworkPopoverOpen, setIsNetworkPopoverOpen] = useState(false);
   const [networkButtonElement, setNetworkButtonElement] =
@@ -189,8 +191,9 @@ export const DappConnectionControlBar = memo(() => {
         dispatch(removePermissionsFor(permissionsRecord));
       }
     }
+    dismissPermittedNetworkToast();
     setShowDisconnectModal(false);
-  }, [dispatch, subjects, activeTabOrigin]);
+  }, [dispatch, subjects, activeTabOrigin, dismissPermittedNetworkToast]);
 
   const handleDisconnectClick = useCallback(() => {
     setShowDisconnectModal(true);

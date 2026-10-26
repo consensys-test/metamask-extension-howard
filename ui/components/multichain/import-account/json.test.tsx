@@ -36,7 +36,7 @@ describe('Json', () => {
   });
 
   it('should import file without password', async () => {
-    const { getByRole, getByTestId } = renderWithProvider(
+    const { getByText, getByTestId } = renderWithProvider(
       <Json
         importAccountFunc={mockImportFunc}
         onActionComplete={mockOnActionComplete}
@@ -44,9 +44,7 @@ describe('Json', () => {
       mockStore,
     );
 
-    const importButton = getByRole('button', {
-      name: messages.import.message,
-    });
+    const importButton = getByText(messages.import.message);
     const fileInput = getByTestId('file-input');
 
     const mockFile = new File(['0'], 'test.json');
@@ -70,7 +68,7 @@ describe('Json', () => {
   });
 
   it('should import file with password', async () => {
-    const { getByRole, getByTestId, getByPlaceholderText } = renderWithProvider(
+    const { getByText, getByTestId, getByPlaceholderText } = renderWithProvider(
       <Json
         importAccountFunc={mockImportFunc}
         onActionComplete={mockOnActionComplete}
@@ -78,9 +76,7 @@ describe('Json', () => {
       mockStore,
     );
 
-    const importButton = getByRole('button', {
-      name: messages.import.message,
-    });
+    const importButton = getByText(messages.import.message);
     const fileInput = getByTestId('file-input');
 
     const mockFile = new File(['0'], 'test.json');

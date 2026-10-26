@@ -33,6 +33,10 @@ const createMockStore = (overrides = {}) =>
     ...mockState,
     metamask: {
       ...mockState.metamask,
+      remoteFeatureFlags: {
+        ...mockState.metamask.remoteFeatureFlags,
+        extensionUxDefaultAddressVersioned: true,
+      },
       preferences: {
         ...mockState.metamask.preferences,
         showDefaultAddress: true,
@@ -48,7 +52,26 @@ describe('ShowDefaultAddressItem', () => {
     setBackgroundConnection(backgroundConnectionMock as never);
   });
 
-  it('renders title', () => {
+  it('renders null when feature is disabled', () => {
+    const storeDisabled = configureMockStore([thunk])({
+      ...mockState,
+      metamask: {
+        ...mockState.metamask,
+        remoteFeatureFlags: {
+          ...mockState.metamask.remoteFeatureFlags,
+          extensionUxDefaultAddressVersioned: false,
+        },
+      },
+    });
+    const { container } = renderWithProvider(
+      <ShowDefaultAddressItem />,
+      storeDisabled,
+    );
+
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('renders title when feature is enabled', () => {
     const mockStore = createMockStore();
     renderWithProvider(<ShowDefaultAddressItem />, mockStore);
 

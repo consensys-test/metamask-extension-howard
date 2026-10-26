@@ -6,7 +6,7 @@ import {
   useMusdConversionConfirmTrace,
   useMusdConversionToastStatus,
 } from '../../../hooks/musd';
-import { MoneyAccountToastListener } from '../money/money-account-toast/money-account-toast-listener';
+import { useMerklClaimStatus } from '../../../hooks/musd/useMerklClaimStatus';
 import { PerpsDepositToast } from '../perps/perps-deposit-toast';
 import { RampsOrderToastListener } from '../ramps/ramps-order-toast-listener';
 import { TransactionEventToastListener } from './transaction-event-toast-listener';
@@ -15,6 +15,7 @@ import { TransactionEventToastListener } from './transaction-event-toast-listene
 const MusdTelemetry = () => {
   const { activeTransactionId } = useMusdConversionToastStatus();
   useMusdConversionConfirmTrace(activeTransactionId ?? '');
+  useMerklClaimStatus();
   return null;
 };
 
@@ -31,7 +32,6 @@ export function ToastListener() {
       {isUnlocked ? <PerpsDepositToast /> : null}
       <MusdTelemetry />
       <TransactionEventToastListener />
-      <MoneyAccountToastListener />
       {isUnlocked ? <RampsOrderToastListener /> : null}
     </>
   );

@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
-import { ErrorCode, HardwareWalletError } from '@metamask/hw-wallet-sdk';
+import { ErrorCode } from '@metamask/hw-wallet-sdk';
 import { useHardwareWalletConnection } from './useHardwareWalletConnection';
 import {
   HardwareWalletType,
@@ -17,20 +17,14 @@ describe('useHardwareWalletConnection', () => {
   let mockRefs: {
     abortControllerRef: { current: AbortController | null };
     adapterRef: { current: HardwareWalletAdapter | null };
-    connectingPromiseRef: {
-      current: Promise<HardwareWalletError | null> | null;
-    };
-    ensureDeviceReadyPromiseRef: {
-      current: Map<string, Promise<HardwareWalletError | null>>;
-    };
+    connectingPromiseRef: { current: Promise<void> | null };
+    ensureDeviceReadyPromiseRef: { current: Map<string, Promise<boolean>> };
     isConnectingRef: { current: boolean };
     hasAutoConnectedRef: { current: boolean };
     lastConnectedAccountRef: { current: string | null };
     isEnsuringDeviceReadyRef: { current: boolean };
     currentConnectionIdRef: { current: number | null };
-    connectRef: {
-      current: (() => Promise<HardwareWalletError | null>) | null;
-    };
+    connectRef: { current: (() => Promise<void>) | null };
     walletTypeRef: { current: HardwareWalletType | null };
     previousWalletTypeRef: { current: HardwareWalletType | null };
     isSigningInProgressRef: { current: boolean };
@@ -767,37 +761,6 @@ describe('useHardwareWalletConnection', () => {
       expect(ready).toBe(false);
     });
 
-    it('returns the connect error when the device is locked during connect', async () => {
-      mockRefs.adapterRef.current = null;
-
-      const mockAdapter = new MockHardwareWalletAdapter({
-        onDisconnect: mockHandleDisconnect,
-        onAwaitingConfirmation: jest.fn(),
-        onDeviceLocked: jest.fn(),
-        onAppNotOpen: jest.fn(),
-        onDeviceEvent: mockHandleDeviceEvent,
-      });
-      const lockedError = createHardwareWalletError(
-        ErrorCode.AuthenticationDeviceLocked,
-        HardwareWalletType.Ledger,
-        'Device locked',
-      );
-      mockAdapter.connectMock.mockRejectedValue(lockedError);
-      (createAdapterForHardwareWalletType as jest.Mock).mockReturnValue(
-        mockAdapter,
-      );
-
-      const { result } = setupHook();
-
-      let deviceError: HardwareWalletError | null | undefined;
-      await act(async () => {
-        deviceError = await result.current.ensureDeviceReadyOrError();
-      });
-
-      expect(deviceError).toBe(lockedError);
-      expect(mockAdapter.ensureDeviceReadyMock).not.toHaveBeenCalled();
-    });
-
     it('handles structured hardware wallet errors', async () => {
       const mockAdapter = new MockHardwareWalletAdapter({
         onDisconnect: mockHandleDisconnect,
@@ -807,50 +770,28 @@ describe('useHardwareWalletConnection', () => {
         onDeviceEvent: mockHandleDeviceEvent,
       });
       mockAdapter.isConnectedMock.mockReturnValue(true);
-      const lockedError = createHardwareWalletError(
-        ErrorCode.AuthenticationDeviceLocked,
-        HardwareWalletType.Ledger,
-        'Device locked',
+      mockAdapter.ensureDeviceReadyMock.mockRejectedValue(
+        createHardwareWalletError(
+          ErrorCode.AuthenticationDeviceLocked,
+          HardwareWalletType.Ledger,
+          'Device locked',
+        ),
       );
-      mockAdapter.ensureDeviceReadyMock.mockRejectedValue(lockedError);
       mockRefs.adapterRef.current = mockAdapter;
 
       const { result } = setupHook();
 
-      let deviceError: HardwareWalletError | null | undefined;
+      let ready: boolean | undefined;
       await act(async () => {
-        deviceError = await result.current.ensureDeviceReadyOrError();
+        ready = await result.current.ensureDeviceReady();
       });
 
-      expect(deviceError).toBe(lockedError);
+      expect(ready).toBe(false);
       expect(mockUpdateConnectionState).toHaveBeenCalledWith(
         expect.objectContaining({
           status: ConnectionStatus.ErrorState,
         }),
       );
-    });
-
-    it('returns a generic error when the adapter reports not ready without throwing', async () => {
-      const mockAdapter = new MockHardwareWalletAdapter({
-        onDisconnect: mockHandleDisconnect,
-        onAwaitingConfirmation: jest.fn(),
-        onDeviceLocked: jest.fn(),
-        onAppNotOpen: jest.fn(),
-        onDeviceEvent: mockHandleDeviceEvent,
-      });
-      mockAdapter.isConnectedMock.mockReturnValue(true);
-      mockAdapter.ensureDeviceReadyMock.mockResolvedValue(false);
-      mockRefs.adapterRef.current = mockAdapter;
-
-      const { result } = setupHook();
-
-      let deviceError: HardwareWalletError | null | undefined;
-      await act(async () => {
-        deviceError = await result.current.ensureDeviceReadyOrError();
-      });
-
-      expect(deviceError).toBeInstanceOf(HardwareWalletError);
-      expect(deviceError?.code).toBe(ErrorCode.Unknown);
     });
 
     it('handles race condition when new connection starts during ensureDeviceReady', async () => {
@@ -916,19 +857,19 @@ describe('useHardwareWalletConnection', () => {
 
       const { result } = setupHook();
 
-      const firstPromise = result.current.ensureDeviceReadyOrError();
-      const secondPromise = result.current.ensureDeviceReadyOrError();
+      const firstPromise = result.current.ensureDeviceReady();
+      const secondPromise = result.current.ensureDeviceReady();
 
       expect(firstPromise).toBeDefined();
       expect(secondPromise).toBeDefined();
 
-      let results: (HardwareWalletError | null)[] = [];
+      let results: boolean[] = [];
       await act(async () => {
         resolveEnsure?.(true);
         results = await Promise.all([firstPromise, secondPromise]);
       });
 
-      expect(results).toStrictEqual([null, null]);
+      expect(results).toStrictEqual([true, true]);
       expect(mockAdapter.ensureDeviceReadyMock).toHaveBeenCalledTimes(1);
     });
 
@@ -996,10 +937,10 @@ describe('useHardwareWalletConnection', () => {
 
       const { result } = setupHook();
 
-      const strictCheckPromise = result.current.ensureDeviceReadyOrError({
+      const strictCheckPromise = result.current.ensureDeviceReady({
         requireBlindSigning: true,
       });
-      const simpleSendCheckPromise = result.current.ensureDeviceReadyOrError({
+      const simpleSendCheckPromise = result.current.ensureDeviceReady({
         requireBlindSigning: false,
       });
 
@@ -1012,13 +953,14 @@ describe('useHardwareWalletConnection', () => {
         requireBlindSigning: false,
       });
 
-      let results: boolean[] | undefined;
+      let results: [boolean, boolean] | undefined;
       await act(async () => {
         resolveBlindSigningCheck?.(false);
         resolveNonBlindSigningCheck?.(true);
-        results = (
-          await Promise.all([strictCheckPromise, simpleSendCheckPromise])
-        ).map((error) => error === null);
+        results = (await Promise.all([
+          strictCheckPromise,
+          simpleSendCheckPromise,
+        ])) as [boolean, boolean];
       });
 
       expect(results).toStrictEqual([false, true]);
@@ -1055,13 +997,13 @@ describe('useHardwareWalletConnection', () => {
 
       const { result } = setupHook();
 
-      const strictCheckPromiseA = result.current.ensureDeviceReadyOrError({
+      const strictCheckPromiseA = result.current.ensureDeviceReady({
         requireBlindSigning: true,
       });
-      const simpleSendCheckPromise = result.current.ensureDeviceReadyOrError({
+      const simpleSendCheckPromise = result.current.ensureDeviceReady({
         requireBlindSigning: false,
       });
-      const strictCheckPromiseB = result.current.ensureDeviceReadyOrError({
+      const strictCheckPromiseB = result.current.ensureDeviceReady({
         requireBlindSigning: true,
       });
 
@@ -1074,17 +1016,15 @@ describe('useHardwareWalletConnection', () => {
         requireBlindSigning: false,
       });
 
-      let results: boolean[] | undefined;
+      let results: [boolean, boolean, boolean] | undefined;
       await act(async () => {
         resolveBlindSigningCheck?.(true);
         resolveNonBlindSigningCheck?.(false);
-        results = (
-          await Promise.all([
-            strictCheckPromiseA,
-            simpleSendCheckPromise,
-            strictCheckPromiseB,
-          ])
-        ).map((error) => error === null);
+        results = (await Promise.all([
+          strictCheckPromiseA,
+          simpleSendCheckPromise,
+          strictCheckPromiseB,
+        ])) as [boolean, boolean, boolean];
       });
 
       expect(results).toStrictEqual([true, false, true]);

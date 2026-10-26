@@ -156,7 +156,7 @@ describe('AddressBookPetnamesBridge', () => {
         value: ADDRESS_MOCK,
         type: NameType.ETHEREUM_ADDRESS,
         name: NAME_MOCK,
-        sourceId: 'npm:@metamask/ens-resolver-snap',
+        sourceId: 'ens',
         variation: CHAIN_ID_MOCK,
         origin: NameOrigin.ADDRESS_BOOK,
       } as SetNameRequest);

@@ -219,12 +219,12 @@ describe('BatchTrackingStrategy', () => {
   describe('checkRetryGeneration', () => {
     it('marks seen batches as stale when generation bumps', () => {
       const retryGenRef = createRetryGenRef(0);
+      const lastSeenRef = { current: 0 };
 
       strategy.processStatusUpdated(createTxMeta({ batchId: 'batch-old' }));
 
       retryGenRef.current = 1;
-      // The call returns the new last-seen generation for the caller to persist.
-      expect(strategy.checkRetryGeneration(retryGenRef, 0)).toBe(1);
+      strategy.checkRetryGeneration(retryGenRef, lastSeenRef);
 
       // Old batch should now be stale — finished event blocked
       const result = strategy.processFinished(
@@ -238,11 +238,12 @@ describe('BatchTrackingStrategy', () => {
 
     it('allows new batch events after generation reset', () => {
       const retryGenRef = createRetryGenRef(0);
+      const lastSeenRef = { current: 0 };
 
       strategy.processStatusUpdated(createTxMeta({ batchId: 'batch-old' }));
 
       retryGenRef.current = 1;
-      expect(strategy.checkRetryGeneration(retryGenRef, 0)).toBe(1);
+      strategy.checkRetryGeneration(retryGenRef, lastSeenRef);
 
       const result = strategy.processStatusUpdated(
         createTxMeta({
@@ -257,11 +258,12 @@ describe('BatchTrackingStrategy', () => {
 
     it('allows rejection from new batch before signed event establishes batch (null state)', () => {
       const retryGenRef = createRetryGenRef(0);
+      const lastSeenRef = { current: 0 };
 
       strategy.processStatusUpdated(createTxMeta({ batchId: 'batch-old' }));
 
       retryGenRef.current = 1;
-      expect(strategy.checkRetryGeneration(retryGenRef, 0)).toBe(1);
+      strategy.checkRetryGeneration(retryGenRef, lastSeenRef);
 
       const result = strategy.processRejected(
         createTxMeta({ batchId: 'batch-new' }),
@@ -273,11 +275,12 @@ describe('BatchTrackingStrategy', () => {
 
     it('blocks stale signed events after retry', () => {
       const retryGenRef = createRetryGenRef(0);
+      const lastSeenRef = { current: 0 };
 
       strategy.processStatusUpdated(createTxMeta({ batchId: 'batch-old' }));
 
       retryGenRef.current = 1;
-      expect(strategy.checkRetryGeneration(retryGenRef, 0)).toBe(1);
+      strategy.checkRetryGeneration(retryGenRef, lastSeenRef);
 
       const result = strategy.processStatusUpdated(
         createTxMeta({
@@ -286,19 +289,6 @@ describe('BatchTrackingStrategy', () => {
         }),
       );
       expect(result.action).toBeNull();
-    });
-
-    it('returns null when the generation has not bumped', () => {
-      const retryGenRef = createRetryGenRef(1);
-
-      // Already seen generation 1 → no bump, nothing to persist.
-      expect(strategy.checkRetryGeneration(retryGenRef, 1)).toBeNull();
-    });
-
-    it('returns null when retry tracking is disabled', () => {
-      strategy.processStatusUpdated(createTxMeta({ batchId: 'batch-1' }));
-
-      expect(strategy.checkRetryGeneration(undefined, 0)).toBeNull();
     });
   });
 

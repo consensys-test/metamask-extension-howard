@@ -86,17 +86,4 @@ describe('useDappSwapCheck', () => {
     );
     expect(isSwapToBeCompared).toBe(false);
   });
-
-  it('returns false for a wallet-initiated simple send', async () => {
-    const mockConfirmation = {
-      ...mockSwapConfirmation,
-      origin: 'metamask',
-      type: TransactionType.simpleSend,
-    };
-    const { isSwapToBeCompared } = await runHook(
-      mockConfirmation as Confirmation,
-      { origins: ['metamask'] },
-    );
-    expect(isSwapToBeCompared).toBe(false);
-  });
 });

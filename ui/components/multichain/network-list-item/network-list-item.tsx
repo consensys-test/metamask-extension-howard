@@ -8,14 +8,9 @@ import React, {
 import classnames from 'clsx';
 import PropTypes from 'prop-types';
 import {
-  AvatarNetwork,
-  AvatarNetworkSize,
   ButtonIcon as DsButtonIcon,
   ButtonIconSize as DsButtonIconSize,
-  Icon,
-  IconColor,
-  IconName,
-  IconSize,
+  IconName as DsIconName,
 } from '@metamask/design-system-react';
 import {
   AlignItems,
@@ -25,14 +20,25 @@ import {
   FlexDirection,
   JustifyContent,
   TextColor,
+  IconColor,
   TextVariant,
+  BorderColor,
 } from '../../../helpers/constants/design-system';
-import { Box, SuccessPill, Text } from '../../component-library';
+import {
+  AvatarNetwork,
+  AvatarNetworkSize,
+  Box,
+  Icon,
+  IconName,
+  IconSize,
+  SuccessPill,
+  Text,
+} from '../../component-library';
 import { useI18nContext } from '../../../hooks/useI18nContext';
+import { getAvatarNetworkColor } from '../../../helpers/utils/accounts';
 import Tooltip from '../../ui/tooltip/tooltip';
 import { NetworkListItemMenu } from '../network-list-item-menu';
 import { useIsNetworkGasSponsored } from '../../../hooks/useIsNetworkGasSponsored';
-import { getAvatarNetworkStyle } from '../../../helpers/utils/accounts';
 
 const isIconSrc = (iconSrc?: string | IconName): iconSrc is IconName =>
   Object.values(IconName).includes(iconSrc as IconName);
@@ -133,7 +139,7 @@ export const NetworkListItem = ({
   const renderButton = useCallback(() => {
     return onDeleteClick || onEditClick || onDiscoverClick ? (
       <DsButtonIcon
-        iconName={IconName.MoreVertical}
+        iconName={DsIconName.MoreVertical}
         ref={setNetworkListItemMenuRef}
         data-testid={`network-list-item-options-button-${chainId}`}
         ariaLabel={t('networkOptions')}
@@ -171,15 +177,11 @@ export const NetworkListItem = ({
 
   // Safety: Reset closing flag whenever menu opens
   // (handles edge cases like rapid toggling)
-  const [prevNetworkOptionsMenuOpen, setPrevNetworkOptionsMenuOpen] = useState(
-    networkOptionsMenuOpen,
-  );
-  if (networkOptionsMenuOpen !== prevNetworkOptionsMenuOpen) {
-    setPrevNetworkOptionsMenuOpen(networkOptionsMenuOpen);
+  useEffect(() => {
     if (networkOptionsMenuOpen) {
       setIsMenuClosing(false);
     }
-  }
+  }, [networkOptionsMenuOpen]);
   useEffect(() => {
     if (networkRef.current && focus) {
       networkRef.current.focus();
@@ -221,11 +223,11 @@ export const NetworkListItem = ({
         <Icon name={iconSrc} size={iconSize as IconSize} />
       ) : (
         <AvatarNetwork
+          borderColor={BorderColor.backgroundDefault}
+          backgroundColor={getAvatarNetworkColor(name)}
           name={name}
           src={iconSrc}
           size={iconSize as AvatarNetworkSize}
-          className="rounded-md"
-          style={getAvatarNetworkStyle(name)}
         />
       )}
       <Box
@@ -291,8 +293,8 @@ export const NetworkListItem = ({
               {rpcEndpoint.name ?? new URL(rpcEndpoint.url).host}
             </Text>
             <Icon
-              className="ml-1"
-              color={IconColor.IconAlternative}
+              marginLeft={1}
+              color={IconColor.iconAlternative}
               name={IconName.ArrowDown}
               size={IconSize.Xs}
             />

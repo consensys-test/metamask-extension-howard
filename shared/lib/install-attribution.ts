@@ -7,7 +7,6 @@ import {
 import type { DeferredDeepLink } from './deep-links/types';
 
 const METAMASK_IO_URL = 'https://metamask.io/';
-const METAMASK_COM_URL = 'https://metamask.com/';
 const DEFERRED_DEEPLINK_COOKIE_NAME = 'deferred_deeplink';
 const GOOGLE_ANALYTICS_COOKIE_NAME = '_ga';
 
@@ -80,15 +79,9 @@ export function getInstallAttributionFromCookies(
  */
 export async function getInstallAttribution(): Promise<InstallAttribution> {
   try {
-    const [comCookies, ioCookies] = await Promise.all([
-      browser.cookies.getAll({ url: METAMASK_COM_URL }),
-      browser.cookies.getAll({ url: METAMASK_IO_URL }),
-    ]);
-    const comCookieNames = new Set(comCookies.map(({ name }) => name));
-    const cookies = [
-      ...comCookies,
-      ...ioCookies.filter(({ name }) => !comCookieNames.has(name)),
-    ];
+    const cookies = await browser.cookies.getAll({
+      url: METAMASK_IO_URL,
+    });
 
     return getInstallAttributionFromCookies(cookies);
   } catch (error) {
