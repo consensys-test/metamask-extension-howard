@@ -1,16 +1,16 @@
 import React from 'react';
+import { Text, TextVariant, TextColor } from '@metamask/design-system-react';
 import {
-  Text,
-  TextVariant,
-  TextColor,
+  Button,
+  ButtonSize,
+  ButtonVariant,
   Modal,
   ModalBody,
+  ModalContent,
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  ModalContent,
-} from '@metamask/design-system-react';
-import { Button, ButtonSize, ButtonVariant } from '../../component-library';
+} from '../../component-library';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 
 export type DisconnectAllSitesModalProps = {
@@ -34,10 +34,7 @@ export const DisconnectAllSitesModal = ({
     >
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader
-          onClose={onClose}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
+        <ModalHeader onClose={onClose}>
           {t('disconnectAllSitesQuestion')}
         </ModalHeader>
         <ModalBody>

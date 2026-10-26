@@ -4,10 +4,6 @@ import type { TransactionMetricsBuilder } from './types';
 
 export const getTransactionDetailsMetricsProperties: TransactionMetricsBuilder =
   ({ eventName, transactionEventPayload, transactionMeta, context }) => {
-    const transactionParams =
-      transactionMeta.containerTypes?.length && transactionMeta.txParamsOriginal
-        ? transactionMeta.txParamsOriginal
-        : transactionMeta.txParams;
     const finalizedExtras =
       eventName === TransactionMetaMetricsEvent.finalized
         ? {
@@ -40,16 +36,13 @@ export const getTransactionDetailsMetricsProperties: TransactionMetricsBuilder =
         ? {}
         : {
             transaction_contract_address:
-              context.isContractInteraction && transactionParams.to
-                ? [transactionParams.to]
+              context.isContractInteraction && transactionMeta.txParams?.to
+                ? [transactionMeta.txParams.to]
                 : [],
           }),
       ...(context.isContractInteraction
         ? {
-            transaction_contract_method_4byte: transactionParams.data?.slice(
-              0,
-              10,
-            ),
+            transaction_contract_method_4byte: context.contractMethod4Byte,
           }
         : {}),
       ...finalizedExtras,

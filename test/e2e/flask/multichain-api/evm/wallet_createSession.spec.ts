@@ -10,7 +10,7 @@ import { withFixtures } from '../../../helpers';
 import FixtureBuilderV2 from '../../../fixtures/fixture-builder-v2';
 import { toEvmCaipAccountId } from '../../../../../shared/lib/multichain/scope-utils';
 import ConnectAccountConfirmation from '../../../page-objects/pages/confirmations/connect-account-confirmation';
-import EditConnectedAccountsPage from '../../../page-objects/pages/permission/edit-connected-accounts-page';
+import EditConnectedAccountsModal from '../../../page-objects/pages/dialog/edit-connected-accounts-modal';
 import HomePage from '../../../page-objects/pages/home/homepage';
 import TestDappMultichain from '../../../page-objects/pages/test-dapp-multichain';
 import { login } from '../../../page-objects/flows/login.flow';
@@ -212,11 +212,11 @@ describe('Multichain API', function () {
             await connectAccountConfirmation.checkPageIsLoaded();
             await connectAccountConfirmation.openEditAccountsModal();
 
-            const editConnectedAccountsPage = new EditConnectedAccountsPage(
+            const editConnectedAccountsModal = new EditConnectedAccountsModal(
               driver,
             );
-            await editConnectedAccountsPage.checkPageIsLoaded();
-            await editConnectedAccountsPage.addNewAccount();
+            await editConnectedAccountsModal.checkPageIsLoaded();
+            await editConnectedAccountsModal.addNewAccount();
 
             await connectAccountConfirmation.checkPageIsLoaded();
             await connectAccountConfirmation.confirmConnect();
@@ -265,12 +265,12 @@ describe('Multichain API', function () {
           await connectAccountConfirmation.checkPageIsLoaded();
           await connectAccountConfirmation.openEditAccountsModal();
 
-          const editConnectedAccountsPage = new EditConnectedAccountsPage(
+          const editConnectedAccountsModal = new EditConnectedAccountsModal(
             driver,
           );
-          await editConnectedAccountsPage.checkPageIsLoaded();
+          await editConnectedAccountsModal.checkPageIsLoaded();
 
-          await editConnectedAccountsPage.waitForAccountSelectedStatus({
+          await editConnectedAccountsModal.waitForAccountSelectedStatus({
             accountIndex: 1,
             status: 'selected',
           });
@@ -313,11 +313,11 @@ describe('Multichain API', function () {
             ]);
             await connectAccountConfirmation.openEditAccountsModal();
 
-            const editConnectedAccountsPage = new EditConnectedAccountsPage(
+            const editConnectedAccountsModal = new EditConnectedAccountsModal(
               driver,
             );
-            await editConnectedAccountsPage.checkPageIsLoaded();
-            await editConnectedAccountsPage.addNewAccount();
+            await editConnectedAccountsModal.checkPageIsLoaded();
+            await editConnectedAccountsModal.addNewAccount();
 
             await connectAccountConfirmation.checkPageIsLoaded();
 
@@ -374,15 +374,17 @@ describe('Multichain API', function () {
             await connectAccountConfirmation.checkPageIsLoaded();
             await connectAccountConfirmation.openEditAccountsModal();
 
-            const editConnectedAccountsPage = new EditConnectedAccountsPage(
+            const editConnectedAccountsModal = new EditConnectedAccountsModal(
               driver,
             );
-            await editConnectedAccountsPage.checkPageIsLoaded();
-            await editConnectedAccountsPage.selectAccount(1);
+            await editConnectedAccountsModal.checkPageIsLoaded();
+            await editConnectedAccountsModal.selectAccount(1);
 
-            await editConnectedAccountsPage.waitForConnectButtonState({
-              state: 'disabled',
-            });
+            assert.strictEqual(
+              await editConnectedAccountsModal.isConnectButtonEnabled(),
+              false,
+              'should not be able to approve the create session request without at least one account selected',
+            );
           },
         );
       });

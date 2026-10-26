@@ -3,7 +3,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useMemo,
+  useEffect,
   useState,
 } from 'react';
 import { Hex } from '@metamask/utils';
@@ -73,6 +73,7 @@ export const SendContextProvider = ({
   const accountGroupWithInternalAccounts = useSelector(
     getAccountGroupWithInternalAccounts,
   );
+  const [fromAccount, updateFromAccount] = useState<InternalAccount>();
   const [hexData, updateHexData] = useState<Hex>();
   const [maxValueMode, updateMaxValueMode] = useState<boolean>();
   const [nonEVMSubmitError, updateNonEVMSubmitError] = useState<string>();
@@ -80,21 +81,6 @@ export const SendContextProvider = ({
   const [toResolved, updateToResolved] = useState<string>();
   const [value, setValue] = useState<string>();
   const [currentPage, updateCurrentPage] = useState<SendPages>();
-
-  const fromAccount = useMemo(() => {
-    if (!asset?.accountId) {
-      return undefined;
-    }
-
-    const selectedAccountGroupWithInternalAccounts =
-      accountGroupWithInternalAccounts.find(
-        (accountGroup) => accountGroup.id === selectedAccountGroupId,
-      )?.accounts;
-
-    return selectedAccountGroupWithInternalAccounts?.find(
-      (account) => account.id === asset.accountId,
-    );
-  }, [asset, selectedAccountGroupId, accountGroupWithInternalAccounts]);
 
   const updateValue = useCallback(
     (val: string, maxMode?: boolean) => {
@@ -141,6 +127,24 @@ export const SendContextProvider = ({
     !isHexString(asset.chainId.toString())
       ? toHex(asset.chainId)
       : asset?.chainId?.toString();
+
+  useEffect(() => {
+    if (asset?.accountId) {
+      const selectedAccountGroupWithInternalAccounts =
+        accountGroupWithInternalAccounts.find(
+          (accountGroup) => accountGroup.id === selectedAccountGroupId,
+        )?.accounts;
+
+      const selectedAccount = selectedAccountGroupWithInternalAccounts?.find(
+        (account) => account.id === asset?.accountId,
+      );
+      updateFromAccount(selectedAccount as InternalAccount);
+    }
+  }, [
+    asset?.accountId,
+    selectedAccountGroupId,
+    accountGroupWithInternalAccounts,
+  ]);
 
   return (
     <SendContext.Provider

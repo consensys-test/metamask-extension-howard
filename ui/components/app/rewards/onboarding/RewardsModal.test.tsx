@@ -91,9 +91,7 @@ describe('RewardsModal', () => {
 
     render(<RewardsModal />);
 
-    expect(
-      screen.getByTestId('parent-selector-rewards-page'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('rewards-modal')).toBeInTheDocument();
     expect(screen.getByTestId('rewards-modal-header')).toBeInTheDocument();
     expect(screen.getByTestId('onboarding-main-step')).toBeInTheDocument();
     expect(screen.getByTestId('rewards-error-toast')).toBeInTheDocument();

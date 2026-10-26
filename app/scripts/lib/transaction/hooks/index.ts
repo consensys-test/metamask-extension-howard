@@ -16,12 +16,9 @@ import { Hex } from '@metamask/utils';
 
 import { AccountOverviewTabKey } from '../../../../../shared/constants/app-state';
 import { getEip7702SupportedChains } from '../../../../../shared/lib/eip7702-support-utils';
-import {
-  getInternalEvmAddresses,
-  isEnforcedSimulationsEligible,
-} from '../../../../../shared/lib/transaction/enforced-simulations';
+import { isEnforcedSimulationsEligible } from '../../../../../shared/lib/transaction/enforced-simulations';
 import { TransactionMetricsRequest } from '../../../../../shared/types/metametrics';
-import { accountSupports7702ForRelay } from '../../account-supports-7702';
+import { accountSupports7702 } from '../../account-supports-7702';
 import {
   getSmartTransactionCommonParams,
   SmartTransactionHookMessenger,
@@ -40,8 +37,6 @@ export type TransactionControllerHookRequest = {
   getTransactionMetricsRequest: () => TransactionMetricsRequest;
   messenger: TransactionControllerInitMessenger;
 };
-
-const STX_GET_FEES_ERROR_METRIC_NAME = 'stx_get_fees_error';
 
 const TRANSACTION_SUBMISSION_METHOD_METRIC_NAME =
   'transaction_submission_method';
@@ -74,7 +69,7 @@ export function getTransactionControllerHooks(
 function afterAddHook({ messenger }: TransactionControllerHookRequest) {
   return async ({ transactionMeta }: { transactionMeta: TransactionMeta }) => {
     await messenger.call(
-      'ShieldSubscriptionService:submitSubscriptionSponsorshipIntent',
+      'SubscriptionService:submitSubscriptionSponsorshipIntent',
       transactionMeta,
     );
     return {};
@@ -87,31 +82,17 @@ function beforePublishHook({ messenger }: TransactionControllerHookRequest) {
 }
 
 function beforeSignHook({ messenger }: TransactionControllerHookRequest) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const m = messenger as any;
   return new EnforceSimulationHook({
     messenger,
-    isEligible: (transactionMeta) => {
-      const { addressSecurityAlertResponses } = messenger.call(
-        'AppStateController:getState',
-      );
-
-      const featureFlagState = messenger.call(
-        'RemoteFeatureFlagController:getState',
-      );
-
-      const {
-        internalAccounts: { accounts },
-      } = messenger.call('AccountsController:getState');
-
-      const internalAddresses = getInternalEvmAddresses(
-        Object.values(accounts),
-      );
-
-      return isEnforcedSimulationsEligible(transactionMeta, {
-        addressSecurityAlertResponses,
-        eip7702SupportedChains: getEip7702SupportedChains(featureFlagState),
-        internalAddresses,
-      });
-    },
+    isEligible: (transactionMeta) =>
+      isEnforcedSimulationsEligible(transactionMeta, {
+        ...m.call('AppStateController:getState'),
+        eip7702SupportedChains: getEip7702SupportedChains(
+          m.call('RemoteFeatureFlagController:getState'),
+        ),
+      }),
   }).getBeforeSignHook();
 }
 
@@ -154,7 +135,7 @@ function publishHook({
 
     const { isExternalSign } = transactionMeta;
 
-    const keyringSupports7702 = await accountSupports7702ForRelay(
+    const keyringSupports7702 = await accountSupports7702(
       transactionMeta.txParams?.from,
       getKeyringController(messenger),
     );
@@ -213,24 +194,6 @@ function publishHook({
         isSmartTransaction,
         featureFlags,
       });
-
-      if (result?.getFeesError) {
-        try {
-          getTransactionMetricsRequest().upsertTransactionUIMetricsFragment(
-            transactionMeta.id,
-            {
-              properties: {
-                [STX_GET_FEES_ERROR_METRIC_NAME]: result?.getFeesError,
-              },
-            },
-          );
-        } catch (e) {
-          console.error(
-            'Failed to record stx_get_fees_error metrics fragment',
-            e,
-          );
-        }
-      }
 
       if (result?.transactionHash) {
         try {

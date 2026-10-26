@@ -1,5 +1,5 @@
 import React from 'react';
-import { Meta, StoryFn } from '@storybook/react-webpack5';
+import { Meta, StoryFn } from '@storybook/react';
 import { BannerBase } from './banner-base';
 import { Icon, IconName, IconSize } from '../icon';
 
@@ -7,7 +7,6 @@ export default {
   title: 'Components/ComponentLibrary/BannerBase (deprecated)',
   component: BannerBase,
   tags: ['autodocs'],
-
   parameters: {
     docs: {
       description: {
@@ -15,8 +14,8 @@ export default {
           '**Deprecated**: This component is deprecated and will be removed in a future release. Please use BannerBase from @metamask/design-system-react instead.',
       },
     },
+    backgrounds: { default: 'alternative' },
   },
-
   argTypes: {
     className: {
       control: 'text',
@@ -53,12 +52,6 @@ export default {
     },
     onClose: {
       action: 'onClose',
-    },
-  },
-
-  globals: {
-    backgrounds: {
-      value: 'alternative',
     },
   },
 } as Meta<typeof BannerBase>;

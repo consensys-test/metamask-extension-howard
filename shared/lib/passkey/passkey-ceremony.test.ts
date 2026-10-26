@@ -10,7 +10,6 @@ import {
   ENVIRONMENT_TYPE_SIDEPANEL,
 } from '../../constants/app';
 import { getEnvironmentType } from '../environment-type';
-import * as manifestFlags from '../manifestFlags';
 import {
   PasskeyCeremonyTimeoutError,
   PASSKEY_SIDEPANEL_CEREMONY_TIMEOUT_MS,
@@ -18,7 +17,6 @@ import {
   isPasskeyCeremonySilentError,
   startPasskeyAuthentication,
   startPasskeyRegistration,
-  MOCK_PASSKEY_PRF_RESULT,
 } from './passkey-ceremony';
 
 jest.mock('@simplewebauthn/browser', () => ({
@@ -78,47 +76,8 @@ describe('passkey ceremony helpers', () => {
           extensions: undefined,
         },
       });
-      expect(result).toStrictEqual({
-        ...response,
-        clientExtensionResults: {
-          prf: {
-            enabled: true,
-          },
-        },
-      });
+      expect(result).toStrictEqual(response);
       expect(mockCancelCeremony).not.toHaveBeenCalled();
-    });
-
-    it('rejects registration when PRF is disabled outside test builds', async () => {
-      const originalInTest = process.env.IN_TEST;
-      delete process.env.IN_TEST;
-      try {
-        mockStartRegistration.mockResolvedValue({
-          id: 'credential-id',
-          rawId: 'raw-id',
-          response: {} as never,
-          type: 'public-key',
-          authenticatorAttachment: null,
-          clientExtensionResults: {
-            prf: {
-              enabled: false,
-            },
-          },
-        } as never);
-
-        await expect(
-          startPasskeyRegistration({ challenge: 'abc' } as never),
-        ).rejects.toMatchObject({
-          name: 'PasskeyPRFRequiredError',
-          message: 'Passkey setup requires PRF support',
-        });
-      } finally {
-        if (originalInTest === undefined) {
-          delete process.env.IN_TEST;
-        } else {
-          process.env.IN_TEST = originalInTest;
-        }
-      }
     });
 
     it('times out in sidepanel and cancels ceremony', async () => {
@@ -222,7 +181,7 @@ describe('passkey ceremony helpers', () => {
   });
 
   describe('startPasskeyAuthentication', () => {
-    it('adds a PRF result in test builds when missing', async () => {
+    it('runs authentication and returns results without PRF transform when missing', async () => {
       const response = {
         id: 'credential-id',
         rawId: 'raw-id',
@@ -240,39 +199,7 @@ describe('passkey ceremony helpers', () => {
       expect(mockStartAuthentication).toHaveBeenCalledWith({
         optionsJSON: { challenge: 'abc' },
       });
-      expect(result).toStrictEqual({
-        ...response,
-        clientExtensionResults: {
-          prf: MOCK_PASSKEY_PRF_RESULT,
-        },
-      });
-    });
-
-    it('keeps the authenticator response when mock passkey PRF is disabled', async () => {
-      const getManifestFlagsSpy = jest
-        .spyOn(manifestFlags, 'getManifestFlags')
-        .mockReturnValue({
-          testing: { mockPasskeyPrfEnabled: false },
-        });
-      const response = {
-        id: 'credential-id',
-        rawId: 'raw-id',
-        response: {} as never,
-        type: 'public-key',
-        authenticatorAttachment: null,
-        clientExtensionResults: {},
-      };
-      mockStartAuthentication.mockResolvedValue(response as never);
-
-      try {
-        const result = await startPasskeyAuthentication({
-          challenge: 'abc',
-        } as never);
-
-        expect(result.clientExtensionResults).toStrictEqual({});
-      } finally {
-        getManifestFlagsSpy.mockRestore();
-      }
+      expect(result).toStrictEqual(response);
     });
 
     it('decodes PRF eval.first string to buffer for authentication options', async () => {

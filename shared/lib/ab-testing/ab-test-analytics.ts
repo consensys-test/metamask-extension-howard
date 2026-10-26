@@ -84,7 +84,6 @@ export function enrichWithABTests<TEvent extends ABTestAnalyticsEvent>(
   event: TEvent,
   featureFlags: Record<string, unknown> | null | undefined,
   mappings: readonly ABTestAnalyticsMapping[] = AB_TEST_ANALYTICS_MAPPINGS,
-  thresholdGroups?: Record<string, string> | null,
 ): TEvent {
   const existingAssignments = normalizeActiveABTestAssignments(
     event.properties?.active_ab_tests,
@@ -106,7 +105,6 @@ export function enrichWithABTests<TEvent extends ABTestAnalyticsEvent>(
       featureFlags,
       mapping.flagKey,
       mapping.validVariants,
-      thresholdGroups,
     );
 
     return isActive

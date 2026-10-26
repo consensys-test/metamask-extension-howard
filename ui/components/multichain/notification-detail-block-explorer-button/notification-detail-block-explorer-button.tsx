@@ -59,7 +59,7 @@ export const NotificationDetailBlockExplorerButton = ({
 
   const analyticsEvent = useCallback(() => {
     trackEvent(
-      createEventBuilder(MetaMetricsEventName.NotificationDetailItemClicked)
+      createEventBuilder(MetaMetricsEventName.NotificationDetailClicked)
         .addCategory(MetaMetricsEventCategory.NotificationInteraction)
         .addProperties({
           /* eslint-disable @typescript-eslint/naming-convention */

@@ -30,7 +30,7 @@ import Tooltip from '../../../../../components/ui/tooltip';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useConfirmContext } from '../../../context/confirm';
 import { applyTransactionContainersExisting } from '../../../../../store/actions';
-import { useEnforcedSimulationsEligibility } from '../../../hooks/useEnforcedSimulationsEligibility';
+import { useIsEnforcedSimulationsEligible } from '../../../hooks/useIsEnforcedSimulationsEligible';
 import { useTransactionEventFragment } from '../../../hooks/useTransactionEventFragment';
 import { getEnforcedSimulationsSlippageBasisPoints } from '../../../../../../shared/lib/transaction/enforced-simulations';
 
@@ -42,14 +42,13 @@ export function EnforcedSimulationsRow() {
 
   const { containerTypes, id: transactionId } = currentConfirmation ?? {};
 
-  const { isEligible, isDefaultEnabled, hasPendingTrustSignals } =
-    useEnforcedSimulationsEligibility();
+  const isEligible = useIsEnforcedSimulationsEligible();
   const { updateTransactionEventFragment } = useTransactionEventFragment();
   const [isUnavailable, setIsUnavailable] = useState(false);
-  const initializationRequestId = useRef(0);
+  const autoEnableRequestId = useRef(0);
   const currentTransactionIdRef = useRef(transactionId);
 
-  const hasInitialized = containerTypes !== undefined;
+  const hasAutoEnabled = containerTypes !== undefined;
 
   const hasEnforcedSimulations = containerTypes?.includes(
     TransactionContainerType.EnforcedSimulations,
@@ -59,37 +58,25 @@ export function EnforcedSimulationsRow() {
     currentTransactionIdRef.current = transactionId;
   }, [transactionId]);
 
-  const [prevTransactionId, setPrevTransactionId] = useState(transactionId);
-  if (transactionId !== prevTransactionId) {
-    setPrevTransactionId(transactionId);
+  useEffect(() => {
     setIsUnavailable(false);
-  }
+  }, [transactionId]);
 
   useEffect(() => {
-    if (
-      isUnavailable ||
-      !isEligible ||
-      hasPendingTrustSignals ||
-      hasInitialized ||
-      !transactionId
-    ) {
+    if (isUnavailable || !isEligible || hasAutoEnabled || !transactionId) {
       return;
     }
 
-    const requestId = initializationRequestId.current + 1;
-    initializationRequestId.current = requestId;
+    const requestId = autoEnableRequestId.current + 1;
+    autoEnableRequestId.current = requestId;
 
-    const initialContainerTypes: TransactionContainerType[] = [
+    applyTransactionContainersExisting(transactionId, [
       ...(containerTypes ?? []),
-    ];
-    if (isDefaultEnabled) {
-      initialContainerTypes.push(TransactionContainerType.EnforcedSimulations);
-    }
-
-    applyTransactionContainersExisting(transactionId, initialContainerTypes)
+      TransactionContainerType.EnforcedSimulations,
+    ])
       .then(({ enforcedSimulationsSlippage }) => {
         if (
-          requestId !== initializationRequestId.current ||
+          requestId !== autoEnableRequestId.current ||
           transactionId !== currentTransactionIdRef.current
         ) {
           return;
@@ -98,7 +85,7 @@ export function EnforcedSimulationsRow() {
         updateTransactionEventFragment(
           {
             properties: {
-              enforced_simulations_default_enabled: isDefaultEnabled,
+              enforced_simulations_default_enabled: true,
               enforced_simulation_slippage_bps:
                 getEnforcedSimulationsSlippageMetric(
                   enforcedSimulationsSlippage,
@@ -110,7 +97,7 @@ export function EnforcedSimulationsRow() {
       })
       .catch((error) => {
         if (
-          requestId !== initializationRequestId.current ||
+          requestId !== autoEnableRequestId.current ||
           transactionId !== currentTransactionIdRef.current
         ) {
           return;
@@ -124,9 +111,7 @@ export function EnforcedSimulationsRow() {
   }, [
     currentConfirmation,
     isEligible,
-    hasPendingTrustSignals,
-    hasInitialized,
-    isDefaultEnabled,
+    hasAutoEnabled,
     transactionId,
     containerTypes,
     isUnavailable,
@@ -170,7 +155,7 @@ export function EnforcedSimulationsRow() {
     [transactionId, updateTransactionEventFragment],
   );
 
-  if (isUnavailable || !hasInitialized) {
+  if (isUnavailable || !hasAutoEnabled) {
     return null;
   }
 
@@ -218,9 +203,15 @@ function EnforcedSimulationsCheckbox({
 
   const isToggling = pendingEnabled !== null;
 
-  if (pendingEnabled !== null && isEnabled === pendingEnabled) {
-    setPendingEnabled(null);
-  }
+  useEffect(() => {
+    if (pendingEnabled === null) {
+      return;
+    }
+
+    if (isEnabled === pendingEnabled) {
+      setPendingEnabled(null);
+    }
+  }, [isEnabled, pendingEnabled]);
 
   const handleToggle = useCallback(async () => {
     const targetEnabled = !isEnabled;

@@ -3,17 +3,19 @@ import { formatChainIdToHex } from '@metamask/bridge-controller';
 import {
   Box,
   FontWeight,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
   Text,
   TextColor,
   TextVariant,
 } from '@metamask/design-system-react';
 import { type CaipChainId } from '@metamask/utils';
 
+import {
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
+} from '../../components/component-library';
 import { NetworkListItem } from '../../components/multichain/network-list-item';
 import { isEvmChainId } from '../../../shared/lib/asset-utils';
 import { useI18nContext } from '../../hooks/useI18nContext';
@@ -54,16 +56,18 @@ export const CustomTokenImportNetworkSelector = ({
       data-testid="custom-token-import-network-selector"
     >
       <ModalOverlay />
-      <ModalContent modalDialogProps={{ padding: 0, className: 'h-full' }}>
-        <ModalHeader
-          onBack={onBack}
-          onClose={onClose}
-          backButtonProps={{ ariaLabel: t('back') }}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
+      <ModalContent
+        padding={0}
+        modalDialogProps={{ padding: 0, height: '100%' }}
+      >
+        <ModalHeader onBack={onBack} onClose={onClose}>
           {t('networkMenuHeading')}
         </ModalHeader>
-        <ModalBody className="flex min-h-0 flex-1 flex-col overflow-auto px-0">
+        <ModalBody
+          paddingLeft={0}
+          paddingRight={0}
+          className="flex min-h-0 flex-1 flex-col overflow-auto"
+        >
           {networkSections.map((section, index) => (
             <Box key={section.key} className="flex flex-col">
               {index > 0 ? (

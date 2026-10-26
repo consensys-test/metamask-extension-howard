@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type {
   HardwareWalletSignatureEventWithoutPayload,
   HardwareWalletSignaturesAction,
@@ -13,18 +13,19 @@ import { hwSwapStoryState } from './story-state';
 const FROM_ADDRESS = '0x1234567890123456789012345678901234567890';
 const TO_ADDRESS = '0x0987654321098765432109876543210987654321';
 const SPENDER_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
-const FROM_TOKEN = { symbol: 'ETH', chainId: 'eip155:1' };
-const TO_TOKEN = { symbol: 'USDC', chainId: 'eip155:1' };
+const FROM_TOKEN = { symbol: 'ETH' };
+const TO_TOKEN = { symbol: 'USDC' };
 
 type Dispatch = (action: HardwareWalletSignaturesAction) => void;
 
 function buildLockedQuote(needsTwoConfirmations: boolean) {
   return {
+    sentAmount: { amount: '1.5' },
     trade: { from: FROM_ADDRESS, to: TO_ADDRESS },
     approval: needsTwoConfirmations ? { to: SPENDER_ADDRESS } : undefined,
     quote: {
-      src: { normalizedAmount: '1.5' },
-      dest: { normalizedAmount: '3000' },
+      srcTokenAmount: '1500000000000000000',
+      destTokenAmount: '3000000000',
       requestId: 'story-request-id',
     },
   };
@@ -108,23 +109,22 @@ function driveToStatus(
 export function useHwSwapQuoteData() {
   const { needsTwoConfirmations, hardwareWalletType } =
     hwSwapStoryState.current;
-  const [lockedQuoteState, setLockedQuoteState] = useState(() => ({
+  const ref = useRef<{
+    needsTwoConf: boolean;
+    quote: ReturnType<typeof buildLockedQuote>;
+  }>({
     needsTwoConf: needsTwoConfirmations,
     quote: buildLockedQuote(needsTwoConfirmations),
-  }));
+  });
 
-  useEffect(() => {
-    if (lockedQuoteState.needsTwoConf !== needsTwoConfirmations) {
-      queueMicrotask(() => {
-        setLockedQuoteState({
-          needsTwoConf: needsTwoConfirmations,
-          quote: buildLockedQuote(needsTwoConfirmations),
-        });
-      });
-    }
-  }, [lockedQuoteState.needsTwoConf, needsTwoConfirmations]);
+  if (ref.current.needsTwoConf !== needsTwoConfirmations) {
+    ref.current = {
+      needsTwoConf: needsTwoConfirmations,
+      quote: buildLockedQuote(needsTwoConfirmations),
+    };
+  }
 
-  const lockedQuote = lockedQuoteState.quote;
+  const lockedQuote = ref.current.quote;
   return {
     activeQuote: lockedQuote,
     lockedQuote,
@@ -215,7 +215,7 @@ export function useHwSwapActions() {
     handleRetry: async () => undefined,
     handleCancel: async () => undefined,
     isRetrying: false,
-    hasRetried: false,
+    hasRetriedRef: { current: false },
   };
 }
 

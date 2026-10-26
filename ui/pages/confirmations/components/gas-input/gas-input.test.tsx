@@ -1,7 +1,6 @@
 import React from 'react';
 import { fireEvent } from '@testing-library/react';
 import { CHAIN_IDS } from '@metamask/transaction-controller';
-import { Hex } from '@metamask/utils';
 import configureStore from '../../../../store/store';
 import { renderWithConfirmContextProvider } from '../../../../../test/lib/confirmations/render-helpers';
 import { enLocale as messages } from '../../../../../test/lib/i18n-helpers';
@@ -9,13 +8,7 @@ import { getMockConfirmStateForTransaction } from '../../../../../test/data/conf
 import { genUnapprovedContractInteractionConfirmation } from '../../../../../test/data/confirmations/contract-interaction';
 import { GasInput } from './gas-input';
 
-const render = (
-  props: {
-    gasLimit?: Hex;
-    helpText?: string;
-    isDisabled?: boolean;
-  } = { gasLimit: '0x5208' },
-) => {
+const render = (props = {}) => {
   const contractInteraction = genUnapprovedContractInteractionConfirmation({
     chainId: CHAIN_IDS.GOERLI,
   });
@@ -29,11 +22,9 @@ const render = (
 
   const result = renderWithConfirmContextProvider(
     <GasInput
-      gasLimit={props.gasLimit}
-      helpText={props.helpText}
-      isDisabled={props.isDisabled}
       onChange={mockOnChange}
       onErrorChange={mockOnErrorChange}
+      {...props}
     />,
     store,
   );
@@ -57,74 +48,13 @@ describe('GasInput', () => {
     expect(getByText(messages.gasLimit.message)).toBeInTheDocument();
   });
 
-  it('uses numeric input mode without number input behavior', () => {
-    const { getByTestId } = render();
-
-    const input = getByTestId('gas-input').querySelector(
-      'input',
-    ) as HTMLInputElement;
-
-    expect(input).toHaveAttribute('inputmode', 'numeric');
-    expect(input).toHaveAttribute('type', 'text');
-  });
-
-  it('renders an empty value when the gas estimate is missing', () => {
-    const { getByTestId } = render({ gasLimit: undefined });
-
-    const input = getByTestId('gas-input').querySelector(
-      'input',
-    ) as HTMLInputElement;
-
-    expect(input.value).toBe('');
-  });
-
-  it('disables editing and describes why the estimate is unavailable', () => {
-    const { getByTestId, getByText } = render({
-      gasLimit: undefined,
-      helpText: messages.gasLimitEditingUnavailable.message,
-      isDisabled: true,
-    });
-
-    const input = getByTestId('gas-input').querySelector(
-      'input',
-    ) as HTMLInputElement;
-    const helpText = getByText(messages.gasLimitEditingUnavailable.message);
-
-    expect(input).toBeDisabled();
-    expect(input).toHaveAttribute('aria-describedby', helpText.id);
-  });
-
-  it('updates the displayed value when the gas estimate changes', () => {
-    const { getByTestId, mockOnChange, mockOnErrorChange, rerender } = render({
-      gasLimit: undefined,
-    });
-    const renderGasInput = (gasLimit: Hex | undefined) => (
-      <GasInput
-        gasLimit={gasLimit}
-        onChange={mockOnChange}
-        onErrorChange={mockOnErrorChange}
-      />
-    );
-
-    rerender(renderGasInput('0x7530'));
-
-    const input = getByTestId('gas-input').querySelector(
-      'input',
-    ) as HTMLInputElement;
-    expect(input.value).toBe('30000');
-
-    rerender(renderGasInput(undefined));
-
-    expect(input.value).toBe('');
-  });
-
   it('calls onChange when value changes', () => {
     const { getByTestId, mockOnChange } = render();
 
     const input = getByTestId('gas-input').querySelector(
       'input',
     ) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: '30000' } });
+    fireEvent.change(input, { target: { value: '21000' } });
 
     expect(mockOnChange).toHaveBeenCalled();
   });

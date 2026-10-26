@@ -1,31 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOriginTrustSignals } from '../../../hooks/useOriginTrustSignals';
 import { TrustSignalDisplayState } from '../../../hooks/useTrustSignals';
-import { TrustSignalModal } from '../../../components/app/trust-signal-modal/trust-signal-modal';
-import { useBoolean } from '../../../hooks/useBoolean';
+import { TrustSignalModal } from './trust-signal-modal';
 
 type ConnectionTrustSignalGateProps = {
   origin: string;
   children: React.ReactNode;
-  onCancel: () => void;
+  onCancel?: () => void;
 };
 
 export function ConnectionTrustSignalGate({
   origin,
   children,
   onCancel,
-}: Readonly<ConnectionTrustSignalGateProps>) {
+}: ConnectionTrustSignalGateProps) {
   const { state } = useOriginTrustSignals(origin);
-  const { value: dismissed, setTrue: dismiss } = useBoolean(false);
+  const [dismissed, setDismissed] = useState(false);
 
-  const showModal = !dismissed && state === TrustSignalDisplayState.Malicious;
+  if (!dismissed && state === TrustSignalDisplayState.Malicious) {
+    return (
+      <TrustSignalModal
+        origin={origin}
+        onContinue={() => setDismissed(true)}
+        onCancel={onCancel}
+      />
+    );
+  }
 
-  return (
-    <>
-      {showModal && (
-        <TrustSignalModal onContinue={dismiss} onCancel={onCancel} />
-      )}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

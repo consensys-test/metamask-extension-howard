@@ -1,4 +1,5 @@
-import { useDeferredValue, useState } from 'react';
+import { useState } from 'react';
+import { useDeferredValue } from './useDeferredValue';
 
 export type UseDeferredSearchQueryResult = {
   query: string;

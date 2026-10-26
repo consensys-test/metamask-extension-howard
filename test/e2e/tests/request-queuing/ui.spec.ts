@@ -22,7 +22,7 @@ import { Anvil } from '../../seeder/anvil';
 import { CHAIN_IDS } from '../../../../shared/constants/network';
 import Confirmation from '../../page-objects/pages/confirmations/confirmation';
 import TransactionConfirmation from '../../page-objects/pages/confirmations/transaction-confirmation';
-import HeaderNavbar from '../../page-objects/pages/home/header-navbar';
+import HeaderNavbar from '../../page-objects/pages/header-navbar';
 import {
   openDappAndSwitchChain,
   openPopupWithActiveTabOrigin,
@@ -119,10 +119,7 @@ describe('Request-queue UI changes', function () {
           originText: DAPP_URL,
         });
         const confirmation = new Confirmation(driver);
-        await confirmation.clickFooterButton({
-          button: 'cancel',
-          waitUntil: 'windowClose',
-        });
+        await confirmation.clickFooterCancelButtonAndAndWaitForWindowToClose();
 
         // Go to the second dapp, ensure it uses Ethereum
         await selectDappClickSend(driver, DAPP_ONE_URL);
@@ -131,10 +128,7 @@ describe('Request-queue UI changes', function () {
           networkText: 'Localhost 8546',
           originText: DAPP_ONE_URL,
         });
-        await confirmation.clickFooterButton({
-          button: 'cancel',
-          waitUntil: 'windowClose',
-        });
+        await confirmation.clickFooterCancelButtonAndAndWaitForWindowToClose();
       },
     );
   });
@@ -213,7 +207,7 @@ describe('Request-queue UI changes', function () {
         });
 
         // Confirm transaction, wait for first confirmation window to close, second to display
-        await transactionConfirmation.clickFooterButton({ button: 'confirm' });
+        await transactionConfirmation.clickFooterConfirmButton();
         await driver.waitForWindowWithTitleToBePresent(WINDOW_TITLES.Dialog);
 
         // Switch to the new Notification window, ensure second transaction showing
@@ -225,7 +219,7 @@ describe('Request-queue UI changes', function () {
 
         // Reject this transaction, wait for second confirmation window to close, third to display
         const confirmation = new Confirmation(driver);
-        await confirmation.clickFooterButton({ button: 'cancel' });
+        await confirmation.clickFooterCancelButton();
 
         if (!IS_FIREFOX) {
           // Switch to the new Notification window, ensure third transaction showing
@@ -236,9 +230,7 @@ describe('Request-queue UI changes', function () {
           });
 
           // Confirm transaction
-          await transactionConfirmation.clickFooterButton({
-            button: 'confirm',
-          });
+          await transactionConfirmation.clickFooterConfirmButton();
         }
 
         // With first and last confirmations confirmed, and second rejected,

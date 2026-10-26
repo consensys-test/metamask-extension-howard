@@ -19,11 +19,20 @@ export {
   useMusdCtaVisibility,
   isTokenInWildcardList,
   checkTokenAllowed,
+  BuyGetMusdCtaVariant,
   type UseMusdCtaVisibilityResult,
+  type BuyGetMusdCtaState,
   type TokenForCta,
+  type BuyGetCtaOptions,
+  type TokenListItemCtaOptions,
 } from './useMusdCtaVisibility';
 
 export { useMusdBalance, type UseMusdBalanceResult } from './useMusdBalance';
+
+export {
+  useMusdMerklPosition,
+  type UseMusdMerklPositionResult,
+} from './useMusdMerklPosition';
 
 export {
   useMusdNetworkFilter,
@@ -56,3 +65,5 @@ export {
   useMusdPaymentToken,
   type UseMusdPaymentTokenResult,
 } from './useMusdPaymentToken';
+
+export { isMerklClaimTransaction } from '../../components/app/musd/utils';

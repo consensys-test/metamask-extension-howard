@@ -20,7 +20,7 @@ import { getNetworkConfigurationsByChainId } from '../../../../../shared/lib/sel
 import { getSubjectMetadata } from '../../../../selectors';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
 import ZENDESK_URLS from '../../../../helpers/constants/zendesk-url';
-import { stripProtocol, toPunycodeURL } from '../../utils/confirm';
+import { stripProtocol } from '../../utils/confirm';
 import { CHAIN_ID_TO_NETWORK_IMAGE_URL_MAP } from '../../../../../shared/constants/network';
 import { RowAlertKey } from '../../../../components/app/confirm/info/row/constants';
 import { AddEthereumChainContext } from './types';
@@ -90,11 +90,7 @@ export const AddEthereumChain = () => {
           alertKey={RowAlertKey.RpcUrl}
           ownerId={currentConfirmation.id}
         >
-          <Text>
-            {stripProtocol(
-              toPunycodeURL(requestData.rpcUrl) ?? requestData.rpcUrl,
-            )}
-          </Text>
+          <Text>{stripProtocol(requestData.rpcUrl)}</Text>
         </ConfirmInfoAlertRow>
       </ConfirmInfoSection>
 

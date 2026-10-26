@@ -10,11 +10,25 @@ import type {
 } from '@metamask/ramps-controller';
 import configureStore from '../../../store/store';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
-import { RampsProviderSelectionModal } from './provider-selection';
+import { PREVIOUS_ROUTE } from '../../../helpers/constants/routes';
+import { RampsProviderSelectionScreen } from './provider-selection';
 
+const mockNavigate = jest.fn();
 const mockSetSelectedProvider = jest.fn().mockResolvedValue(undefined);
 const mockUseRampsQuotes = jest.fn();
-const mockOnClose = jest.fn();
+let mockLocationState: { amount?: number } | null = null;
+
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+  useLocation: () => ({
+    pathname: '/ramps/provider-selection',
+    search: '',
+    hash: '',
+    state: mockLocationState,
+    key: 'default',
+  }),
+}));
 
 jest.mock('../../../hooks/ramps/useRampsController', () => ({
   useRampsController: jest.fn(),
@@ -24,15 +38,8 @@ jest.mock('../../../hooks/ramps/useRampsQuotes', () => ({
   useRampsQuotes: (...args: unknown[]) => mockUseRampsQuotes(...args),
 }));
 
-jest.mock('../../../selectors/multichain-accounts/account-tree', () => ({
-  getInternalAccountBySelectedAccountGroupAndCaip: jest.fn(() => null),
-}));
-
 const { useRampsController } = jest.requireMock(
   '../../../hooks/ramps/useRampsController',
-);
-const { getInternalAccountBySelectedAccountGroupAndCaip } = jest.requireMock(
-  '../../../selectors/multichain-accounts/account-tree',
 );
 
 const createStore = () =>
@@ -107,22 +114,10 @@ const defaultControllerState = {
   },
 };
 
-const renderModal = (
-  props: Partial<React.ComponentProps<typeof RampsProviderSelectionModal>> = {},
-) =>
-  renderWithProvider(
-    <RampsProviderSelectionModal
-      isOpen
-      onClose={mockOnClose}
-      amount={0}
-      {...props}
-    />,
-    createStore(),
-  );
-
-describe('RampsProviderSelectionModal', () => {
+describe('RampsProviderSelectionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocationState = null;
     mockSetSelectedProvider.mockResolvedValue(undefined);
     useRampsController.mockReturnValue(defaultControllerState);
     mockUseRampsQuotes.mockReturnValue({
@@ -137,9 +132,13 @@ describe('RampsProviderSelectionModal', () => {
   });
 
   it('matches snapshot with providers', () => {
-    const { baseElement } = renderModal();
+    const { container } = renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
-    expect(baseElement).toMatchSnapshot();
+    expect(container).toMatchSnapshot();
   });
 
   it('matches snapshot while loading', () => {
@@ -150,9 +149,13 @@ describe('RampsProviderSelectionModal', () => {
       selectedProvider: null,
     });
 
-    const { baseElement } = renderModal();
+    const { container } = renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
-    expect(baseElement).toMatchSnapshot();
+    expect(container).toMatchSnapshot();
   });
 
   it('matches snapshot when empty', () => {
@@ -162,13 +165,23 @@ describe('RampsProviderSelectionModal', () => {
       selectedProvider: null,
     });
 
-    const { baseElement } = renderModal();
+    const { container } = renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
-    expect(baseElement).toMatchSnapshot();
+    expect(container).toMatchSnapshot();
   });
 
   it('fetches quotes for all providers when amount and payment method exist', () => {
-    renderModal({ amount: 100 });
+    mockLocationState = { amount: 100 };
+
+    renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
     expect(mockUseRampsQuotes).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -181,6 +194,7 @@ describe('RampsProviderSelectionModal', () => {
   });
 
   it('keeps the provider list visible while quotes load', () => {
+    mockLocationState = { amount: 100 };
     mockUseRampsQuotes.mockReturnValue({
       data: null,
       loading: true,
@@ -191,7 +205,11 @@ describe('RampsProviderSelectionModal', () => {
       getBuyWidgetData: jest.fn(),
     });
 
-    const { baseElement } = renderModal({ amount: 100 });
+    const { container } = renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
     expect(
       screen.getByTestId('ramps-provider-item-/providers/transak'),
@@ -202,10 +220,11 @@ describe('RampsProviderSelectionModal', () => {
     expect(screen.getAllByTestId('ramps-quote-display-loading')).toHaveLength(
       2,
     );
-    expect(baseElement).toMatchSnapshot();
+    expect(container).toMatchSnapshot();
   });
 
-  it('matches snapshot with only providers that returned quotes', () => {
+  it('matches snapshot with provider quotes', () => {
+    mockLocationState = { amount: 100 };
     mockUseRampsQuotes.mockReturnValue({
       data: {
         success: [transakQuote],
@@ -226,43 +245,21 @@ describe('RampsProviderSelectionModal', () => {
       getBuyWidgetData: jest.fn(),
     });
 
-    const { baseElement } = renderModal({ amount: 100 });
+    const { container } = renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
-    expect(baseElement).toMatchSnapshot();
+    expect(container).toMatchSnapshot();
   });
 
-  it('matches snapshot when no providers return quotes', () => {
-    mockUseRampsQuotes.mockReturnValue({
-      data: {
-        success: [],
-        sorted: [],
-        error: [
-          {
-            provider: transak.id,
-            error: 'Quote unavailable',
-          },
-          {
-            provider: moonpay.id,
-            error: 'Quote unavailable',
-          },
-        ],
-        customActions: [],
-      },
-      loading: false,
-      status: 'success',
-      isSuccess: true,
-      error: null,
-      getQuotes: jest.fn(),
-      getBuyWidgetData: jest.fn(),
-    });
-
-    const { baseElement } = renderModal({ amount: 100 });
-
-    expect(baseElement).toMatchSnapshot();
-  });
-
-  it('selects a provider and closes the modal', async () => {
-    renderModal();
+  it('selects a provider and navigates back', async () => {
+    renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
+    );
 
     await act(async () => {
       fireEvent.click(
@@ -271,52 +268,17 @@ describe('RampsProviderSelectionModal', () => {
     });
 
     expect(mockSetSelectedProvider).toHaveBeenCalledWith(moonpay);
-    expect(mockOnClose).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith(PREVIOUS_ROUTE);
   });
 
-  it('closes from the header close button', () => {
-    renderModal();
-
-    fireEvent.click(screen.getByTestId('ramps-provider-selection-close'));
-    expect(mockOnClose).toHaveBeenCalled();
-  });
-
-  it('uses the chain-matching account address for non-EVM assets', () => {
-    const solanaAccount = {
-      id: 'sol-account-1',
-      address: '7NpQ2kKqLhB5rJ3mF8vXcYaZ9wEd1tGsR2VnQ4bHkU',
-      metadata: { name: 'Solana Account' },
-    };
-    const solanaToken = {
-      assetId: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/slip44:501',
-      symbol: 'SOL',
-      chainId: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
-    };
-    const solanaProvider = {
-      id: '/providers/solana-ramp',
-      name: 'Solana Ramp',
-      supportedCryptoCurrencies: {
-        'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/slip44:501': true,
-      },
-    } as unknown as Provider;
-
-    jest
-      .mocked(getInternalAccountBySelectedAccountGroupAndCaip)
-      .mockReturnValue(solanaAccount);
-
-    useRampsController.mockReturnValue({
-      ...defaultControllerState,
-      providers: [solanaProvider],
-      selectedProvider: solanaProvider,
-      selectedToken: solanaToken,
-    });
-
-    renderModal({ amount: 100 });
-
-    expect(mockUseRampsQuotes).toHaveBeenCalledWith(
-      expect.objectContaining({
-        walletAddress: '7NpQ2kKqLhB5rJ3mF8vXcYaZ9wEd1tGsR2VnQ4bHkU',
-      }),
+  it('navigates back from the header', () => {
+    renderWithProvider(
+      <RampsProviderSelectionScreen />,
+      createStore(),
+      '/ramps/provider-selection',
     );
+
+    fireEvent.click(screen.getByTestId('ramps-provider-selection-back'));
+    expect(mockNavigate).toHaveBeenCalledWith(PREVIOUS_ROUTE);
   });
 });

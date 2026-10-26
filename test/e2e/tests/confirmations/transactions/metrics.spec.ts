@@ -26,7 +26,7 @@ describe('Metrics', function () {
         dappOptions: { numberOfTestDapps: 1 },
         fixtures: new FixtureBuilderV2()
           .withPermissionControllerConnectedToTestDapp()
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,
@@ -54,7 +54,7 @@ describe('Metrics', function () {
         );
         await deploymentConfirmation.checkTitle();
         await deploymentConfirmation.checkDeploymentSiteInfo();
-        await deploymentConfirmation.clickFooterButton({ button: 'confirm' });
+        await deploymentConfirmation.clickFooterConfirmButton();
 
         // check activity list
         await driver.switchToWindowWithTitle(
@@ -98,10 +98,7 @@ describe('Metrics', function () {
         );
 
         await assertAdvancedGasDetails(driver);
-        await transactionConfirmation.clickFooterButton({
-          button: 'confirm',
-          waitUntil: 'windowClose',
-        });
+        await transactionConfirmation.clickFooterConfirmButtonAndAndWaitForWindowToClose();
         await driver.switchToWindowWithTitle(
           WINDOW_TITLES.ExtensionInFullScreenView,
         );

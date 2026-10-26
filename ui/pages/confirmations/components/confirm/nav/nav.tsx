@@ -103,6 +103,7 @@ export const Nav = ({ confirmationId }: NavProps) => {
         />
       </Box>
       <Button
+        borderRadius={BorderRadius.XL}
         className="confirm_nav__reject_all"
         data-testid="confirm-nav__reject-all"
         fontWeight={FontWeight.Normal}

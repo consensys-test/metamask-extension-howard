@@ -40,11 +40,7 @@ export const EstimatesModal = ({
   });
 
   return (
-    <Modal
-      isOpen
-      onClose={handleCloseModals}
-      data-testid="parent-selector-gas-fee-modal"
-    >
+    <Modal isOpen onClose={handleCloseModals}>
       <ModalOverlay />
       <ModalContent
         size={ModalContentSize.Md}

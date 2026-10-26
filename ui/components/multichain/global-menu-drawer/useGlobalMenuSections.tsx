@@ -56,7 +56,7 @@ import {
   getAnySnapUpdateAvailable,
   getUseExternalServices,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
   getDataCollectionForMarketing,
 } from '../../../selectors';
@@ -128,9 +128,11 @@ export function useGlobalMenuSections(
   );
 
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
-  const isMetaMetricsEnabled = consentDecisionMade && isOptedIn;
+  const isMetaMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
 
   const supportText =
@@ -167,7 +169,15 @@ export function useGlobalMenuSections(
 
   const handleSupportMenuClick = useCallback(() => {
     dispatch(setShowSupportDataConsentModal(true));
-
+    trackEvent(
+      createEventBuilder(MetaMetricsEventName.SupportLinkClicked)
+        .addCategory(MetaMetricsEventCategory.Home)
+        .addProperties({
+          url: supportLink,
+          location: segmentContext.page?.title,
+        })
+        .build(),
+    );
     if (showPriorityTag) {
       const shieldSubscription = getShieldSubscription(subscriptions);
       const { cryptoPaymentChain, cryptoPaymentCurrency } =
@@ -184,17 +194,6 @@ export function useGlobalMenuSections(
           MetaMetricsEventName.ShieldPrioritySupportClicked,
         );
       }
-    } else {
-      // if shield subscription is not active, track the support link clicked event for non-priority support
-      trackEvent(
-        createEventBuilder(MetaMetricsEventName.SupportLinkClicked)
-          .addCategory(MetaMetricsEventCategory.Home)
-          .addProperties({
-            url: supportLink,
-            location: segmentContext.page?.title,
-          })
-          .build(),
-      );
     }
     onClose();
   }, [
@@ -336,7 +335,7 @@ export function useGlobalMenuSections(
         {
           id: 'global-menu-connected-sites',
           iconName: IconName.SecurityTick,
-          label: t('permissions'),
+          label: t('allPermissions'),
           to: isGatorPermissionsRevocationFeatureEnabled()
             ? `${GATOR_PERMISSIONS}?from=${encodeURIComponent(location.pathname)}`
             : `${PERMISSIONS}?from=${encodeURIComponent(location.pathname)}`,

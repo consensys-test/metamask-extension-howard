@@ -8,6 +8,13 @@ import {
   stringifyBalance,
 } from './useTokenBalances';
 
+jest.mock('../../shared/lib/assets-unify-state/remote-feature-flag', () => ({
+  ...jest.requireActual(
+    '../../shared/lib/assets-unify-state/remote-feature-flag',
+  ),
+  isAssetsUnifyStateFeatureEnabled: jest.fn(() => true),
+}));
+
 jest.mock('../store/actions', () => ({
   tokenBalancesStartPolling: jest
     .fn()
@@ -59,7 +66,7 @@ describe('useTokenBalances', () => {
     jest.clearAllMocks();
   });
 
-  it('does not start TokenBalancesController polling', () => {
+  it('does not start polling when assets-unify-state is enabled', () => {
     renderHookWithProvider(() => useTokenBalances(), BASE_STATE);
 
     expect(mockTokenBalancesStartPolling).not.toHaveBeenCalled();
@@ -76,7 +83,7 @@ describe('useTokenTracker', () => {
     { address: '0xToken2', symbol: 'TK2', decimals: 6 },
   ];
 
-  it('returns placeholder balances', () => {
+  it('returns placeholder balances when assets-unify-state is enabled', () => {
     const { result } = renderHookWithProvider(
       () =>
         useTokenTracker({

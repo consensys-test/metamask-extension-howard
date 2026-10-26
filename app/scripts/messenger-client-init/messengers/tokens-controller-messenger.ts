@@ -9,7 +9,6 @@ import type {
   NetworkControllerGetSelectedNetworkClientAction,
   NetworkControllerGetStateAction,
 } from '@metamask/network-controller';
-import { RemoteFeatureFlagControllerGetStateAction } from '@metamask/remote-feature-flag-controller';
 import { RootMessenger } from '../../lib/messenger';
 
 /**
@@ -51,8 +50,7 @@ export function getTokensControllerMessenger(
 type AllowedInitializationActions =
   | NetworkControllerGetNetworkClientByIdAction
   | NetworkControllerGetSelectedNetworkClientAction
-  | NetworkControllerGetStateAction
-  | RemoteFeatureFlagControllerGetStateAction;
+  | NetworkControllerGetStateAction;
 
 export type TokensControllerInitMessenger = ReturnType<
   typeof getTokensControllerInitMessenger
@@ -82,7 +80,6 @@ export function getTokensControllerInitMessenger(
       'NetworkController:getNetworkClientById',
       'NetworkController:getSelectedNetworkClient',
       'NetworkController:getState',
-      'RemoteFeatureFlagController:getState',
     ],
   });
   return controllerInitMessenger;

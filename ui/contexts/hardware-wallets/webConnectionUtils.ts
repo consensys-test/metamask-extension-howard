@@ -313,23 +313,16 @@ export async function checkCameraPermission(): Promise<PermissionState> {
 }
 
 /**
- * Canonical WebHID grant entry point: requests permission and returns the
- * granted devices. Must be called from a user gesture (`requestDevice` needs
- * transient activation); the offscreen document sees the grant via
- * `getDevices()` instead.
- *
- * Filters by vendor only, so the picker still matches the device when it
- * re-enumerates with a different productId (e.g. BOLOS vs bootloader).
+ * Request WebHID permission from the user
+ * This will show the browser's device selection dialog
  *
  * @param walletType - The hardware wallet type to request permission for
- * @returns Granted devices matching `walletType`, or `[]` when unavailable,
- * cancelled, or no matching device is selected.
  */
-export async function requestWebHidDevices(
+export async function requestWebHidPermission(
   walletType: HardwareWalletType,
-): Promise<HIDDevice[]> {
+): Promise<boolean> {
   if (!isWebHidAvailable()) {
-    return [];
+    return false;
   }
 
   try {
@@ -337,27 +330,15 @@ export async function requestWebHidDevices(
       filters: getDeviceFilters(walletType) as HIDDeviceFilter[],
     });
 
-    return devices.filter((device) =>
+    // Check if user selected a device matching the wallet type
+    const hasDevice = devices.some((device) =>
       isHardwareWalletDevice(device, walletType),
     );
-  } catch {
-    return [];
-  }
-}
 
-/**
- * Request WebHID permission from the user, showing the browser's device
- * selection dialog.
- *
- * Boolean wrapper over {@link requestWebHidDevices}.
- *
- * @param walletType - The hardware wallet type to request permission for
- */
-export async function requestWebHidPermission(
-  walletType: HardwareWalletType,
-): Promise<boolean> {
-  const devices = await requestWebHidDevices(walletType);
-  return devices.length > 0;
+    return hasDevice;
+  } catch {
+    return false;
+  }
 }
 
 /**

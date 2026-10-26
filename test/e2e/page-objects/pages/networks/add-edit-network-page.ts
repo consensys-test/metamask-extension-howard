@@ -251,7 +251,8 @@ class AddEditNetworkPage {
     console.log(`Select RPC ${rpcName} on the edit network page`);
     await this.driver.clickElement(this.rpcDropDownButton);
     await this.driver.clickElement({
-      testId: `network-form-rpc-option-${rpcName}`,
+      text: rpcName,
+      tag: 'button',
     });
     await this.saveEditedNetwork();
   }

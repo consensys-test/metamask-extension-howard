@@ -18,6 +18,7 @@
     "importNftsModal": {
       "open": false
     },
+    "showPermittedNetworkToastOpen": false,
     "isLoading": false,
     "modal": {
       "open": false,
@@ -1675,6 +1676,9 @@
     "grantedPermissions": [],
     "isFetchingGatorPermissions": false,
     "lastSyncedTimestamp": -1,
+    "networkConnectionBanner": {
+      "status": "unknown"
+    },
     "coverageResults": {}
   }
 }

@@ -1,6 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { AvatarIconSeverity, IconName } from '@metamask/design-system-react';
+import {
+  BackgroundColor,
+  TextColor,
+} from '../../../helpers/constants/design-system';
+import { IconName } from '../../component-library';
 import {
   NotificationDetailInfo,
   NotificationDetailInfoProps,
@@ -10,7 +14,8 @@ describe('NotificationDetailInfo', () => {
   const defaultProps: NotificationDetailInfoProps = {
     icon: {
       iconName: IconName.Arrow2Down,
-      severity: AvatarIconSeverity.Success,
+      color: TextColor.primaryDefault,
+      backgroundColor: BackgroundColor.successDefault,
     },
     label: 'Test Label',
     detail: 'Test Detail',

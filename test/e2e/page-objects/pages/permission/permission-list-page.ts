@@ -1,19 +1,8 @@
 import { Driver } from '../../../webdriver/driver';
 
 /**
- * Connected-sites permissions list.
- *
- * Screen: `#/permissions`.
- * Owns: page-loaded checks, counting connection list items, asserting a site
- * is listed, opening a site's permission page, and back navigation.
- * Boundaries: the list only. Per-site edit/disconnect is
- * `EditConnectedAccountsPage`; the Gator category hub is
- * `GatorPermissionsPage`.
- * Related: `EditConnectedAccountsPage`, `GatorPermissionsPage`,
- * `flows/permissions.flow.ts`.
- *
- * @see ui/components/multichain/pages/permissions-page/permissions-page.js
- * @see test/e2e/page-objects/flows/permissions.flow.ts
+ * Represents the permissions list page.
+ * This page allows users to view permissions for connected sites.
  */
 class PermissionListPage {
   private readonly backButton = '[data-testid="permissions-page-back"]';
@@ -22,7 +11,7 @@ class PermissionListPage {
 
   private driver: Driver;
 
-  private readonly page = '[data-testid="parent-selector-permission-list"]';
+  private readonly permissionsPage = '[data-testid="permissions-page"]';
 
   constructor(driver: Driver) {
     this.driver = driver;
@@ -60,7 +49,7 @@ class PermissionListPage {
 
   async checkPageIsLoaded(): Promise<void> {
     try {
-      await this.driver.waitForSelector(this.page);
+      await this.driver.waitForSelector(this.permissionsPage);
     } catch (e) {
       console.log(
         'Timeout while waiting for permission list page to be loaded',

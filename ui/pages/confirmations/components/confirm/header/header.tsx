@@ -4,7 +4,6 @@ import {
 } from '@metamask/transaction-controller';
 import React from 'react';
 import { ORIGIN_METAMASK } from '../../../../../../shared/constants/app';
-import { getConfirmationTransactionType } from '../../../utils/confirm';
 import { Box, Text } from '../../../../../components/component-library';
 import { PreferredAvatar } from '../../../../../components/app/preferred-avatar';
 import {
@@ -27,7 +26,6 @@ const SIMPLE_HEADER_TYPES = [TransactionType.musdConversion];
 const CONFIRMATIONS_WITH_ALT_HEADER = [
   ...SIMPLE_HEADER_TYPES,
   TransactionType.moneyAccountDeposit,
-  TransactionType.moneyAccountWithdraw,
   TransactionType.musdClaim,
   TransactionType.perpsDeposit,
   TransactionType.perpsWithdraw,
@@ -93,18 +91,15 @@ const Header = () => {
   // back button if it's a wallet initiated confirmation. The default header is
   // the original header for the redesigns and includes the sender and recipient
   // addresses as well.
-  const confirmationType = getConfirmationTransactionType(
-    currentConfirmation as TransactionMeta,
-  );
-
   const isConfirmationWithNewHeader =
-    confirmationType &&
-    CONFIRMATIONS_WITH_ALT_HEADER.includes(confirmationType);
+    currentConfirmation?.type &&
+    CONFIRMATIONS_WITH_ALT_HEADER.includes(currentConfirmation.type);
   const isWalletInitiated =
     (currentConfirmation as TransactionMeta)?.origin === ORIGIN_METAMASK;
 
   const isSimpleHeader =
-    confirmationType && SIMPLE_HEADER_TYPES.includes(confirmationType);
+    currentConfirmation?.type &&
+    SIMPLE_HEADER_TYPES.includes(currentConfirmation.type);
 
   if (isSimpleHeader && isWalletInitiated) {
     return <SimpleConfirmationHeader />;

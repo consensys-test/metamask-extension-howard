@@ -422,9 +422,12 @@
       "0xaa36a7": true
     }
   },
+  "ensEntries": {},
+  "ensResolutionsByAddress": {},
   "featureFlags": {},
   "firstTimeFlowType": "create",
   "forgottenPassword": false,
+  "fragments": {},
   "fullScreenGasPollTokens": [],
   "gasEstimateType": "fee-market",
   "gasFeeEstimates": {

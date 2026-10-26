@@ -66,7 +66,13 @@ export default function RecoveryPhraseChips({
     () => quizWords.map((word) => word.index),
     [quizWords],
   );
-  const quizWordsKey = quizWords;
+  const [quizAnswers, setQuizAnswers] = useState(
+    indicesToCheck.map((index) => ({
+      index, // the index in the SRP chips UI where the answer is inserted
+      word: '', // the answer value
+      actualIndexInSrp: -1, // the correct index of the answer value in the secret recovery phrase
+    })),
+  );
 
   const setNextTargetIndex = (
     newQuizAnswers: { index: number; word: string }[],
@@ -84,64 +90,8 @@ export default function RecoveryPhraseChips({
 
     return firstEmpty;
   };
-
-  const emptyQuizAnswers = useMemo(
-    () =>
-      indicesToCheck.map((index) => ({
-        index, // the index in the SRP chips UI where the answer is inserted
-        word: '', // the answer value
-        actualIndexInSrp: -1, // the correct index of the answer value in the secret recovery phrase
-      })),
-    [indicesToCheck],
-  );
-
-  // Key quiz UI state by quizWords identity so a new quiz resets without
-  // render-phase setState.
-  const [quizUiState, setQuizUiState] = useState(() => ({
-    key: quizWordsKey,
-    answers: emptyQuizAnswers,
-    indexToFocus: setNextTargetIndex(emptyQuizAnswers),
-  }));
-
-  const quizAnswers =
-    quizUiState.key === quizWordsKey ? quizUiState.answers : emptyQuizAnswers;
-  const indexToFocus =
-    quizUiState.key === quizWordsKey
-      ? quizUiState.indexToFocus
-      : setNextTargetIndex(emptyQuizAnswers);
-
-  const setQuizAnswers = useCallback(
-    (
-      next:
-        | typeof emptyQuizAnswers
-        | ((prev: typeof emptyQuizAnswers) => typeof emptyQuizAnswers),
-    ) => {
-      setQuizUiState((prev) => {
-        const prevAnswers =
-          prev.key === quizWordsKey ? prev.answers : emptyQuizAnswers;
-        const answers = typeof next === 'function' ? next(prevAnswers) : next;
-        return {
-          key: quizWordsKey,
-          answers,
-          indexToFocus:
-            prev.key === quizWordsKey
-              ? prev.indexToFocus
-              : setNextTargetIndex(answers),
-        };
-      });
-    },
-    [emptyQuizAnswers, quizWordsKey],
-  );
-
-  const setIndexToFocus = useCallback(
-    (nextIndex: number) => {
-      setQuizUiState((prev) => ({
-        key: quizWordsKey,
-        answers: prev.key === quizWordsKey ? prev.answers : emptyQuizAnswers,
-        indexToFocus: nextIndex,
-      }));
-    },
-    [emptyQuizAnswers, quizWordsKey],
+  const [indexToFocus, setIndexToFocus] = useState(
+    setNextTargetIndex(quizAnswers),
   );
 
   const addQuizWord = useCallback(
@@ -158,7 +108,7 @@ export default function RecoveryPhraseChips({
       setQuizAnswers(newQuizAnswers);
       setIndexToFocus(setNextTargetIndex(newQuizAnswers));
     },
-    [quizAnswers, indexToFocus, setIndexToFocus, setQuizAnswers],
+    [quizAnswers, indexToFocus],
   );
 
   const removeQuizWord = useCallback(
@@ -176,12 +126,24 @@ export default function RecoveryPhraseChips({
       setQuizAnswers(newQuizAnswers);
       setIndexToFocus(newQuizAnswers[targetIndex].index);
     },
-    [quizAnswers, setIndexToFocus, setQuizAnswers],
+    [quizAnswers],
   );
 
   useEffect(() => {
     setInputValue?.(quizAnswers);
   }, [quizAnswers, setInputValue]);
+
+  useEffect(() => {
+    if (quizWords.length) {
+      const newQuizAnswers = quizWords.map((word) => ({
+        index: word.index,
+        word: '',
+        actualIndexInSrp: -1,
+      }));
+      setQuizAnswers(newQuizAnswers);
+      setIndexToFocus(setNextTargetIndex(newQuizAnswers));
+    }
+  }, [quizWords]);
 
   // obfuscate the blurred recovery phrase to prevent blur-reversal attacks
   // from revealing the underlying words.
@@ -194,6 +156,7 @@ export default function RecoveryPhraseChips({
   return (
     <Box flexDirection={BoxFlexDirection.Column} gap={4}>
       <Box
+        backgroundColor={BoxBackgroundColor.BackgroundSection}
         className={classnames(
           'recovery-phrase__secret rounded-lg w-full',
           recoveryPhraseChipsContainerClassName,
@@ -223,20 +186,20 @@ export default function RecoveryPhraseChips({
                 className="recovery-phrase__text rounded-lg px-2"
                 flexDirection={BoxFlexDirection.Row}
                 alignItems={BoxAlignItems.Center}
-                backgroundColor={BoxBackgroundColor.BackgroundMuted}
-                borderColor={BoxBorderColor.BorderMuted}
-                borderWidth={1}
+                backgroundColor={
+                  isQuizWord
+                    ? BoxBackgroundColor.BackgroundDefault
+                    : BoxBackgroundColor.BackgroundMuted
+                }
+                borderColor={
+                  isTargetIndex
+                    ? BoxBorderColor.PrimaryDefault
+                    : BoxBorderColor.BorderMuted
+                }
+                borderWidth={isTargetIndex ? 2 : 1}
                 paddingTop={1}
                 paddingBottom={1}
                 gap={1}
-                style={
-                  isTargetIndex
-                    ? {
-                        borderColor: 'var(--color-icon-default)',
-                        borderWidth: '1.5px',
-                      }
-                    : undefined
-                }
                 onClick={() => {
                   if (!isQuizWord) {
                     return;
@@ -342,7 +305,7 @@ export default function RecoveryPhraseChips({
                 data-testid={`recovery-phrase-quiz-answered-${actualIdxInSrp}`}
                 key={quizWord.index}
                 color={TextColor.TextAlternative}
-                className="rounded-lg w-full bg-muted hover:bg-muted-hover active:bg-muted-pressed"
+                className="rounded-lg w-full bg-muted"
                 onClick={() => {
                   removeQuizWord(quizWord.word);
                 }}
@@ -354,7 +317,7 @@ export default function RecoveryPhraseChips({
                 data-testid={`recovery-phrase-quiz-unanswered-${actualIdxInSrp}`}
                 key={quizWord.index}
                 variant={ButtonVariant.Secondary}
-                className="rounded-lg w-full"
+                className="rounded-lg w-full bg-muted border-primary-default border text-primary-default"
                 onClick={() => {
                   addQuizWord(quizWord.word, actualIdxInSrp);
                 }}

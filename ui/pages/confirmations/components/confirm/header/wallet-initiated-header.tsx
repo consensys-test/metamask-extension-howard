@@ -1,4 +1,3 @@
-import { Text, TextColor, TextVariant } from '@metamask/design-system-react';
 import {
   TransactionMeta,
   TransactionType,
@@ -6,13 +5,12 @@ import {
 import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MetaMetricsEventLocation } from '../../../../../../shared/constants/metametrics';
-import { hasTransactionType } from '../../../../../../shared/lib/transactions.utils';
-import { getConfirmationTransactionType } from '../../../utils/confirm';
 import {
   Box,
   ButtonIcon,
   ButtonIconSize,
   IconName,
+  Text,
 } from '../../../../../components/component-library';
 import {
   AlignItems,
@@ -21,51 +19,41 @@ import {
   FlexDirection,
   IconColor,
   JustifyContent,
+  TextColor,
+  TextVariant,
 } from '../../../../../helpers/constants/design-system';
 import { SHIELD_PLAN_ROUTE } from '../../../../../helpers/constants/routes';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useConfirmContext } from '../../../context/confirm';
-import { PAY_TRANSACTION_TYPES } from '../../../constants/pay';
 import { SEND_TRANSACTION_TYPES } from '../../../constants/send';
 import { useConfirmActions } from '../../../hooks/useConfirmActions';
-import { useHasInsufficientBalance } from '../../../hooks/useHasInsufficientBalance';
-import { useShieldConfirm } from '../../../hooks/transactions/useShieldConfirm';
-import { useIsMoneyAccountPerpsNavigation } from '../../../hooks/pay/useIsMoneyAccountPerpsNavigation';
 import { AdvancedDetailsButton } from './advanced-details-button';
 
 export const WalletInitiatedHeader = () => {
   const t = useI18nContext();
   const { onCancel } = useConfirmActions();
-  const { handleShieldSubscriptionApprovalTransactionRejected } =
-    useShieldConfirm();
   const { currentConfirmation } = useConfirmContext<TransactionMeta>();
-  const { hasInsufficientBalance, isNativeBalanceKnown } =
-    useHasInsufficientBalance();
   const navigate = useNavigate();
-  const isMoneyAccountPerpsDeposit = useIsMoneyAccountPerpsNavigation();
-
-  const confirmationType = getConfirmationTransactionType(currentConfirmation);
 
   const isSendTransaction =
-    confirmationType && SEND_TRANSACTION_TYPES.includes(confirmationType);
+    currentConfirmation?.type &&
+    SEND_TRANSACTION_TYPES.includes(currentConfirmation.type);
 
   const handleBackButtonClick = useCallback(() => {
     if (
-      confirmationType === TransactionType.shieldSubscriptionApprove &&
-      currentConfirmation
+      currentConfirmation.type === TransactionType.shieldSubscriptionApprove
     ) {
-      handleShieldSubscriptionApprovalTransactionRejected(
-        currentConfirmation,
-        isNativeBalanceKnown &&
-          !currentConfirmation.isGasFeeSponsored &&
-          hasInsufficientBalance,
-      );
       onCancel({ location: MetaMetricsEventLocation.Confirmation });
       navigate(SHIELD_PLAN_ROUTE);
       return;
     }
 
-    if (hasTransactionType(currentConfirmation, PAY_TRANSACTION_TYPES)) {
+    if (
+      currentConfirmation.type === TransactionType.moneyAccountDeposit ||
+      currentConfirmation.type === TransactionType.musdClaim ||
+      currentConfirmation.type === TransactionType.perpsDeposit ||
+      currentConfirmation.type === TransactionType.perpsWithdraw
+    ) {
       onCancel({
         location: MetaMetricsEventLocation.Confirmation,
         navigateBackToPreviousPage: true,
@@ -73,12 +61,13 @@ export const WalletInitiatedHeader = () => {
       return;
     }
 
-    const isNativeSend = confirmationType === TransactionType.simpleSend;
+    const isNativeSend =
+      currentConfirmation.type === TransactionType.simpleSend;
     const isERC20TokenSend =
-      confirmationType === TransactionType.tokenMethodTransfer;
+      currentConfirmation.type === TransactionType.tokenMethodTransfer;
     const isNFTTokenSend =
-      confirmationType === TransactionType.tokenMethodTransferFrom ||
-      confirmationType === TransactionType.tokenMethodSafeTransferFrom;
+      currentConfirmation.type === TransactionType.tokenMethodTransferFrom ||
+      currentConfirmation.type === TransactionType.tokenMethodSafeTransferFrom;
 
     if (isNativeSend || isERC20TokenSend || isNFTTokenSend) {
       onCancel({
@@ -86,38 +75,27 @@ export const WalletInitiatedHeader = () => {
         navigateBackForSend: true,
       });
     }
-  }, [
-    confirmationType,
-    currentConfirmation,
-    hasInsufficientBalance,
-    handleShieldSubscriptionApprovalTransactionRejected,
-    isNativeBalanceKnown,
-    navigate,
-    onCancel,
-  ]);
+  }, [currentConfirmation, navigate, onCancel]);
 
   const getHeaderTitle = () => {
     if (isSendTransaction) {
       return null;
     }
-    if (confirmationType === TransactionType.shieldSubscriptionApprove) {
+    if (
+      currentConfirmation?.type === TransactionType.shieldSubscriptionApprove
+    ) {
       return t('shieldConfirmMembership');
     }
-    if (confirmationType === TransactionType.moneyAccountDeposit) {
+    if (currentConfirmation?.type === TransactionType.moneyAccountDeposit) {
       return t('addFunds');
     }
-    if (confirmationType === TransactionType.moneyAccountWithdraw) {
-      return t('send');
-    }
-    if (confirmationType === TransactionType.musdClaim) {
+    if (currentConfirmation?.type === TransactionType.musdClaim) {
       return null;
     }
-    if (confirmationType === TransactionType.perpsDeposit) {
-      return isMoneyAccountPerpsDeposit
-        ? t('sendToPerps')
-        : t('perpsDepositFundsTitle');
+    if (currentConfirmation?.type === TransactionType.perpsDeposit) {
+      return t('perpsDepositFundsTitle');
     }
-    if (confirmationType === TransactionType.perpsWithdraw) {
+    if (currentConfirmation?.type === TransactionType.perpsWithdraw) {
       return t('perpsWithdrawFundsTitle');
     }
     return t('review');
@@ -146,11 +124,7 @@ export const WalletInitiatedHeader = () => {
         color={IconColor.iconDefault}
       />
       {headerTitle && (
-        <Text
-          variant={TextVariant.HeadingSm}
-          color={TextColor.Inherit}
-          data-testid="wallet-initiated-header-title"
-        >
+        <Text variant={TextVariant.headingSm} color={TextColor.inherit}>
           {headerTitle}
         </Text>
       )}

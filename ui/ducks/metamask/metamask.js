@@ -56,8 +56,7 @@ const initialState = {
   analyticsId: null,
   optedIn: false,
   consentDecisionMade: false,
-  optedInToMarketing: false,
-  marketingConsentDecisionMade: false,
+  dataCollectionForMarketing: null,
   currencyRates: {
     ETH: {
       conversionRate: null,
@@ -148,8 +147,7 @@ export default function reduceMetamask(state = initialState, action) {
     case actionConstants.SET_DATA_COLLECTION_FOR_MARKETING:
       return {
         ...metamaskState,
-        optedInToMarketing: action.value === true,
-        marketingConsentDecisionMade: true,
+        dataCollectionForMarketing: action.value,
       };
 
     case actionConstants.COMPLETE_ONBOARDING: {
@@ -188,8 +186,6 @@ export default function reduceMetamask(state = initialState, action) {
         analyticsId: null,
         optedIn: false,
         consentDecisionMade: false,
-        optedInToMarketing: false,
-        marketingConsentDecisionMade: false,
       };
     }
 
@@ -587,16 +583,6 @@ export function getOpenedWithSidepanel(state) {
  */
 export function getPasskeyAutoUnlockSuppressed(state) {
   return Boolean(state.metamask.passkeyAutoUnlockSuppressed);
-}
-
-/**
- * Returns when the legacy passkey PRF migration reminder was last shown.
- *
- * @param {object} state - Redux root state
- * @returns {number|null}
- */
-export function getLastShownPrfMigrationReminderAt(state) {
-  return state.metamask.lastShownPrfMigrationReminderAt ?? null;
 }
 
 /**

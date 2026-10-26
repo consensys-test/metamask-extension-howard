@@ -5,6 +5,7 @@ import thunk from 'redux-thunk';
 import mockState from '../../../../test/data/mock-state.json';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { setBackgroundConnection } from '../../../store/background-connection';
+import { PREFERENCES_AND_DISPLAY_ROUTE } from '../../../helpers/constants/routes';
 import { tEn } from '../../../../test/lib/i18n-helpers';
 import LanguageSubPage from './language-sub-page';
 
@@ -56,7 +57,7 @@ describe('LanguageSubPage', () => {
     fireEvent.click(screen.getByText('Español (Latinoamérica)'));
 
     expect(mockUpdateCurrentLocale).toHaveBeenCalledWith('es_419');
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(mockNavigate).toHaveBeenCalledWith(PREFERENCES_AND_DISPLAY_ROUTE);
   });
 
   it('selects a different language when clicked', () => {
@@ -72,6 +73,6 @@ describe('LanguageSubPage', () => {
     fireEvent.click(screen.getByText('Deutsch'));
 
     expect(mockUpdateCurrentLocale).toHaveBeenCalledWith('de');
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(mockNavigate).toHaveBeenCalledWith(PREFERENCES_AND_DISPLAY_ROUTE);
   });
 });

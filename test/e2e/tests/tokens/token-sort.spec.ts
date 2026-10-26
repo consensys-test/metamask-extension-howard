@@ -41,7 +41,6 @@ describe('Token List Sorting', function () {
           symbol: customTokenSymbol,
           name: customTokenSymbol,
           decimals: 18,
-          balance: '1',
         },
       ])),
       await mockSpotPrices(mockServer, {

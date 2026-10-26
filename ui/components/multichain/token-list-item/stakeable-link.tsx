@@ -23,7 +23,7 @@ import { getPortfolioUrl } from '../../../helpers/utils/portfolio';
 import {
   getDataCollectionForMarketing,
   getAnalyticsId,
-  getConsentDecisionMade,
+  getCompletedMetaMetricsOnboarding,
   getOptedIn,
 } from '../../../selectors';
 import { useI18nContext } from '../../../hooks/useI18nContext';
@@ -37,9 +37,11 @@ export const StakeableLink = ({ chainId, symbol }: StakeableLinkProps) => {
   const t = useI18nContext();
   const { trackEvent, createEventBuilder } = useAnalytics();
   const analyticsId = useSelector(getAnalyticsId);
-  const consentDecisionMade = useSelector(getConsentDecisionMade);
+  const completedMetaMetricsOnboarding = useSelector(
+    getCompletedMetaMetricsOnboarding,
+  );
   const isOptedIn = useSelector(getOptedIn);
-  const isMetaMetricsEnabled = consentDecisionMade && isOptedIn;
+  const isMetaMetricsEnabled = completedMetaMetricsOnboarding && isOptedIn;
   const isMarketingEnabled = useSelector(getDataCollectionForMarketing);
   return (
     <button

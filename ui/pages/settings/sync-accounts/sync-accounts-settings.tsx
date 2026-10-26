@@ -29,21 +29,7 @@ const SyncAccountsSettings = () => {
   const qrSyncPhase = useSelector(selectQrSyncPhase);
   const qrSyncError = useSelector(selectQrSyncError);
   const [isExiting, setIsExiting] = useState(false);
-  const [passwordState, setPasswordState] = useState<{
-    phase: typeof qrSyncPhase;
-    value: string | undefined;
-  }>({ phase: qrSyncPhase, value: undefined });
-  const password =
-    qrSyncPhase === QR_SYNC_PHASES.REVIEWING_SYNC_OFFER &&
-    passwordState.phase === qrSyncPhase
-      ? passwordState.value
-      : undefined;
-  const setPassword = useCallback(
-    (value: string | undefined) => {
-      setPasswordState({ phase: qrSyncPhase, value });
-    },
-    [qrSyncPhase],
-  );
+  const [password, setPassword] = useState<string | undefined>();
   const [syncSummary, setSyncSummary] = useState<Pick<
     AddDeviceSyncRequest,
     'syncedAccountCount' | 'syncedWalletCount'
@@ -91,6 +77,14 @@ const SyncAccountsSettings = () => {
       cancelQrSyncSession().catch(() => undefined);
     };
   }, [cancelQrSyncSession, createQrSyncSession, isExiting]);
+
+  useEffect(() => {
+    if (qrSyncPhase === QR_SYNC_PHASES.REVIEWING_SYNC_OFFER) {
+      return;
+    }
+
+    setPassword(undefined);
+  }, [qrSyncPhase]);
 
   const handleExit = useCallback(async () => {
     setIsExiting(true);

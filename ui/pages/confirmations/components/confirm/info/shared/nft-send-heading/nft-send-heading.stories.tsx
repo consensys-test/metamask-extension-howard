@@ -1,4 +1,4 @@
-import { Meta } from '@storybook/react-webpack5';
+import { Meta } from '@storybook/react';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { getMockTokenTransferConfirmState } from '../../../../../../../../test/data/confirmations/helper';

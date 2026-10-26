@@ -256,9 +256,9 @@ const SubmitBar = ({ isDisabled, isLoading, onSubmit }: SubmitBarProps) => {
         isDisabled={isDisabled}
         isLoading={isLoading}
         onClick={onSubmit}
-        className="flex-1"
+        className="flex-1 rounded-xl"
       >
-        {t('save')}
+        {t('addToken')}
       </Button>
     </Box>
   );

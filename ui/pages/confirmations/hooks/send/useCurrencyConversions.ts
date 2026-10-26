@@ -3,10 +3,7 @@ import { ERC1155, ERC721 } from '@metamask/controller-utils';
 import { useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
-import {
-  getCrossChainTokenExchangeRates,
-  getUseCurrencyRateCheck,
-} from '../../../../selectors';
+import { getCrossChainTokenExchangeRates } from '../../../../selectors';
 import { getCurrencySymbol } from '../../../../helpers/utils/common.util';
 import { getMultichainCurrentCurrency } from '../../../../selectors/multichain';
 import { useMultichainSelector } from '../../../../hooks/useMultichainSelector';
@@ -74,8 +71,6 @@ export const useCurrencyConversions = () => {
     getCrossChainTokenExchangeRates,
   ) as Record<Hex, Record<Hex, number>>;
 
-  const useCurrencyRateCheck = useSelector(getUseCurrencyRateCheck);
-
   const exchangeRate = useMemo(() => {
     if (!asset) {
       return 1;
@@ -133,7 +128,6 @@ export const useCurrencyConversions = () => {
 
   return {
     conversionSupportedForAsset:
-      useCurrencyRateCheck &&
       conversionRate !== 0 &&
       asset?.standard !== ERC1155 &&
       asset?.standard !== ERC721,

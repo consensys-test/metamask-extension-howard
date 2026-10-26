@@ -307,9 +307,7 @@ describe('PerpsWithdrawPage', () => {
 
     await settleInitialWithdrawRoutesFetch();
 
-    expect(
-      screen.getByTestId('parent-selector-perps-withdraw'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('perps-withdraw-page')).toBeInTheDocument();
     expect(screen.getByTestId('perps-withdraw-cancel')).toBeInTheDocument();
     expect(screen.getByTestId('perps-withdraw-submit')).toBeInTheDocument();
     expect(
@@ -1254,9 +1252,7 @@ describe('PerpsWithdrawPage', () => {
     });
     await flushRejectedWithdrawRoutesPromises();
 
-    expect(
-      screen.getByTestId('parent-selector-perps-withdraw'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('perps-withdraw-page')).toBeInTheDocument();
   });
 
   describe('analytics', () => {

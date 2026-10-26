@@ -5,7 +5,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isCorrectDeveloperTransactionType } from '../../../shared/lib/confirmation.utils';
 import { isFirefoxBrowser } from '../../../shared/lib/browser-runtime.utils';
-import { isInE2eTest } from '../../../shared/lib/environment';
 import { isEqualCaseInsensitive } from '../../../shared/lib/string-utils';
 import { isSignatureTransactionType } from '../../pages/confirmations/utils';
 import {
@@ -74,7 +73,8 @@ export const useHardwareFooter = ({
   onUserRejectedHardwareWalletError,
 }: UseHardwareFooterArgs): UseHardwareFooterResult => {
   const { trackConnectCtaClicked } = useHardwareWalletMetrics();
-  const inE2e = isInE2eTest();
+  const inE2e =
+    process.env.IN_TEST && process.env.JEST_WORKER_ID === 'undefined';
   const { connectionState } = useHardwareWalletState();
   const {
     accountAddress,

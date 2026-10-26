@@ -82,6 +82,9 @@ export function useMusdGeoBlocking(): UseMusdGeoBlockingResult {
         return null;
       }
 
+      setIsLoading(true);
+      setError(null);
+
       try {
         const location = await submitRequestToBackground<string>(method);
         const resolved = location === UNKNOWN_LOCATION ? null : location;
@@ -111,12 +114,8 @@ export function useMusdGeoBlocking(): UseMusdGeoBlockingResult {
   useEffect(() => {
     let cancelled = false;
 
-    queueMicrotask(() => {
-      if (!cancelled) {
-        fetchGeolocation('getGeolocation', {
-          isCancelled: () => cancelled,
-        });
-      }
+    fetchGeolocation('getGeolocation', {
+      isCancelled: () => cancelled,
     });
 
     return () => {
@@ -125,8 +124,6 @@ export function useMusdGeoBlocking(): UseMusdGeoBlockingResult {
   }, [fetchGeolocation]);
 
   const refreshGeolocation = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
-    setError(null);
     await fetchGeolocation('refreshGeolocation', {
       isCancelled: () => false,
     });

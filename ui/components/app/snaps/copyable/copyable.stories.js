@@ -24,7 +24,7 @@ DefaultStory.args = {
 export const SensitiveStory = (args) => <Copyable {...args} />;
 SensitiveStory.storyName = 'Sensitive';
 SensitiveStory.args = {
-  text: 'Sensitive information',
+  text: 'Sensitive informations',
   sensitive: true,
 };
 

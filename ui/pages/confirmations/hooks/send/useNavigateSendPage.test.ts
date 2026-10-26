@@ -1,18 +1,14 @@
 import mockState from '../../../../../test/data/mock-state.json';
 import { renderHookWithProvider } from '../../../../../test/lib/render-helpers-navigate';
-import {
-  DEFAULT_ROUTE,
-  SEND_ROUTE,
-} from '../../../../helpers/constants/routes';
+import { SEND_ROUTE } from '../../../../helpers/constants/routes';
 import { SendPages } from '../../constants/send';
 import { useNavigateSendPage } from './useNavigateSendPage';
 
 const mockUseNavigate = jest.fn();
-const mockUseLocation = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockUseNavigate,
-  useLocation: () => mockUseLocation(),
+  useLocation: () => ({ pathname: '/send/asset' }),
   useSearchParams: jest
     .fn()
     .mockReturnValue([
@@ -26,13 +22,6 @@ function renderHook() {
 }
 
 describe('useNavigateSendPage', () => {
-  beforeEach(() => {
-    mockUseLocation.mockReturnValue({
-      key: 'in-app-entry',
-      pathname: '/send/asset',
-    });
-  });
-
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -67,17 +56,5 @@ describe('useNavigateSendPage', () => {
     const result = renderHook();
     result.goToPreviousPage();
     expect(mockUseNavigate).toHaveBeenCalledWith(-1);
-  });
-
-  it('navigates home when the Send page was opened directly', () => {
-    mockUseLocation.mockReturnValue({ key: 'default', pathname: '/send' });
-    const result = renderHook();
-
-    result.goToPreviousPage();
-
-    expect(mockUseNavigate).toHaveBeenCalledWith(DEFAULT_ROUTE, {
-      replace: true,
-      state: { fromFreshTab: true },
-    });
   });
 });

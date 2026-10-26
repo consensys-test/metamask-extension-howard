@@ -36,7 +36,7 @@ describe('Empty Buy Banner Displayed event', function () {
     await withFixtures(
       {
         fixtures: new FixtureBuilderV2({ onboarding: true })
-          .withAnalyticsController({
+          .withMetaMetricsController({
             analyticsId: MOCK_ANALYTICS_ID,
             consentDecisionMade: true,
             optedIn: true,
@@ -57,22 +57,19 @@ describe('Empty Buy Banner Displayed event', function () {
         await homePage.checkBalanceEmptyStateIsDisplayed();
 
         const events = await getEventPayloads(driver, mockedEndpoints);
-        // On Chrome with sidepanel enabled, both sidepanel.html and home.html
-        // render BalanceEmptyState after onboarding, so we may receive 1 or 2
-        // events depending on timing (one per window, each with a different
-        // environment_type: 'sidepanel' or 'fullscreen').
-        assert.ok(events.length >= 1, 'Expected at least one event');
+        assert.equal(events.length, 1);
         assert.equal(events[0].event, 'Empty Buy Banner Displayed');
 
-        const sidePanelEnabled = await isSidePanelEnabled();
+        const expectedEnvironmentType = (await isSidePanelEnabled())
+          ? 'sidepanel'
+          : 'fullscreen';
         const {
           profile_id: _profileId,
           canonical_profile_id: _canonicalProfileId,
-          environment_type: actualEnvironmentType,
-          ...restEventProperties
+          ...eventProperties
         } = events[0].properties;
 
-        assert.deepStrictEqual(restEventProperties, {
+        assert.deepStrictEqual(eventProperties, {
           category: 'Navigation',
           locale: 'en',
           referrer: 'metamask',
@@ -80,19 +77,10 @@ describe('Empty Buy Banner Displayed event', function () {
           // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
           // eslint-disable-next-line @typescript-eslint/naming-convention
           chain_id: '0x1',
+          // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          environment_type: expectedEnvironmentType,
         });
-
-        if (sidePanelEnabled) {
-          assert.ok(
-            actualEnvironmentType === 'sidepanel' ||
-              actualEnvironmentType === 'fullscreen',
-            `Expected environment_type to be 'sidepanel' or 'fullscreen' ` +
-              `when sidepanel is enabled (both windows fire the event), ` +
-              `but got '${actualEnvironmentType}'`,
-          );
-        } else {
-          assert.equal(actualEnvironmentType, 'fullscreen');
-        }
       },
     );
   });

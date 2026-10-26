@@ -1,4 +1,10 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   useRive,
   Layout,
@@ -81,7 +87,7 @@ const MetamaskWordMarkAnimationInner = ({
     still?: StateMachineInput;
     start?: StateMachineInput;
   }>({});
-  const isInitializedRef = useRef(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const riveBuffer = useMemo(() => buffer.slice(0), [buffer]);
 
@@ -125,7 +131,7 @@ const MetamaskWordMarkAnimationInner = ({
   }, [rive]);
 
   useEffect(() => {
-    const shouldInitialize = rive && !isInitializedRef.current;
+    const shouldInitialize = rive && !isInitialized;
 
     if (shouldInitialize && cacheInputs()) {
       const { dark, still, start } = inputsRef.current;
@@ -143,9 +149,9 @@ const MetamaskWordMarkAnimationInner = ({
       }
 
       rive.play();
-      isInitializedRef.current = true;
+      setIsInitialized(true);
     }
-  }, [rive, skipTransition, theme, cacheInputs]);
+  }, [rive, skipTransition, isInitialized, theme, cacheInputs]);
 
   // Mark the session animation complete only on unmount after it started
   // (timeout was scheduled). Do not mark when `isAnimationComplete` flips on
@@ -162,7 +168,7 @@ const MetamaskWordMarkAnimationInner = ({
   }, [setIsAnimationCompleted]);
 
   useEffect(() => {
-    if (!rive || !isInitializedRef.current || prevThemeRef.current === theme) {
+    if (!rive || !isInitialized || prevThemeRef.current === theme) {
       return;
     }
 
@@ -174,7 +180,7 @@ const MetamaskWordMarkAnimationInner = ({
     }
 
     prevThemeRef.current = theme;
-  }, [rive, theme]);
+  }, [rive, theme, isInitialized]);
 
   return (
     <Box

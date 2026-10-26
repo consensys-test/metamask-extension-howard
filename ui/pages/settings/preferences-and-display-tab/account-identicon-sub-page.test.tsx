@@ -7,6 +7,7 @@ import mockState from '../../../../test/data/mock-state.json';
 import { enLocale as messages } from '../../../../test/lib/i18n-helpers';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { setBackgroundConnection } from '../../../store/background-connection';
+import { PREFERENCES_AND_DISPLAY_ROUTE } from '../../../helpers/constants/routes';
 import AccountIdenticonSubPage from './account-identicon-sub-page';
 
 const mockNavigate = jest.fn();
@@ -63,6 +64,6 @@ describe('AccountIdenticonSubPage', () => {
     expect(mockSetAvatarType).toHaveBeenCalledWith(
       AvatarAccountVariant.Maskicon,
     );
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(mockNavigate).toHaveBeenCalledWith(PREFERENCES_AND_DISPLAY_ROUTE);
   });
 });

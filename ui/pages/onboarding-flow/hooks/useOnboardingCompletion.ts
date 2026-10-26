@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { shallowEqual, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import browser from 'webextension-polyfill';
 import { BACKUPANDSYNC_FEATURES } from '@metamask/profile-sync-controller/user-storage';
 import {
@@ -29,9 +29,7 @@ import {
   getOptedIn,
   getDeferredDeepLink,
   getAccountTypeForOnboardingMetrics,
-  getIsSocialLoginFlow,
 } from '../../../selectors';
-import { getExternalServicesOwnedPreferences } from '../../../selectors/multichain/basic-functionality';
 import {
   getCompletedOnboarding,
   getHasSeenOnboardingCompletionPage,
@@ -48,6 +46,7 @@ import {
   setIsBackupAndSyncFeatureEnabled,
   setHasSeenOnboardingCompletionPage,
 } from '../../../store/actions';
+import type { MetaMaskReduxDispatch } from '../../../store/store';
 import { useDispatch } from '../../../store/hooks';
 
 /**
@@ -76,16 +75,8 @@ export function useOnboardingCompletion() {
   const isOptedIn = useSelector(getOptedIn);
   const accountTypeForMetrics = useSelector(getAccountTypeForOnboardingMetrics);
   const deferredDeepLink = useSelector(getDeferredDeepLink);
-  const isSocialLoginFlow = useSelector(getIsSocialLoginFlow);
   const isBasicFunctionalityToggleEnabled =
     getIsBasicFunctionalityConsolidationEnabledInBuild();
-
-  // Captured so the legacy `toggleExternalServices` write can apply these in
-  // the same background call instead of overwriting them and restoring later.
-  const externalServicesOwnedPreferences = useSelector(
-    getExternalServicesOwnedPreferences,
-    shallowEqual,
-  );
 
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
   const isFinishingOnboardingRef = useRef(false);
@@ -273,23 +264,10 @@ export function useOnboardingCompletion() {
           );
         }
 
-        // Social-login wallets must keep Basic Functionality enabled once the
-        // consolidated experience is on. Remote flags are not reliable during
-        // onboarding, so this uses the build-time consolidation gate.
-        const basicFunctionalityEnabled =
-          isBasicFunctionalityToggleEnabled && isSocialLoginFlow
-            ? true
-            : externalServicesOnboardingToggleState;
-
         await dispatch(
           isBasicFunctionalityToggleEnabled
-            ? toggleBasicFunctionality(basicFunctionalityEnabled)
-            : toggleExternalServices(
-                basicFunctionalityEnabled,
-                basicFunctionalityEnabled
-                  ? externalServicesOwnedPreferences
-                  : undefined,
-              ),
+            ? toggleBasicFunctionality(externalServicesOnboardingToggleState)
+            : toggleExternalServices(externalServicesOnboardingToggleState),
         );
 
         if (!backupAndSyncOnboardingToggleState) {
@@ -346,13 +324,11 @@ export function useOnboardingCompletion() {
       deferredDeepLink,
       dispatch,
       externalServicesOnboardingToggleState,
-      externalServicesOwnedPreferences,
       firstTimeFlowType,
       isBasicFunctionalityToggleEnabled,
       isOnboardingCompleted,
       isOptedIn,
       isSidePanelEnabled,
-      isSocialLoginFlow,
       isUnlocked,
       trackEvent,
     ],

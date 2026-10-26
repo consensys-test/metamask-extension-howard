@@ -10,25 +10,18 @@ import {
   IconColor,
   IconName,
   IconSize,
-  Tag,
   Text,
   TextColor,
   FontWeight,
   TextVariant,
 } from '@metamask/design-system-react';
 import { useFormatters } from '../../../../hooks/useFormatters';
-import { getRampsListItemClassName } from '../../components/get-ramps-list-item-class-name';
-import RampsQuoteDisplay, {
-  getRampsQuoteAmounts,
-  shouldShowSelectedCheckIcon,
-} from '../../payment-method/components/ramps-quote-display';
-import type { ProviderTag } from '../utils/build-provider-list-items';
+import RampsQuoteDisplay from '../../payment-method/components/ramps-quote-display';
 
 export type RampsProviderListItemProps = {
   provider: Provider;
   isSelected?: boolean;
   isDisabled?: boolean;
-  tags?: ProviderTag[];
   subtitle?: string | null;
   showQuote?: boolean;
   quote?: Quote | null;
@@ -41,11 +34,11 @@ export type RampsProviderListItemProps = {
 /**
  * Provider row matching mobile ProviderSelection: name (+ optional subtitle)
  * on the left, quote amounts on the right.
+ *
  * @param options0
  * @param options0.provider
  * @param options0.isSelected
  * @param options0.isDisabled
- * @param options0.tags
  * @param options0.subtitle
  * @param options0.showQuote
  * @param options0.quote
@@ -58,7 +51,6 @@ export default function RampsProviderListItem({
   provider,
   isSelected = false,
   isDisabled = false,
-  tags = [],
   subtitle = null,
   showQuote = false,
   quote = null,
@@ -69,26 +61,26 @@ export default function RampsProviderListItem({
 }: RampsProviderListItemProps) {
   const { formatToken, formatCurrency } = useFormatters();
 
-  const { cryptoAmount, fiatAmount } = getRampsQuoteAmounts({
-    quote,
-    tokenSymbol,
-    currency,
-    formatToken,
-    formatCurrency,
-  });
-  const showSelectedCheckIcon = shouldShowSelectedCheckIcon({
-    isSelected,
-    showQuote,
-    cryptoAmount,
-    fiatAmount,
-    isLoading: quoteLoading,
-  });
+  const cryptoAmount =
+    quote?.quote?.amountOut !== undefined &&
+    quote.quote.amountOut !== null &&
+    tokenSymbol
+      ? formatToken(Number(quote.quote.amountOut), tokenSymbol, {
+          maximumFractionDigits: 6,
+          minimumFractionDigits: 0,
+        })
+      : '';
+  const fiatAmount =
+    quote?.quote?.amountOutInFiat !== undefined &&
+    quote.quote.amountOutInFiat !== null
+      ? formatCurrency(Number(quote.quote.amountOutInFiat), currency)
+      : null;
 
   return (
     <ButtonBase
       onClick={onClick}
       isDisabled={isDisabled}
-      className={getRampsListItemClassName(isSelected)}
+      className="w-full rounded-lg px-4 py-3 min-w-0 h-auto hover:bg-hover active:bg-pressed"
       data-testid={`ramps-provider-item-${provider.id}`}
     >
       <Box
@@ -104,31 +96,13 @@ export default function RampsProviderListItem({
           alignItems={BoxAlignItems.Start}
           gap={1}
         >
-          <Box
-            className="w-full min-w-0"
-            flexDirection={BoxFlexDirection.Row}
-            alignItems={BoxAlignItems.Center}
-            gap={2}
+          <Text
+            variant={TextVariant.BodyMd}
+            fontWeight={FontWeight.Medium}
+            className="truncate text-left"
           >
-            <Text
-              variant={TextVariant.BodyMd}
-              fontWeight={FontWeight.Medium}
-              className="min-w-0 truncate text-left"
-              data-testid={`ramps-provider-item-name-${provider.id}`}
-            >
-              {provider.name}
-            </Text>
-            {tags.map((tag, index) => (
-              <Tag
-                key={tag.label}
-                severity={tag.severity}
-                className="shrink-0 self-center"
-                data-testid={`ramps-provider-item-tag-${provider.id}-${index}`}
-              >
-                {tag.label}
-              </Tag>
-            ))}
-          </Box>
+            {provider.name}
+          </Text>
           {subtitle ? (
             <Text
               variant={TextVariant.BodySm}
@@ -154,7 +128,7 @@ export default function RampsProviderListItem({
                 isLoading={quoteLoading}
               />
             ) : null}
-            {showSelectedCheckIcon ? (
+            {isSelected ? (
               <Icon
                 name={IconName.Check}
                 size={IconSize.Md}

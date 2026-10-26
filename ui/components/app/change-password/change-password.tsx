@@ -42,8 +42,10 @@ import {
 } from '../../../../shared/lib/passkey/passkey-error';
 import {
   changePassword,
+  changePasswordWithPasskeyVerification,
   checkIsSeedlessPasswordOutdated,
   forceUpdateMetamaskState,
+  removePasskeyWithPasswordVerification,
   verifyPassword,
 } from '../../../store/actions';
 import { getIsSocialLoginFlow } from '../../../selectors';
@@ -73,9 +75,6 @@ import {
 import { getEnvironmentType } from '../../../../shared/lib/environment-type';
 import { ENVIRONMENT_TYPE_SIDEPANEL } from '../../../../shared/constants/app';
 import { useDispatch } from '../../../store/hooks';
-import { usePasskeyPasswordChange } from '../../../hooks/passkey/usePasskeyPasswordChange';
-import { useRemovePasskeyWithPassword } from '../../../hooks/passkey/usePasskeyRemoval';
-import { usePasskeyAuthentication } from '../../../hooks/passkey/usePasskeyAuthentication';
 import ChangePasswordWarning from './change-password-warning';
 
 const ChangePasswordSteps = {
@@ -97,9 +96,6 @@ const ChangePassword = ({
   const t = useI18nContext();
   const passkeyMethodLabel = t(getPasskeyAuthMethodKey());
   const dispatch = useDispatch();
-  const changePasswordWithPasskey = usePasskeyPasswordChange();
-  const removePasskeyWithPassword = useRemovePasskeyWithPassword();
-  const authenticateWithPasskey = usePasskeyAuthentication();
   const navigate = useNavigate();
   const { trackEvent, createEventBuilder } = useAnalytics();
   const isSocialLoginFlow = useSelector(getIsSocialLoginFlow);
@@ -109,7 +105,7 @@ const ChangePassword = ({
   const mustDeferPasskeyToBrowserTab =
     isPasskeyActive && isPasskeyIncompatibleWithSidepanel;
   const isSidePanel = getEnvironmentType() === ENVIRONMENT_TYPE_SIDEPANEL;
-  const [animationEventEmitter] = useState(() => new EventEmitter());
+  const animationEventEmitter = useRef(new EventEmitter());
   const hasDeferredPasskeyToBrowserTabRef = useRef(false);
 
   const [step, setStep] = useState(() =>
@@ -147,7 +143,7 @@ const ChangePassword = ({
     }
     return (
       <Mascot
-        animationEventEmitter={animationEventEmitter}
+        animationEventEmitter={animationEventEmitter.current}
         width="100"
         height="100"
       />
@@ -183,11 +179,13 @@ const ChangePassword = ({
 
     let isPasskeyRenewed = false;
     try {
-      await changePasswordWithPasskey({
-        newPassword,
-        authenticationResponse: passkeyAuthenticationResponse,
-        options: { renewVaultKeyProtection: isPasskeyRenewalEnabled },
-      });
+      await dispatch(
+        changePasswordWithPasskeyVerification(
+          newPassword,
+          passkeyAuthenticationResponse,
+          { renewVaultKeyProtection: isPasskeyRenewalEnabled },
+        ),
+      );
       isPasskeyRenewed = isPasskeyRenewalEnabled;
 
       trackEvent(
@@ -265,7 +263,7 @@ const ChangePassword = ({
         // Remove enrollment before changing the password so a failure after
         // `changePassword` cannot leave an enrolled-but-invalid passkey on disk.
         if (isPasskeyActive) {
-          await removePasskeyWithPassword(currentPassword);
+          await removePasskeyWithPasswordVerification(currentPassword);
           await forceUpdateMetamaskState(dispatch);
         }
         await dispatch(changePassword(newPassword, currentPassword));
@@ -415,7 +413,6 @@ const ChangePassword = ({
           t,
           showErrorToast: true,
           toastDurationMs: autoHideToastDelay,
-          authenticateWithPasskey,
         });
         setPasskeyAuthenticationResponse(response);
         setIsPasskeyRenewalEnabled(Boolean(response));
@@ -427,7 +424,6 @@ const ChangePassword = ({
       isPasskeyActive,
       isVerifyingPasskey,
       passkeyAuthenticationResponse,
-      authenticateWithPasskey,
       passkeyMethodLabel,
       t,
     ],

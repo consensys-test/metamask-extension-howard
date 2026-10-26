@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createSearchParams,
   useNavigate,
@@ -6,6 +6,7 @@ import {
 } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { isSnapId } from '@metamask/snaps-utils';
+import { Content, Footer, Header, Page } from '../page';
 import {
   Box,
   Button,
@@ -13,17 +14,29 @@ import {
   ButtonIconSize,
   ButtonSize,
   ButtonVariant,
-  IconColor,
   IconName,
-} from '@metamask/design-system-react';
-import { Content, Footer, Header, Page } from '../page';
+  Text,
+} from '../../../component-library';
 import { useI18nContext } from '../../../../hooks/useI18nContext';
-import { PermissionsEmptyState } from '../gator-permissions/components';
-import { BackgroundColor } from '../../../../helpers/constants/design-system';
+import { useTheme } from '../../../../hooks/useTheme';
+import { TabEmptyState } from '../../../ui/tab-empty-state';
+import { ThemeType } from '../../../../../shared/constants/preferences';
+import {
+  AlignItems,
+  BackgroundColor,
+  BlockSize,
+  Color,
+  Display,
+  FlexDirection,
+  JustifyContent,
+  TextAlign,
+  TextVariant,
+} from '../../../../helpers/constants/design-system';
 import {
   DEFAULT_ROUTE,
+  PREVIOUS_ROUTE,
   REVIEW_PERMISSIONS,
-  TOKEN_TRANSFER_ROUTE,
+  GATOR_PERMISSIONS,
 } from '../../../../helpers/constants/routes';
 import {
   getConnectedSitesListWithNetworkInfo,
@@ -41,21 +54,27 @@ import { ConnectionListItem } from './connection-list-item';
 
 const PermissionsPage = () => {
   const t = useI18nContext();
+  const theme = useTheme();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const runCloseTransition = useGlobalMenuRouteTransition();
   const dispatch = useDispatch();
   const headerRef = useRef();
 
-  const fromPath = searchParams.get('from') ?? DEFAULT_ROUTE;
+  const fromPath = searchParams.get('from') ?? undefined;
 
   const handleBack = () => {
     if (fromPath === DEFAULT_ROUTE) {
-      runCloseTransition(() => navigate(-1));
+      runCloseTransition(() => navigate(PREVIOUS_ROUTE));
     } else {
-      navigate(DEFAULT_ROUTE);
+      navigate(
+        isGatorPermissionsRevocationFeatureEnabled()
+          ? GATOR_PERMISSIONS
+          : DEFAULT_ROUTE,
+      );
     }
   };
+  const [totalConnections, setTotalConnections] = useState(0);
   const [showDisconnectAllModal, setShowDisconnectAllModal] = useState(false);
 
   const mergedConnectionsList = useSelector((state) => {
@@ -67,15 +86,16 @@ const PermissionsPage = () => {
 
   const subjects = useSelector(getPermissionSubjects);
 
-  const nonSnapConnections = useMemo(() => {
-    return Object.entries(mergedConnectionsList).filter(
-      ([origin]) => !isSnapId(origin),
-    );
+  useEffect(() => {
+    setTotalConnections(Object.keys(mergedConnectionsList).length);
   }, [mergedConnectionsList]);
 
   const handleDisconnectAll = useCallback(() => {
     const errors = [];
-    const origins = nonSnapConnections.map(([origin]) => origin);
+    // Get all non-snap origins from the merged connections list
+    const origins = Object.keys(mergedConnectionsList).filter(
+      (origin) => !isSnapId(origin),
+    );
 
     origins.forEach((origin) => {
       try {
@@ -107,82 +127,106 @@ const PermissionsPage = () => {
         id: 'disconnect-all-success-toast',
       });
     }
-  }, [dispatch, nonSnapConnections, subjects, t]);
+  }, [dispatch, mergedConnectionsList, subjects, t]);
 
   const handleConnectionClick = (connection) => {
-    const hasOnlyAdvancedPermissions =
-      !connection.addresses?.length &&
-      (connection.advancedPermissionsCount ?? 0) > 0;
-
-    transitionForward(() => {
-      if (hasOnlyAdvancedPermissions) {
-        navigate(
-          `${TOKEN_TRANSFER_ROUTE}/${encodeURIComponent(connection.origin)}`,
-        );
-        return;
-      }
-
+    transitionForward(() =>
       navigate({
         pathname: REVIEW_PERMISSIONS,
         search: createSearchParams({
           origin: connection.origin,
         }).toString(),
-      });
-    });
+      }),
+    );
   };
 
-  const renderConnectionsList = () =>
-    nonSnapConnections.map(([itemKey, connection]) => (
-      <ConnectionListItem
-        data-testid="connection-list-item"
-        key={itemKey}
-        connection={connection}
-        onClick={() => handleConnectionClick(connection)}
-      />
-    ));
+  const renderConnectionsList = (connectionList) =>
+    Object.entries(connectionList).map(([itemKey, connection]) => {
+      const isSnap = isSnapId(connection.origin);
+      return isSnap ? null : (
+        <ConnectionListItem
+          data-testid="connection-list-item"
+          key={itemKey}
+          connection={connection}
+          onClick={() => handleConnectionClick(connection)}
+        />
+      );
+    });
 
   return (
-    <Page
-      className="main-container"
-      data-testid="parent-selector-permission-list"
-    >
+    <Page className="main-container" data-testid="permissions-page">
       <Header
         backgroundColor={BackgroundColor.backgroundDefault}
         startAccessory={
           <ButtonIcon
             ariaLabel={t('back')}
             iconName={IconName.ArrowLeft}
-            iconProps={{ className: IconColor.IconDefault }}
+            className="connections-header__start-accessory"
+            color={Color.iconDefault}
             onClick={handleBack}
-            size={ButtonIconSize.Md}
+            size={ButtonIconSize.Sm}
             data-testid="permissions-page-back"
           />
         }
-        textProps={{ 'data-testid': 'permissions-page-title' }}
       >
-        {t('permissions')}
+        <Text
+          as="span"
+          variant={TextVariant.headingMd}
+          textAlign={TextAlign.Center}
+          data-testid="permissions-page-title"
+        >
+          {isGatorPermissionsRevocationFeatureEnabled()
+            ? t('sites')
+            : t('dappConnections')}
+        </Text>
       </Header>
-      <Content className="p-0">
-        <Box ref={headerRef} />
-        {nonSnapConnections.length > 0 ? (
-          renderConnectionsList()
+      <Content padding={0}>
+        <Box ref={headerRef}></Box>
+        {totalConnections > 0 ? (
+          renderConnectionsList(mergedConnectionsList)
         ) : (
           <Box
             data-testid="no-connections"
-            className="flex h-full flex-col items-center justify-center p-4"
+            display={Display.Flex}
+            flexDirection={FlexDirection.Column}
+            justifyContent={JustifyContent.center}
+            height={BlockSize.Full}
+            padding={4}
           >
-            <PermissionsEmptyState />
+            <TabEmptyState
+              icon={
+                <img
+                  src={
+                    theme === ThemeType.dark
+                      ? '/images/empty-state-permissions-dark.png'
+                      : '/images/empty-state-permissions-light.png'
+                  }
+                  alt={t('permissionsPageEmptyDescription')}
+                  width={72}
+                  height={72}
+                />
+              }
+              description={t('permissionsPageEmptyDescription')}
+              className="mx-auto"
+            />
           </Box>
         )}
       </Content>
-      {nonSnapConnections.length > 0 && (
+      {totalConnections > 0 && (
         <Footer>
-          <Box className="flex w-full flex-col items-center gap-2">
+          <Box
+            display={Display.Flex}
+            flexDirection={FlexDirection.Column}
+            width={BlockSize.Full}
+            gap={2}
+            alignItems={AlignItems.center}
+          >
             <Button
               size={ButtonSize.Lg}
-              isFullWidth
+              block
               variant={ButtonVariant.Secondary}
-              isDanger
+              startIconName={IconName.Logout}
+              danger
               onClick={() => setShowDisconnectAllModal(true)}
               data-testid="disconnect-all-button"
             >

@@ -61,30 +61,24 @@ const clientIdHeader = { 'X-Client-Id': SWAPS_CLIENT_ID };
 type Validator = {
   property: string;
   type: string;
-  validator?: (value: unknown) => boolean;
+  validator: (a: string) => boolean;
 };
 
 export const TOKEN_VALIDATORS: Validator[] = [
   {
     property: 'address',
     type: 'string',
-    validator: (input) =>
-      typeof input === 'string' &&
-      isValidHexAddress(input, { allowNonPrefixed: false }),
+    validator: (input) => isValidHexAddress(input, { allowNonPrefixed: false }),
   },
   {
     property: 'symbol',
     type: 'string',
-    validator: (value) =>
-      typeof value === 'string' && truthyString(value) && value.length <= 12,
+    validator: (string) => truthyString(string) && string.length <= 12,
   },
   {
     property: 'decimals',
     type: 'string|number',
-    validator: (value) =>
-      (typeof value === 'string' || typeof value === 'number') &&
-      Number(value) >= 0 &&
-      Number(value) <= 36,
+    validator: (string) => Number(string) >= 0 && Number(string) <= 36,
   },
 ];
 
@@ -94,30 +88,24 @@ const AGGREGATOR_METADATA_VALIDATORS: Validator[] = [
   {
     property: 'color',
     type: 'string',
-    validator: (value) =>
-      typeof value === 'string' && Boolean(value.match(/^#[A-Fa-f0-9]+$/u)),
+    validator: (string) => Boolean(string.match(/^#[A-Fa-f0-9]+$/u)),
   },
   {
     property: 'title',
     type: 'string',
-    validator: (value) =>
-      truthyString(typeof value === 'string' ? value : undefined),
+    validator: truthyString,
   },
   {
     property: 'icon',
     type: 'string',
-    validator: (value) =>
-      typeof value === 'string' && Boolean(value.match(/^data:image/u)),
+    validator: (string) => Boolean(string.match(/^data:image/u)),
   },
 ];
 
 // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31973
-
-const isValidDecimalNumber = (value: unknown): boolean =>
-  typeof value === 'string' &&
-  !Number.isNaN(Number(value)) &&
-  Boolean(value.match(/^[.0-9]+$/u)) &&
-  !Number.isNaN(parseFloat(value));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isValidDecimalNumber = (string: any): boolean =>
+  !isNaN(string) && string.match(/^[.0-9]+$/u) && !isNaN(parseFloat(string));
 
 const SWAP_GAS_PRICE_VALIDATOR: Validator[] = [
   {

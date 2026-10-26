@@ -1,10 +1,7 @@
 import { renderHook } from '@testing-library/react';
 
 import { TokenStandard } from '../../../../shared/constants/transaction';
-import {
-  permitNFTSignatureMsg,
-  permitSignatureMsgWithUnsignedFields,
-} from '../../../../test/data/confirmations/typed_sign';
+import { permitNFTSignatureMsg } from '../../../../test/data/confirmations/typed_sign';
 import { unapprovedPersonalSignMsg } from '../../../../test/data/confirmations/personal_sign';
 import { TypedSignSignaturePrimaryTypes } from '../constants';
 import { useTypedSignSignatureInfo } from './useTypedSignSignatureInfo';
@@ -18,17 +15,6 @@ describe('useTypedSignSignatureInfo', () => {
       TypedSignSignaturePrimaryTypes.PERMIT,
     );
     expect(result.current.tokenStandard).toStrictEqual(TokenStandard.ERC721);
-  });
-
-  it('ignores an unsigned tokenId when detecting the token standard', () => {
-    const { result } = renderHook(() =>
-      useTypedSignSignatureInfo(permitSignatureMsgWithUnsignedFields),
-    );
-
-    expect(result.current.primaryType).toStrictEqual(
-      TypedSignSignaturePrimaryTypes.PERMIT,
-    );
-    expect(result.current.tokenStandard).toBeUndefined();
   });
 
   it('should return empty object if confirmation is not typed sign', () => {

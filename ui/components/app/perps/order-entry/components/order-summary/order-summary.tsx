@@ -40,14 +40,10 @@ type TooltipLabelProps = {
 
 const TooltipLabel = ({ label, tooltip, testId }: TooltipLabelProps) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [referenceElement, setReferenceElement] =
-    React.useState<HTMLButtonElement | null>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   const handleOpen = React.useCallback(() => setIsOpen(true), []);
   const handleClose = React.useCallback(() => setIsOpen(false), []);
-  const setTriggerRef = React.useCallback((node: HTMLButtonElement | null) => {
-    setReferenceElement(node);
-  }, []);
 
   return (
     <Box
@@ -60,7 +56,7 @@ const TooltipLabel = ({ label, tooltip, testId }: TooltipLabelProps) => {
         {label}
       </Text>
       <button
-        ref={setTriggerRef}
+        ref={triggerRef}
         type="button"
         aria-label={`${label} info`}
         data-testid={`${testId}-trigger`}
@@ -79,7 +75,7 @@ const TooltipLabel = ({ label, tooltip, testId }: TooltipLabelProps) => {
       <Popover
         isOpen={isOpen}
         position={PopoverPosition.TopStart}
-        referenceElement={referenceElement}
+        referenceElement={triggerRef.current}
         hasArrow
         flip
         preventOverflow

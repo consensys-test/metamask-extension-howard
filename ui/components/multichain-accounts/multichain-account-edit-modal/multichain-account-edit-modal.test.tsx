@@ -103,6 +103,16 @@ describe('MultichainAccountEditModal', () => {
     expect(mockProps.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('calls onClose when back button is clicked', () => {
+    const store = configureStore(mockDefaultState);
+    renderWithProvider(<MultichainAccountEditModal {...mockProps} />, store);
+
+    const backButton = screen.getByLabelText(messages.back.message);
+    fireEvent.click(backButton);
+
+    expect(mockProps.onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('updates input value when typing', () => {
     const store = configureStore(mockDefaultState);
     renderWithProvider(<MultichainAccountEditModal {...mockProps} />, store);

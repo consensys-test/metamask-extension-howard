@@ -3,10 +3,7 @@ import {
   MessengerActions,
   MessengerEvents,
 } from '@metamask/messenger';
-import {
-  RemoteFeatureFlagControllerGetStateAction,
-  RemoteFeatureFlagControllerStateChangeEvent,
-} from '@metamask/remote-feature-flag-controller';
+import { RemoteFeatureFlagControllerGetStateAction } from '@metamask/remote-feature-flag-controller';
 import type { MultichainAccountServiceMessenger } from '@metamask/multichain-account-service';
 import {
   PreferencesControllerGetStateAction,
@@ -63,9 +60,7 @@ type AllowedInitializationActions =
   | PreferencesControllerGetStateAction
   | RemoteFeatureFlagControllerGetStateAction;
 
-type AllowedInitializationEvents =
-  | PreferencesControllerStateChangeEvent
-  | RemoteFeatureFlagControllerStateChangeEvent;
+type AllowedInitializationEvents = PreferencesControllerStateChangeEvent;
 
 export type MultichainAccountServiceInitMessenger = ReturnType<
   typeof getMultichainAccountServiceInitMessenger
@@ -99,10 +94,7 @@ export function getMultichainAccountServiceInitMessenger(
       'PreferencesController:getState',
       'RemoteFeatureFlagController:getState',
     ],
-    events: [
-      'PreferencesController:stateChange',
-      'RemoteFeatureFlagController:stateChange',
-    ],
+    events: ['PreferencesController:stateChange'],
   });
   return serviceInitMessenger;
 }

@@ -4,9 +4,7 @@ import thunk from 'redux-thunk';
 import { renderWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import { RewardsModalContainer } from './rewards-modal-container';
 
-jest.mock('./RewardsModal', () => () => (
-  <div data-testid="parent-selector-rewards-page" />
-));
+jest.mock('./RewardsModal', () => () => <div data-testid="rewards-modal" />);
 
 const mockStore = configureMockStore([thunk]);
 
@@ -50,12 +48,12 @@ function renderContainer(stateOverrides = {}) {
 describe('RewardsModalContainer', () => {
   it('renders nothing when rewards are not enabled', () => {
     const { queryByTestId } = renderContainer({ rewardsEnabled: false });
-    expect(queryByTestId('parent-selector-rewards-page')).toBeNull();
+    expect(queryByTestId('rewards-modal')).toBeNull();
   });
 
   it('renders the modal when rewards are enabled and no higher-priority modal is active', () => {
     const { getByTestId } = renderContainer({ rewardsEnabled: true });
-    expect(getByTestId('parent-selector-rewards-page')).toBeInTheDocument();
+    expect(getByTestId('rewards-modal')).toBeInTheDocument();
   });
 
   it('renders nothing when a deeplink QR code modal is active', () => {
@@ -67,7 +65,7 @@ describe('RewardsModalContainer', () => {
         descriptionKey: 'deepLinkQrPredictDescription',
       },
     });
-    expect(queryByTestId('parent-selector-rewards-page')).toBeNull();
+    expect(queryByTestId('rewards-modal')).toBeNull();
   });
 
   it('renders nothing when canSeeModals is false', () => {
@@ -75,7 +73,7 @@ describe('RewardsModalContainer', () => {
       rewardsEnabled: true,
       canSeeModals: false,
     });
-    expect(queryByTestId('parent-selector-rewards-page')).toBeNull();
+    expect(queryByTestId('rewards-modal')).toBeNull();
   });
 
   it('renders nothing when the shield entry modal is active', () => {
@@ -83,6 +81,6 @@ describe('RewardsModalContainer', () => {
       rewardsEnabled: true,
       showShieldEntryModal: true,
     });
-    expect(queryByTestId('parent-selector-rewards-page')).toBeNull();
+    expect(queryByTestId('rewards-modal')).toBeNull();
   });
 });

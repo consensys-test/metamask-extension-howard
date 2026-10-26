@@ -27,7 +27,6 @@ import {
   MetaMetricsSwapsEventSource,
 } from '../../../../../shared/constants/metametrics';
 import { useAnalytics } from '../../../../hooks/useAnalytics';
-import { showBuyTabOpenedToast } from '../../../../helpers/utils/show-buy-tab-opened-toast';
 import { trace, TraceName } from '../../../../../shared/lib/trace';
 
 const AddFundsModal = ({
@@ -50,18 +49,12 @@ const AddFundsModal = ({
   const [showReceiveModal, setShowReceiveModal] = useState(false);
 
   const handleBuyAndSellOnClick = useCallback(async () => {
-    const destination = await goToBuy();
+    const opened = await goToBuy();
     // The ramps gate can block the buy (e.g. service disruption, unsupported
     // region) and show its own modal; don't report a buy click or close this
     // modal in that case.
-    if (!destination) {
+    if (!opened) {
       return;
-    }
-    if (destination === 'portfolio') {
-      showBuyTabOpenedToast(
-        t('buyTabOpenedToastText'),
-        t('buyTabOpenedToastDescription'),
-      );
     }
     trackEvent(
       createEventBuilder(MetaMetricsEventName.NavBuyButtonClicked)
@@ -79,15 +72,7 @@ const AddFundsModal = ({
         .build(),
     );
     onClose();
-  }, [
-    chainId,
-    onClose,
-    goToBuy,
-    token.symbol,
-    createEventBuilder,
-    trackEvent,
-    t,
-  ]);
+  }, [chainId, onClose, goToBuy, token.symbol, createEventBuilder, trackEvent]);
 
   const handleReceiveOnClick = useCallback(() => {
     trace({ name: TraceName.ReceiveModal });

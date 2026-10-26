@@ -15,7 +15,6 @@ import {
 import { createMockNotificationPreferences } from '../../../ui/hooks/metamask-notifications/mocks';
 import {
   ethSentNotification,
-  ethSentNotificationTemplate,
   featureNotification,
   getMockedNotificationsState,
 } from './data/notification-state';
@@ -97,8 +96,7 @@ describe('Notifications List', () => {
           ...mockedState,
           consentDecisionMade: true,
           optedIn: true,
-          optedInToMarketing: false,
-          marketingConsentDecisionMade: true,
+          dataCollectionForMarketing: false,
         },
         backgroundConnection: backgroundConnectionMocked,
       });
@@ -131,16 +129,12 @@ describe('Notifications List', () => {
       ).toBeInTheDocument();
 
       // Eth sent notification details
-      expect(
-        await within(notificationsList).findByText(
-          ethSentNotificationTemplate.title,
-        ),
-      ).toBeInTheDocument();
-      expect(
-        await within(notificationsList).findByText(
-          ethSentNotificationTemplate.body,
-        ),
-      ).toBeInTheDocument();
+      const sentToElement =
+        await within(notificationsList).findByText('Sent to');
+      expect(sentToElement).toBeInTheDocument();
+
+      const addressElement = sentToElement.nextElementSibling;
+      expect(addressElement).toHaveTextContent('0x881D4...D300D');
 
       // Read all button
       expect(
@@ -197,28 +191,29 @@ describe('Notifications List', () => {
         preloadedState: mockedState,
         backgroundConnection: backgroundConnectionMocked,
       });
-    });
 
-    fireEvent.click(await screen.findByTestId('account-options-menu-button'));
+      fireEvent.click(await screen.findByTestId('account-options-menu-button'));
 
-    await waitFor(async () => {
-      expect(
-        await screen.findByTestId('notifications-menu-item'),
-      ).toBeInTheDocument();
-      fireEvent.click(await screen.findByTestId('notifications-menu-item'));
-    });
+      await waitFor(async () => {
+        expect(
+          await screen.findByTestId('notifications-menu-item'),
+        ).toBeInTheDocument();
+        fireEvent.click(await screen.findByTestId('notifications-menu-item'));
+      });
 
-    await waitFor(async () => {
-      const notificationsList = await screen.findByTestId('notifications-list');
-      expect(notificationsList).toBeInTheDocument();
+      await waitFor(async () => {
+        const notificationsList =
+          await screen.findByTestId('notifications-list');
+        expect(notificationsList).toBeInTheDocument();
 
-      expect(notificationsList.childElementCount).toBe(2);
+        expect(notificationsList.childElementCount).toBe(2);
 
-      expect(
-        screen.queryByTestId('notifications-list-read-all-button'),
-      ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('notifications-list-read-all-button'),
+        ).not.toBeInTheDocument();
 
-      expect(screen.queryAllByTestId('unread-dot')).toHaveLength(0);
+        expect(screen.queryAllByTestId('unread-dot')).toHaveLength(0);
+      });
     });
   });
 
@@ -281,8 +276,7 @@ describe('Notifications List', () => {
           ...mockedState,
           consentDecisionMade: true,
           optedIn: true,
-          optedInToMarketing: false,
-          marketingConsentDecisionMade: true,
+          dataCollectionForMarketing: false,
         },
         backgroundConnection: backgroundConnectionMocked,
       });

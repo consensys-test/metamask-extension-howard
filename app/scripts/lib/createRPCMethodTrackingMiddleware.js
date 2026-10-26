@@ -28,13 +28,7 @@ import {
   // eslint-disable-next-line import-x/no-restricted-paths
 } from '../../../ui/helpers/utils/metrics';
 import { isSnapPreinstalled } from '../../../shared/lib/snaps/snaps';
-import {
-  createEventBuilder,
-  createEventFragment,
-  finalizeEventFragment,
-  trackEvent,
-  updateEventFragment,
-} from '../controllers/analytics';
+import { createEventBuilder, trackEvent } from '../controllers/analytics';
 import { getSnapAndHardwareInfoForMetrics } from './snap-keyring/metrics';
 import { getIframeProperties } from './getIframeProperties';
 
@@ -166,19 +160,25 @@ let globalRateLimitCount = 0;
 /**
  * Create signature request event fragment with an assigned unique identifier
  *
+ * @param {MetaMetricsController} metaMetricsController
  * @param {OriginalRequest} req
- * @param {MetaMetricsEventFragmentPayload} fragmentPayload
+ * @param {Partial<MetaMetricsEventFragment>} fragmentPayload
  * @param {MetaMetricsEventCategory} eventCategory
  */
-function createSignatureFragment(req, fragmentPayload, eventCategory) {
-  createEventFragment({
+function createSignatureFragment(
+  metaMetricsController,
+  req,
+  fragmentPayload,
+  eventCategory,
+) {
+  metaMetricsController.createEventFragment({
     category: eventCategory,
 
     initialEvent: MetaMetricsEventName.SignatureRequested,
     successEvent: MetaMetricsEventName.SignatureApproved,
     failureEvent: MetaMetricsEventName.SignatureRejected,
 
-    id: generateSignatureUniqueId(req.id),
+    uniqueIdentifier: generateSignatureUniqueId(req.id),
     persist: true,
     referrer: {
       url: req.origin,
@@ -190,16 +190,25 @@ function createSignatureFragment(req, fragmentPayload, eventCategory) {
 /**
  * Updates and finalizes event fragment for signature requests
  *
+ * @param {MetaMetricsController} metaMetricsController
  * @param {OriginalRequest} req
- * @param {{ abandoned?: boolean }} finalizeEventOptions
- * @param {MetaMetricsEventFragmentPayload} fragmentPayload
+ * @param {MetaMetricsFinalizeEventFragmentOptions}  finalizeEventOptions
+ * @param {Partial<MetaMetricsEventFragment>} fragmentPayload
  */
-function finalizeSignatureFragment(req, finalizeEventOptions, fragmentPayload) {
+function finalizeSignatureFragment(
+  metaMetricsController,
+  req,
+  finalizeEventOptions,
+  fragmentPayload,
+) {
   const signatureUniqueId = generateSignatureUniqueId(req.id);
 
-  updateEventFragment(signatureUniqueId, fragmentPayload);
+  metaMetricsController.updateEventFragment(signatureUniqueId, fragmentPayload);
 
-  finalizeEventFragment(signatureUniqueId, finalizeEventOptions);
+  metaMetricsController.finalizeEventFragment(
+    signatureUniqueId,
+    finalizeEventOptions,
+  );
 }
 
 function isMultichainRequestMethod(method) {
@@ -228,6 +237,7 @@ function isMultichainRequestMethod(method) {
  * @param {number} [opts.globalRateLimitMaxAmount] - max number of method calls that should
  * tracked within the globalRateLimitTimeout time window.
  * @param {AppStateController} [opts.appStateController]
+ * @param {MetaMetricsController} [opts.metaMetricsController]
  * @param {AnalyticsController} [opts.analyticsController]
  * @returns {Function}
  */
@@ -242,6 +252,7 @@ export default function createRPCMethodTrackingMiddleware({
   getHardwareTypeForMetric,
   snapAndHardwareMessenger,
   appStateController,
+  metaMetricsController,
   analyticsController,
   getHDEntropyIndex,
 }) {
@@ -264,12 +275,10 @@ export default function createRPCMethodTrackingMiddleware({
       : MetaMetricsEventCategory.InpageProvider;
 
     let invokedMethod = method;
-    let invokedMethodParams = params;
     let multichainApiRequestScope;
     // if the request is through the multichain api, the method is nested in the params
     if (method === MESSAGE_TYPE.WALLET_INVOKE_METHOD) {
       invokedMethod = params?.request?.method;
-      invokedMethodParams = params?.request?.params;
       multichainApiRequestScope = params?.scope;
     }
 
@@ -355,10 +364,10 @@ export default function createRPCMethodTrackingMiddleware({
         // In personal messages the first param is data while in typed messages second param is data
         // if condition below is added to ensure that the right params are captured as data and address.
         let data;
-        if (isValidAddress(invokedMethodParams?.[1])) {
-          data = invokedMethodParams?.[0];
+        if (isValidAddress(req?.params?.[1])) {
+          data = req?.params?.[0];
         } else {
-          data = invokedMethodParams?.[1];
+          data = req?.params?.[1];
         }
 
         if (req.securityAlertResponse?.providerRequestsCount) {
@@ -453,7 +462,12 @@ export default function createRPCMethodTrackingMiddleware({
           sensitiveProperties: sensitiveEventProperties,
         };
 
-        createSignatureFragment(req, fragmentPayload, eventCategory);
+        createSignatureFragment(
+          metaMetricsController,
+          req,
+          fragmentPayload,
+          eventCategory,
+        );
       } else {
         trackEvent(
           createEventBuilder(event)
@@ -563,7 +577,12 @@ export default function createRPCMethodTrackingMiddleware({
           sensitiveProperties: sensitiveEventProperties,
         };
 
-        finalizeSignatureFragment(req, finalizeOptions, fragmentPayload);
+        finalizeSignatureFragment(
+          metaMetricsController,
+          req,
+          finalizeOptions,
+          fragmentPayload,
+        );
       } else {
         trackEvent(
           createEventBuilder(event)

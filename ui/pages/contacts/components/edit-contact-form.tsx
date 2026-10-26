@@ -54,6 +54,7 @@ export function EditContactForm({
   initialName,
   initialMemo,
   contactChainId,
+  onCancel,
   onSuccess,
 }: EditContactFormProps) {
   const t = useI18nContext();
@@ -292,16 +293,27 @@ export function EditContactForm({
 
       {/* Footer */}
       <Box
+        flexDirection={BoxFlexDirection.Row}
+        gap={4}
         padding={4}
         paddingBottom={6}
-        className="shrink-0 bg-background-default"
+        className="shrink-0 flex-row bg-background-default"
       >
+        <Button
+          variant={ButtonVariant.Secondary}
+          size={ButtonSize.Lg}
+          onClick={onCancel}
+          className="flex-1 rounded-xl"
+          data-testid="page-container-footer-cancel"
+        >
+          {t('cancel')}
+        </Button>
         <Button
           variant={ButtonVariant.Primary}
           size={ButtonSize.Lg}
           isDisabled={isSaveDisabled}
           onClick={handleSubmit}
-          isFullWidth
+          className="flex-1 rounded-xl"
           data-testid="page-container-footer-next"
         >
           {t('save')}

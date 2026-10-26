@@ -1,4 +1,5 @@
 export { PerpsCardSkeleton } from './perps-card-skeleton';
+export { PerpsControlBarSkeleton } from './perps-control-bar-skeleton';
 export {
   PerpsSectionSkeleton,
   type PerpsSectionSkeletonProps,

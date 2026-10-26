@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   BoxAlignItems,
@@ -13,22 +12,11 @@ import {
 import { useAccountSettingsProps } from '../../hooks/metamask-notifications/useSwitchNotifications';
 import { useSafeState } from '../../hooks/metamask-notifications/useNotifications';
 import { useNotificationPreferences } from '../../hooks/metamask-notifications/useNotificationPreferences';
-import { getIsPerpsIncludedInBuild } from '../../../shared/lib/environment';
-import {
-  getNotificationsSettingsSectionTypeFromSlug,
-  NotificationsSettingsQueryParams,
-  NOTIFICATIONS_SETTINGS_SECTION_ROUTES,
-} from '../../../shared/lib/notifications-settings';
 import { NotificationsSettingsAllowNotifications } from './notifications-settings-allow-notifications';
 import { NotificationsSettingsTypes } from './notifications-settings-types';
 import { useNotificationAccountGroups } from './notifications-settings-helpers';
 
 export function NotificationsSettingsContent() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const pendingSectionType = getNotificationsSettingsSectionTypeFromSlug(
-    searchParams.get(NotificationsSettingsQueryParams.Section),
-  );
   const isMetamaskNotificationsEnabled = useSelector(
     selectIsMetamaskNotificationsEnabled,
   );
@@ -37,39 +25,7 @@ export function NotificationsSettingsContent() {
   );
   const [loadingAllowNotifications, setLoadingAllowNotifications] =
     useSafeState<boolean>(isUpdatingMetamaskNotifications);
-  const {
-    preferences,
-    refetchPreferences,
-    isLoading: isLoadingPreferences,
-    error: preferencesError,
-  } = useNotificationPreferences();
-
-  useEffect(() => {
-    if (
-      pendingSectionType &&
-      (pendingSectionType !== 'perps' || getIsPerpsIncludedInBuild()) &&
-      isMetamaskNotificationsEnabled &&
-      !isUpdatingMetamaskNotifications &&
-      !loadingAllowNotifications &&
-      !isLoadingPreferences &&
-      !preferencesError &&
-      preferences?.[pendingSectionType]
-    ) {
-      // Consume the pending intent so returning to the main page does not resume it again.
-      navigate(NOTIFICATIONS_SETTINGS_SECTION_ROUTES[pendingSectionType], {
-        replace: true,
-      });
-    }
-  }, [
-    pendingSectionType,
-    isMetamaskNotificationsEnabled,
-    isUpdatingMetamaskNotifications,
-    loadingAllowNotifications,
-    isLoadingPreferences,
-    preferencesError,
-    preferences,
-    navigate,
-  ]);
+  const { preferences, refetchPreferences } = useNotificationPreferences();
 
   const notificationAccountGroups = useNotificationAccountGroups();
   const accountAddresses = useMemo(

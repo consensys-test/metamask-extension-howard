@@ -29,22 +29,11 @@ export const PERPS_RECENT_ACTIVITY_MAX_TRANSACTIONS = 5;
 // Market categories are owned by the controller (v8 `MARKET_CATEGORIES`); the UI
 // only adds the `all` and `new` pseudo-filters, so a new core category does not
 // require a change here.
-export const MARKET_CATEGORY_FILTERS = [
+export const VALID_MARKET_FILTERS = [
   'all',
   ...MARKET_CATEGORIES,
   'new',
 ] as const satisfies readonly MarketTypeFilter[];
-
-// User state, not a market category, so it stays out of the controller's
-// `MarketTypeFilter` union.
-export const WATCHLIST_MARKET_FILTER = 'watchlist';
-
-export const VALID_MARKET_FILTERS = [
-  ...MARKET_CATEGORY_FILTERS,
-  WATCHLIST_MARKET_FILTER,
-] as const;
-
-export type MarketCategoryFilter = (typeof MARKET_CATEGORY_FILTERS)[number];
 
 export type MarketFilter = (typeof VALID_MARKET_FILTERS)[number];
 
@@ -71,18 +60,6 @@ export function normalizeMarketFilter(filter: string): MarketFilter | null {
  */
 export const SUPPORT_CONFIG = {
   Url: 'https://support.metamask.io/?utm_source=extension',
-} as const;
-
-/**
- * Outage banner links. The FAQ points at the Perps help-center hub. The
- * support link opens the Perps troubleshoot article, separate from the
- * general contact-support button, matching mobile.
- */
-export const SERVICE_INTERRUPTION_CONFIG = {
-  FaqUrl:
-    'https://support.metamask.io/manage-crypto/trade/perps/?utm_source=extension',
-  SupportUrl:
-    'https://support.metamask.io/trade/perps/troubleshoot/?utm_source=extension',
 } as const;
 
 /**

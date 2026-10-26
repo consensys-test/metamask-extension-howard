@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { StoryFn, Meta } from '@storybook/react-webpack5';
+import React, { useState, useEffect } from 'react';
+import type { StoryFn, Meta } from '@storybook/react';
 import { HeaderSearch } from './header-search';
 import { HeaderSearchVariant } from './header-search.types';
 
@@ -27,12 +27,10 @@ export default {
 const Template: StoryFn<typeof HeaderSearch> = (args) => {
   const initialValue = (args.textFieldSearchProps?.value as string) ?? '';
   const [value, setValue] = useState(initialValue);
-  const [prevInitialValue, setPrevInitialValue] = useState(initialValue);
 
-  if (initialValue !== prevInitialValue) {
-    setPrevInitialValue(initialValue);
+  useEffect(() => {
     setValue(initialValue);
-  }
+  }, [initialValue]);
 
   const handleChangeText = (text: string) => {
     setValue(text);

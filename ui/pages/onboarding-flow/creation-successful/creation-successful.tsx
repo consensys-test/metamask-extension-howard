@@ -140,7 +140,7 @@ export default function CreationSuccessful() {
         <Button
           variant={ButtonVariant.Secondary}
           data-testid="manage-default-settings"
-          className="w-full flex justify-between items-center"
+          className="rounded-lg w-full flex justify-between items-center"
           onClick={() =>
             navigate(`${ONBOARDING_PRIVACY_SETTINGS_ROUTE}?isFromReminder=true`)
           }
@@ -221,7 +221,7 @@ export default function CreationSuccessful() {
       justifyContent={BoxJustifyContent.Between}
       gap={6}
       className="creation-successful h-full"
-      data-testid="parent-selector-onboarding-complete"
+      data-testid="wallet-ready"
     >
       {isFromSettingsSRPBackup && (
         <Box>
@@ -271,16 +271,15 @@ export default function CreationSuccessful() {
       )}
       {renderDoneButton()}
       {!isFromSettingsSRPBackup && (
-        <Button
-          variant={ButtonVariant.Tertiary}
-          size={ButtonSize.Lg}
-          className="w-full"
-          data-testid="manage-default-settings"
-          onClick={() => navigate(ONBOARDING_PRIVACY_SETTINGS_ROUTE)}
-          disabled={isSidePanelEnabled && isSidePanelOpen}
-        >
-          {t('manageDefaultSettings')}
-        </Button>
+        <Box>
+          <TextButton
+            onClick={() => navigate(ONBOARDING_PRIVACY_SETTINGS_ROUTE)}
+            className="hover:bg-transparent active:bg-transparent w-full text-center"
+            data-testid="manage-default-settings"
+          >
+            {t('manageDefaultSettings')}
+          </TextButton>
+        </Box>
       )}
     </Box>
   );

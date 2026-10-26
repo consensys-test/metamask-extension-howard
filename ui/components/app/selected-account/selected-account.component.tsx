@@ -24,7 +24,9 @@ type SelectedAccountProps = {
 
 function SelectedAccount({ selectedAccount }: SelectedAccountProps) {
   const t = useI18nContext();
-  const [copied, copyToClipboard] = useCopyToClipboard();
+  const [copied, copyToClipboard] = useCopyToClipboard({
+    clearDelayMs: null,
+  });
 
   const checksummedAddress = toChecksumHexAddress(selectedAccount.address);
 

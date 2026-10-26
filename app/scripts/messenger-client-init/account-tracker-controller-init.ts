@@ -3,7 +3,6 @@ import {
   AccountTrackerControllerMessenger,
 } from '@metamask/assets-controllers';
 import { NetworkClientId } from '@metamask/network-controller';
-import { getIsDeprecatedController } from '../../../shared/lib/assets-unify-state/remote-feature-flag';
 import { MessengerClientInitFunction } from './types';
 import { AccountTrackerControllerInitMessenger } from './messengers';
 
@@ -52,15 +51,6 @@ export const AccountTrackerControllerInit: MessengerClientInitFunction<
     isOnboarded: () => {
       const { completedOnboarding } = onboardingController().state;
       return completedOnboarding;
-    },
-    isDeprecated: () => {
-      const { remoteFeatureFlags } = initMessenger.call(
-        'RemoteFeatureFlagController:getState',
-      );
-      return getIsDeprecatedController(
-        remoteFeatureFlags,
-        'AccountTrackerController',
-      );
     },
   });
 

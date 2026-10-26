@@ -9,12 +9,19 @@ import {
   Text,
   TextVariant,
   TextColor,
+} from '@metamask/design-system-react';
+import {
   Modal,
+  ModalContent,
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  ModalContent,
-} from '@metamask/design-system-react';
+} from '../../../components/component-library';
+import {
+  AlignItems,
+  Display,
+  FlexDirection,
+} from '../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import {
   exportAsFile,
@@ -64,15 +71,13 @@ export default function ExportYourDataModal({
     <Modal isOpen onClose={onClose}>
       <ModalOverlay />
       <ModalContent
-        className="items-center"
+        alignItems={AlignItems.center}
         modalDialogProps={{
-          flexDirection: BoxFlexDirection.Column,
+          display: Display.Flex,
+          flexDirection: FlexDirection.Column,
         }}
       >
-        <ModalHeader
-          onClose={onClose}
-          closeButtonProps={{ ariaLabel: t('close') }}
-        >
+        <ModalHeader onClose={onClose}>
           <Box
             flexDirection={BoxFlexDirection.Column}
             alignItems={BoxAlignItems.Center}

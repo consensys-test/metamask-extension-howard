@@ -20,7 +20,7 @@ const rows = [
     key="line-1"
     detailTitle={
       <>
-        Estimated network fee
+        Estimated gas fee
         <InfoTooltip contentText="This is the tooltip text" position="top">
           <Icon name={IconName.Info} />
         </InfoTooltip>
@@ -40,7 +40,7 @@ const rows = [
     detailTitle="Total"
     detailText=".0312 ETH"
     detailTotal="$15.77"
-    subTitle="Amount + network fee"
+    subTitle="Amount + gas fee"
     subText={
       <>
         Up to <strong>$19.85</strong>

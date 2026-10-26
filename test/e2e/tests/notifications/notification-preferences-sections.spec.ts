@@ -11,10 +11,7 @@ import { goToNotificationsSettingsPage } from '../../page-objects/flows/notifica
 import { closeSettings } from '../../page-objects/flows/settings.flow';
 import NotificationsSettingsPage from '../../page-objects/pages/settings/notifications-settings-page';
 import { MockttpNotificationTriggerServer } from '../../helpers/notifications/mock-notification-trigger-server';
-import {
-  getMockNotificationPreferences,
-  mockNotificationServices,
-} from './mocks';
+import { mockNotificationServices } from './mocks';
 
 const FEATURE_FLAGS_URL = 'https://client-config.api.cx.metamask.io/v1/flags';
 
@@ -49,12 +46,9 @@ async function mockFeatureFlagsWithoutAutoEnableNotifications(server: Mockttp) {
 describe('Notification Preferences Sections', function () {
   it('persists section in-app notification preferences to authenticated user storage', async function () {
     const triggerServer = new MockttpNotificationTriggerServer();
-    triggerServer.setNotificationPreferences(getMockNotificationPreferences());
     await withFixtures(
       {
-        fixtures: new FixtureBuilderV2()
-          .withAuthenticationController({ isSignedIn: true })
-          .build(),
+        fixtures: new FixtureBuilderV2().build(),
         title: this.test?.fullTitle(),
         testSpecificMock: async (server: Mockttp) => {
           await mockNotificationServices(server, triggerServer);

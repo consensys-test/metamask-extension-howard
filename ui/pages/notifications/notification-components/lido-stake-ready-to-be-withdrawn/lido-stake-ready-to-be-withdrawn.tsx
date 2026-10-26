@@ -1,6 +1,5 @@
 import React from 'react';
 import { NotificationServicesController } from '@metamask/notification-services-controller';
-import { AvatarIconSeverity, IconName } from '@metamask/design-system-react';
 import { type ExtractedNotification, isOfTypeNodeGuard } from '../node-guard';
 import {
   NotificationComponentType,
@@ -9,6 +8,7 @@ import {
 import {
   NotificationListItem,
   NotificationDetailInfo,
+  NotificationDetailTitle,
   NotificationDetailAsset,
   NotificationDetailBlockExplorerButton,
   NotificationDetailAddress,
@@ -17,12 +17,19 @@ import { t } from '../../../../../shared/lib/translate';
 import {
   createTextItems,
   formatAmount,
+  formatIsoDateString,
   getNativeCurrencyLogoByChainId,
 } from '../../../../helpers/utils/notification.util';
-import { TextVariant } from '../../../../helpers/constants/design-system';
+import {
+  TextVariant,
+  BackgroundColor,
+  TextColor,
+} from '../../../../helpers/constants/design-system';
 import { NotificationListItemIconType } from '../../../../components/multichain/notification-list-item-icon/notification-list-item-icon';
-import { BadgeWrapperPosition } from '../../../../components/component-library';
-import { OnChainNotificationDetailsTitle } from '../notification-details-title';
+import {
+  BadgeWrapperPosition,
+  IconName,
+} from '../../../../components/component-library';
 
 const { TRIGGER_TYPES } = NotificationServicesController.Constants;
 
@@ -33,12 +40,23 @@ const isLidoReadyWithDrawnNotification = isOfTypeNodeGuard([
 ]);
 
 const getDescription = (n: LidoReadyWithDrawnNotification) => {
-  const items = createTextItems([n.template?.body ?? ''], TextVariant.bodyMd);
+  const amount = formatAmount(parseFloat(n.payload.data.staked_eth.amount), {
+    shouldEllipse: true,
+  });
+  const description =
+    t(
+      'notificationItemLidoStakeReadyToBeWithdrawnMessage',
+      `${amount} ${n.payload.data.staked_eth.symbol}`,
+    ) ?? '';
+  const items = createTextItems([description], TextVariant.bodyMd);
   return items;
 };
 
-const getTitle = (n: LidoReadyWithDrawnNotification) => {
-  const items = createTextItems([n.template?.title ?? ''], TextVariant.bodySm);
+const getTitle = () => {
+  const items = createTextItems(
+    [t('notificationItemLidoStakeReadyToBeWithdrawn') ?? ''],
+    TextVariant.bodySm,
+  );
   return items;
 };
 
@@ -58,7 +76,7 @@ export const components: NotificationComponent<LidoReadyWithDrawnNotification> =
               position: BadgeWrapperPosition.bottomRight,
             },
           }}
-          title={getTitle(notification)}
+          title={getTitle()}
           description={getDescription(notification)}
           createdAt={new Date(notification.createdAt)}
           onClick={onClick}
@@ -66,7 +84,12 @@ export const components: NotificationComponent<LidoReadyWithDrawnNotification> =
       );
     },
     details: {
-      title: OnChainNotificationDetailsTitle,
+      title: ({ notification }) => (
+        <NotificationDetailTitle
+          title={t('notificationItemLidoStakeReadyToBeWithdrawn') ?? ''}
+          date={formatIsoDateString(notification.createdAt)}
+        />
+      ),
       body: {
         type: NotificationComponentType.OnChainBody,
         Account: ({ notification }) => {
@@ -84,7 +107,8 @@ export const components: NotificationComponent<LidoReadyWithDrawnNotification> =
           <NotificationDetailInfo
             icon={{
               iconName: IconName.Check,
-              severity: AvatarIconSeverity.Success,
+              color: TextColor.successDefault,
+              backgroundColor: BackgroundColor.successMuted,
             }}
             label={t('notificationItemStatus') ?? ''}
             detail={t('notificationItemConfirmed') ?? ''}

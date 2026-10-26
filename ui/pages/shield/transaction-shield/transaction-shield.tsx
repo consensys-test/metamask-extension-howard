@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Product,
   PRODUCT_TYPES,
@@ -39,6 +33,8 @@ import {
   useUserSubscriptionByProduct,
   useUserSubscriptions,
 } from '../../../hooks/subscription/useSubscription';
+// eslint-disable-next-line import-x/no-restricted-paths -- TODO(ADR-0021): route-isolation backlog
+import { getShortDateFormatterV2 } from '../../asset/util';
 import {
   DEFAULT_ROUTE,
   SHIELD_PLAN_ROUTE,
@@ -74,7 +70,6 @@ import { setRewardsModalOpen } from '../../../ducks/rewards';
 import { getIntlLocale } from '../../../ducks/locale/locale';
 import { linkRewardToShieldSubscription } from '../../../store/actions';
 import { isCardPaymentMethod, isCryptoPaymentMethod } from './types';
-import { formatOptionalDate } from './utils';
 import {
   ButtonRow,
   ButtonRowContainer,
@@ -127,23 +122,23 @@ const TransactionShield = () => {
     | (Subscription & { rewardAccountId?: string }) // TODO: fix this type once we have controller released.
     | undefined = currentShieldSubscription ?? lastShieldSubscription;
 
-  const timeoutCancelledRef = useRef(false);
+  const [timeoutCancelled, setTimeoutCancelled] = useState(false);
   useEffect(() => {
     // cancel timeout when component unmounts
     return () => {
-      timeoutCancelledRef.current = true;
+      setTimeoutCancelled(true);
     };
   }, []);
   useEffect(() => {
     // cancel timeout when subscription is created
     if (currentShieldSubscription) {
-      timeoutCancelledRef.current = true;
+      setTimeoutCancelled(true);
     }
   }, [currentShieldSubscription]);
 
   const startSubscriptionCreationTimeout = useTimeout(
     () => {
-      if (timeoutCancelledRef.current) {
+      if (timeoutCancelled) {
         return;
       }
 
@@ -464,7 +459,9 @@ const TransactionShield = () => {
           <Icon name={IconName.Info} size={IconSize.Lg} />
           <Text variant={TextVariant.BodySm}>
             {t('shieldTxMembershipCancelNotification', [
-              formatOptionalDate(currentShieldSubscription.currentPeriodEnd),
+              getShortDateFormatterV2().format(
+                new Date(currentShieldSubscription.currentPeriodEnd),
+              ),
             ])}
           </Text>
         </Box>
@@ -537,8 +534,8 @@ const TransactionShield = () => {
                     RECURRING_INTERVALS.year
                       ? t('shieldPlanYearly')
                       : t('shieldPlanMonthly'),
-                    formatOptionalDate(
-                      displayedShieldSubscription?.currentPeriodEnd,
+                    getShortDateFormatterV2().format(
+                      new Date(displayedShieldSubscription?.currentPeriodEnd),
                     ),
                   ])}
                   descriptionTestId="shield-detail-next-billing"
@@ -669,10 +666,8 @@ const TransactionShield = () => {
                       ? t('shieldTxPastPlansYearly')
                       : t('shieldTxPastPlansMonthly')
                   }
-                  description={`${formatOptionalDate(
-                    lastShieldSubscription.currentPeriodStart,
-                  )} - ${formatOptionalDate(
-                    lastShieldSubscription.currentPeriodEnd,
+                  description={`${getShortDateFormatterV2().format(new Date(lastShieldSubscription.currentPeriodStart))} - ${getShortDateFormatterV2().format(
+                    new Date(lastShieldSubscription.currentPeriodEnd),
                   )}`}
                   loading={showSkeletonLoader}
                   onClick={() => {
