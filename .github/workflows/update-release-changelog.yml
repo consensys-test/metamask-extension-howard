@@ -1,10 +1,10 @@
-# Fork-only fixture workflow. Runs the candidate github-tools action on every release branch push.
+# Fork copy of Extension's real workflow; v1 replaced by the candidate sha, token from a secret.
 name: Update Release Changelog PR
 
 on:
   push:
     branches:
-      - 'release/*'
+      - 'release/[0-9]+.[0-9]+.[0-9]+'
 
 concurrency:
   group: update-release-changelog-${{ github.ref }}
@@ -16,14 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
       pull-requests: write
     steps:
       - name: Update Release Changelog
-        uses: MetaMask/github-tools/.github/actions/update-release-changelog@eb7fc7fd3c855bc478ee674325f2e35439cf0a37
-        env:
-          AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@91130975ae435a2e422fae2dcbbc3ac67a35fcc5
         with:
           release-branch: ${{ github.ref_name }}
-          repository-url: https://github.com/MetaMask/metamask-extension
+          repository-url: ${{ github.server_url }}/${{ github.repository }}
           platform: extension
+          previous-version-ref: 'null'
           github-token: ${{ secrets.PR_TOKEN }}
