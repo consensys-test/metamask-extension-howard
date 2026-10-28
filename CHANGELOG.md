@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.53.1]
+
+### Uncategorized
+
+- Upsert get_fees_error to Transaction events (#46825)
+- Remove Bitcoin account label tags everywhere but multichain account address list (#47077)
+- Upgrade Bitcoin wallet Snap to 3.2.0 (#47052)
+
+### Added
+
+- Improved transaction simulation accuracy for verified contracts (#47025)
+- (feat): bump Tron, Solana and Bitcoin snaps (#47048)
+- Fixed the home balance flashing "Fund your wallet" or a zero balance while assets are loading for the first time. (#47105)
+- Show earn section and banner in stablecoin token details page (#47056)
+
+## **Related issues**
+
+- Fixed a bug that was causing Tron energy and bandwidth values to display incorrectly when the data was unavailable; a warning (#47046)
+  is now shown instead.
+- Ensure that money menu is aligned with general burger menu (#47071)
+- Improve money account styling (#47026)
+- Add sentry tag to lifetime earnings API call failures (#47078)
+- Added deep links to notification settings and supported preference sections (#46753)
+- Refreshed Tron energy, bandwidth and staking information on the TRX token details page so it shows up-to-date values (#46795)
+  when the page is opened and after Tron transactions confirm
+- Added a Perps outage banner with help-center and support links on home, market, trade, close, and market list (#46864)
+- Adds token symbol to Search asset row subtitles (#47045)
+- Moved Import NFT from a modal to a full page (#47027)
+- Fixed stale reverse-position fee previews during quote refresh and unavailable estimates for malformed live Perps position (#47016)
+  values.
+- Added an About section to Perps market details so users can read a short description of the underlying asset (#46610)
+- Reordered the notification settings so the Agentic CLI section appears above the Marketing section. (#47023)
+- Clicking the Money balance on the home screen now opens the Money page, and the mUSD label was removed from that card (#46901)
+- Add money account CTAs to token row, gated behind feature flag (#46923)
+- Updated Perps and Predict deposits to prefill half of the selected token balance. (#46892)
+
+### Fixed
+
+- Apply old-script PR fixture change (#68)
+- Fix no icon for native sends on Activity tab when non-bridge slip44 asset (#47145)
+- Fixed malicious and suspicious token warnings not appearing in Swaps when the destination token was opened from deeplinks, (#47097)
+  the asset page and other entry points
+- Updated the Import NFT banner to point to Basic Functionality when NFT media is controlled by that setting. (#47044)
+- Fixed grammar in the Arc usage notice (#47112)
+- Sets tempo nativeCurrency to USD (#47074)
+- Fixed a misleading lifetime earnings value when Money data could not be fetched. (#47076)
+- Fixed Send Max transactions on Ink by accounting for Layer 1 gas fees. (#46880)
+- Fix transaction from auto retrying from rejection. (#47060)
+- Hide fiat values in the send asset picker when Basic Functionality is turned off (#47022)
+- Hide auto connect errors during swap. (#46766)
+- Deduplicates native token result(s) on Manage Tokens view when duplicated (#47038)
+- Matched the Add contact network dropdown border to the other form fields. (#47037)
+- Fixed the add-network Chainlist lists so they stay open, stay attached to the field that opened them, and keep entered (#47001)
+  details when adding an RPC or block explorer URL.
+- Fixed native Max sends to reserve the gas estimated by the selected network. (#46461)
+- Fixed Robinhood Chain explorer links for existing users (#47019)
+- Fixed a bug that hid the failed-transaction toast when a transaction failed before it was submitted (#46872)
+- Fixed the internal error dialog so it follows the selected theme (#46890)
+- Fixed misleading insufficient network fee alerts on Monad when the 10 MON reserve balance requirement was the actual cause (#46049)
+- Simplified the locked device error modal into a single unlock description instead of multi-step recovery instructions (#46936)
+
 ## [13.53.0]
 
 ### Added
@@ -3479,7 +3540,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This changelog was split off with 12.22.0
 - All older changes can be found in [docs/CHANGELOG_older.md](https://github.com/MetaMask/metamask-extension/blob/main/docs/CHANGELOG_older.md)
 
-[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v13.53.0...HEAD
+[Unreleased]: https://github.com/MetaMask/metamask-extension/compare/v13.53.1...HEAD
+[13.53.1]: https://github.com/MetaMask/metamask-extension/compare/v13.53.0...v13.53.1
 [13.53.0]: https://github.com/MetaMask/metamask-extension/compare/v13.52.0...v13.53.0
 [13.52.0]: https://github.com/MetaMask/metamask-extension/compare/v13.51.0...v13.52.0
 [13.51.0]: https://github.com/MetaMask/metamask-extension/compare/v13.50.0...v13.51.0
