@@ -20,7 +20,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Update Release Changelog
-        uses: MetaMask/github-tools/.github/actions/update-release-changelog@91130975ae435a2e422fae2dcbbc3ac67a35fcc5
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@v1.21.0
         with:
           release-branch: ${{ github.ref_name }}
           repository-url: https://github.com/MetaMask/metamask-extension
