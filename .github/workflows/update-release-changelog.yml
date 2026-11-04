@@ -24,21 +24,12 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      - name: Get token
-        id: token
-        uses: MetaMask/github-tools/.github/actions/get-token@v1
-        with:
-          token-exchange-url: ${{ vars.TOKEN_EXCHANGE_URL }}
-          permissions: |
-            contents: write
-            pull_requests: write
-
       - name: Update Release Changelog
-        uses: MetaMask/github-tools/.github/actions/update-release-changelog@v1
+        uses: MetaMask/github-tools/.github/actions/update-release-changelog@88836cf1473f73a64848a809cf89e616ed6ed692
         env:
           AI_ANALYZER_LITELLM_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
         with:
           release-branch: ${{ github.ref_name }}
-          repository-url: ${{ github.server_url }}/${{ github.repository }}
+          repository-url: https://github.com/MetaMask/metamask-extension
           platform: extension
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ secrets.PR_TOKEN }}
