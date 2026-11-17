@@ -14,7 +14,9 @@ Only `package.json`, `yarn.lock`, `.yarn/patches/**` and `lavamoat/webpack/**/po
 
 Report only. Run `yarn why electron` and confirm the chain `metamask-crx -> react-devtools -> electron`; group all Electron advisories into one cluster (count, installed version, highest fixed version) under category C. Do not change anything for them.
 
-## Fix order (stop at the first that works)
+## Fix order (per advisory package: stop at the first step that works)
+
+Work through every advisory package in `audit-before.json`, one at a time, before you write the report. A package is only difficult (category C) after steps 1 to 3 below were each tried or ruled out with a command and its output. "Not researched further" is not an acceptable reason; you have many turns, so use them. Keep the accepted fixes of earlier packages when a later candidate fails.
 
 1. Lockfile refresh inside the existing ranges: `yarn up -R <pkg> --mode=update-lockfile`.
 2. A parent upgrade that pulls in the patched child. For each ancestor on the chain (`yarn why -R <pkg>`), check its latest release and whether it still depends on the vulnerable child: `yarn npm info <pkg> --fields version` and `yarn npm info <pkg>@<ver> --fields dependencies --json`. Never run `yarn npm info` without `--fields`; it can print megabytes.
@@ -35,7 +37,8 @@ Run the repo scripts below with plain `node` (Node strips the types); `yarn tsx`
 - After all changes run `yarn install --mode=update-lockfile`, then `yarn dedupe --check`. If dedupe wants changes, run `yarn dedupe` and re-check which packages moved.
 - LavaMoat policies and `lavamoat.allowScripts` are repaired by later steps; do not run `yarn lavamoat:auto`.
 - Never call a production moderate-or-higher advisory unfixable just because the parent pins an old version: check whether the vulnerable code exists in the installed copy, whether it runs at runtime, and whether a scoped resolution (`<parent>/<child>`) fixes only that parent. If it is still unfixable, say so plainly; a human decides (never add an `npmAuditIgnoreAdvisories` entry).
-- Resolution fixes that cross a major version, or ESM-only fixes for CommonJS parents (Jest cannot `require()` ESM), must be flagged with the risk.
+- Major versions: for a dev-only package, apply a fix that crosses a major version (a parent upgrade, a resolution, or a re-created `patch:`) as its own candidate. Check it with `yarn install --mode=update-lockfile`, the churn guard and a re-audit, keep it when it fixes the advisory without breaking those, and flag it under "Risks for the reviewer" with the old and new versions. CI decides whether it breaks anything. For a production package, do not apply a major-crossing fix: put the exact candidate (command and versions) under C.
+- ESM-only fixes for CommonJS parents (Jest cannot `require()` ESM) must be flagged with the risk.
 
 ## Report
 
@@ -54,4 +57,4 @@ Write `.tmp/audit-autofix/agent-report.md` in this shape, in plain Markdown, wit
 ### Risks for the reviewer
 ```
 
-If you changed nothing because nothing is fixable, still write the report and leave the files untouched.
+Every item under C names, for each of steps 1 to 3, the command you ran and why it did not work. If you changed nothing because nothing is fixable, still write the report and leave the files untouched.
