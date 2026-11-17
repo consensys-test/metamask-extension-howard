@@ -28,8 +28,10 @@ Keep `resolutions` tidy: all keys of one package (every descriptor, scoped `pare
 
 ## Tools you must use
 
-- Age gate: if `npmMinimalAgeGate` quarantines a fix (`YN0016 ... quarantined`), wrap the Yarn command: `AGE_GATE_BYPASS_LOG=.tmp/audit-autofix/bypassed.txt yarn tsx .github/scripts/age-gate-bypass.mts --allow <pkg>[,<pkg>] -- <yarn command>`. It never edits `.yarnrc.yml`. If it needs more than the fix's own packages, stop and report that advisory as category C.
-- Lockfile churn: write only the packages you deliberately fix or upgrade, one per line, to `.tmp/audit-autofix/targets.txt`. Do not add incidental children just to make the guard pass. Save the original lockfile with `git show HEAD:yarn.lock > .tmp/audit-autofix/yarn.base.lock`, then run `yarn tsx .github/scripts/lockfile-churn-guard.mts --before .tmp/audit-autofix/yarn.base.lock --after yarn.lock --targets "$(paste -sd, .tmp/audit-autofix/targets.txt)"`. Run it after each candidate and again after the final install and dedupe. If it fails, narrow or roll back that candidate while preserving the accepted fixes, remove its target, and try the next fix strategy. Do not hand off a failing guard as a reviewer risk: keep the clean subset and report rejected candidates under category C. A devDependency upgrade can also change production packages through shared transitive dependencies.
+Run the repo scripts below with plain `node` (Node strips the types); `yarn tsx` fails in this sandbox.
+
+- Age gate: if `npmMinimalAgeGate` quarantines a fix (`YN0016 ... quarantined`), wrap the Yarn command: `AGE_GATE_BYPASS_LOG=.tmp/audit-autofix/bypassed.txt node .github/scripts/age-gate-bypass.mts --allow <pkg>[,<pkg>] -- <yarn command>`. It never edits `.yarnrc.yml`. If it needs more than the fix's own packages, stop and report that advisory as category C.
+- Lockfile churn: write only the packages you deliberately fix or upgrade, one per line, to `.tmp/audit-autofix/targets.txt`. Packages that a target depends on (its children, transitively) may move; the guard lists them as "moved with targets" and the PR body shows them, so do not add them to the targets file. Other production changes, such as a package no target depends on, fail the guard. Save the original lockfile with `git show HEAD:yarn.lock > .tmp/audit-autofix/yarn.base.lock`, then run `node .github/scripts/lockfile-churn-guard.mts --before .tmp/audit-autofix/yarn.base.lock --after yarn.lock --targets "$(paste -sd, .tmp/audit-autofix/targets.txt)"`. Run it after each candidate and again after the final install and dedupe. If it fails, narrow or roll back that candidate while preserving the accepted fixes, remove its target, and try the next fix strategy. Do not hand off a failing guard as a reviewer risk: keep the clean subset and report rejected candidates under category C. A devDependency upgrade can also change production packages through shared transitive dependencies.
 - After all changes run `yarn install --mode=update-lockfile`, then `yarn dedupe --check`. If dedupe wants changes, run `yarn dedupe` and re-check which packages moved.
 - LavaMoat policies and `lavamoat.allowScripts` are repaired by later steps; do not run `yarn lavamoat:auto`.
 - Never call a production moderate-or-higher advisory unfixable just because the parent pins an old version: check whether the vulnerable code exists in the installed copy, whether it runs at runtime, and whether a scoped resolution (`<parent>/<child>`) fixes only that parent. If it is still unfixable, say so plainly; a human decides (never add an `npmAuditIgnoreAdvisories` entry).
@@ -40,7 +42,7 @@ Keep `resolutions` tidy: all keys of one package (every descriptor, scoped `pare
 Write `.tmp/audit-autofix/agent-report.md` in this shape, in plain Markdown, with no issue-closing keywords (`Closes`, `Fixes`, `Resolves`; the workflow adds the real `Closes:` lines):
 
 ```
-**Result:** <one line: how many advisories fixed, how many remain>
+**Result:** <one line: "N advisory packages fixed, M left", counting packages, not GHSA ids>
 
 ### A. Already resolved
 ### B. Fixed in this change

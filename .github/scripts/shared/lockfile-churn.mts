@@ -12,6 +12,12 @@ export type PackageChange = {
   targeted: boolean;
   /** True when the package is reachable from the root `dependencies` (it ships in the extension). */
   production: boolean;
+  /** True when a targeted package depends on it, directly or transitively, in the new lockfile. */
+  reachable: boolean;
+  /** True when a major version appeared that the package did not have before. */
+  majorJump: boolean;
+  /** True when the package already existed and now resolves to more versions. */
+  extraVersion: boolean;
 };
 
 const unquote = (text: string): string => text.replace(/^"(.*)"$/u, '$1');
@@ -114,6 +120,46 @@ export function productionPackages(
   return new Set([...seen].map((entry) => entry.name));
 }
 
+/**
+ * Names of every package a target depends on, directly or transitively, in
+ * the given lockfile. Descriptors that no entry lists fall back to the name.
+ */
+export function reachableFromTargets(
+  entries: LockEntry[],
+  targets: ReadonlySet<string>,
+): Set<string> {
+  const byDescriptor = new Map<string, LockEntry[]>();
+  const byName = new Map<string, LockEntry[]>();
+  for (const entry of entries) {
+    byName.set(entry.name, [...(byName.get(entry.name) ?? []), entry]);
+    for (const descriptor of entry.descriptors) {
+      byDescriptor.set(descriptor, [
+        ...(byDescriptor.get(descriptor) ?? []),
+        entry,
+      ]);
+    }
+  }
+
+  const seen = new Set<LockEntry>();
+  const queue = entries.filter((entry) => targets.has(entry.name));
+  while (queue.length > 0) {
+    const entry = queue.pop() as LockEntry;
+    if (seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    for (const [name, range] of Object.entries(entry.dependencies)) {
+      queue.push(
+        ...(byDescriptor.get(`${name}@${range}`) ?? byName.get(name) ?? []),
+      );
+    }
+  }
+
+  return new Set([...seen].map((entry) => entry.name));
+}
+
+const majorOf = (version: string): string => version.split('.')[0];
+
 function versionsByName(entries: LockEntry[]): Map<string, string[]> {
   const versions = new Map<string, Set<string>>();
   for (const { name, version } of entries) {
@@ -139,6 +185,7 @@ export function computeChurn({
   const beforeVersions = versionsByName(before);
   const afterVersions = versionsByName(after);
   const production = productionPackages(after, rootDependencies);
+  const reachable = reachableFromTargets(after, targets);
   const changes: PackageChange[] = [];
 
   for (const name of new Set([
@@ -154,6 +201,14 @@ export function computeChurn({
         after: next,
         targeted: targets.has(name),
         production: production.has(name),
+        reachable: reachable.has(name),
+        majorJump:
+          previous.length > 0 &&
+          next.some(
+            (version) =>
+              !previous.some((old) => majorOf(old) === majorOf(version)),
+          ),
+        extraVersion: previous.length > 0 && next.length > previous.length,
       });
     }
   }
@@ -161,7 +216,16 @@ export function computeChurn({
   return changes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Changes the fix did not aim for that also ship in the extension. */
+/** Changes that ship in the extension and that no targeted package explains. */
 export function riskyChanges(changes: PackageChange[]): PackageChange[] {
-  return changes.filter((change) => !change.targeted && change.production);
+  return changes.filter(
+    (change) => !change.targeted && !change.reachable && change.production,
+  );
+}
+
+/** Production packages that moved only because a targeted package depends on them. */
+export function movedWithTargets(changes: PackageChange[]): PackageChange[] {
+  return changes.filter(
+    (change) => !change.targeted && change.reachable && change.production,
+  );
 }
