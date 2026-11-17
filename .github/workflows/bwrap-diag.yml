@@ -1,0 +1,52 @@
+name: bwrap-diag
+
+on:
+  push:
+    branches:
+      - trigger-ci-bwrap-diag
+
+permissions:
+  contents: read
+
+env:
+  MODEL: claude-sonnet-5-5
+  ANTHROPIC_BASE_URL: https://litellm.consensys.info
+
+jobs:
+  diag:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        run: |
+          sudo apt-get install -y bubblewrap socat
+          npm install -g @anthropic-ai/claude-code@2.1.323
+          sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict
+          sudo rm /etc/apparmor.d/bwrap-userns-restrict
+          sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOT'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOT
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          mkdir -p ~/.cache ~/.yarn ~/.npm ~/.config ~/.ssh
+          ls -la package.json README.md
+
+      - name: Write key file
+        env:
+          KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/k"
+          printf '%s' "$KEY" > "$RUNNER_TEMP/k"
+
+      - name: V6 apiKeyHelper, no scrub, denyRead key
+        run: |
+          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg k "$RUNNER_TEMP/k" '{apiKeyHelper: ("cat " + $k), sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {allowWrite: [$ws], denyRead: [$k]}}}')
+          claude -p 'Run exactly this one shell command and reply with its full output: for f in package.json yarn.lock README.md; do (echo x >> $f) 2>&1 && echo "$f WRITABLE" || echo "$f READONLY"; done; echo "ENV: $(env | grep -c -iE "ANTHROPIC_AUTH|LITELLM")"; echo "KEYFILE: $(cat $RUNNER_TEMP/k 2>&1 | head -c 8)"; git checkout -q -- .' --model "$MODEL" --settings "$settings" --allowedTools Bash --max-turns 3 --output-format json | jq -r '.result'
