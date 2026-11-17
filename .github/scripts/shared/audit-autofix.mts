@@ -101,6 +101,7 @@ export function buildPrBody(input: PrBodyInput): string {
       ? ['- Resolutions added, each tested by removing it:']
       : []),
     ...input.necessityLines.map((line) => `  ${line}`),
+    "- Not run by the workflow: unit and E2E tests, builds, and `yarn lavamoat:auto`. CI decides, and later steps apply CI's LavaMoat policy diff.",
   ];
 
   return [

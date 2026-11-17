@@ -21,7 +21,10 @@ function argValue(name: string): string | undefined {
 }
 
 function fetchOpenAuditIssues(): IssueInput[] {
-  const repo = process.env.GITHUB_REPOSITORY ?? 'MetaMask/metamask-extension';
+  const repo =
+    process.env.ISSUES_REPO ||
+    process.env.GITHUB_REPOSITORY ||
+    'MetaMask/metamask-extension';
   const output = ghApi(`/repos/${repo}/issues?state=open&per_page=100`, {
     paginate: true,
     jq: `.[] | select(.pull_request == null) | select(.title | startswith("${ISSUE_TITLE_PREFIX}")) | {number, body}`,
