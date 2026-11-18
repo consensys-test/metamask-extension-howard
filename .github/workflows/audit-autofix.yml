@@ -159,7 +159,8 @@ jobs:
         run: |
           git show HEAD:package.json > "$WORK_DIR/package.base.json"
           git show HEAD:yarn.lock > "$WORK_DIR/yarn.base.lock"
-          yarn install --mode=skip-build
+          # Fails when the agent moved a package to a path allowScripts has no entry for; the next command adds it.
+          yarn install --mode=skip-build || true
           yarn allow-scripts auto
           code=0
           yarn tsx .github/scripts/allow-scripts-reconcile.mts \
