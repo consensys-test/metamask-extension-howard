@@ -35,7 +35,7 @@ env:
   MODEL: claude-sonnet-5-5
   CLAUDE_CODE_VERSION: 2.1.323
   # TEMPORARY (2/2): once the push trigger is gone this is just `inputs.dry-run`.
-  DRY_RUN: ${{ github.event_name == 'push' || inputs.dry-run }}
+  DRY_RUN: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '[publish]') || inputs.dry-run }}
   WORK_DIR: .tmp/audit-autofix
   # TEMPORARY (2/2): the bot issues live upstream, so push-triggered fork runs read them from there.
   # Once the push trigger is gone this is just `github.repository`.
