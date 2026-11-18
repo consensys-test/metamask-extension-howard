@@ -144,6 +144,7 @@ function body(): void {
       readJson<unknown[]>(`${DIR}/audit-after.json`)?.length ?? 0,
     necessityLines: readText(`${DIR}/necessity.md`).split('\n').filter(Boolean),
     churnLines: readText(`${DIR}/churn.md`).split('\n').filter(Boolean),
+    deadPinLines: readText(`${DIR}/dead-pins.md`).split('\n').filter(Boolean),
     ageGateBypassed: [...new Set(bypassed)],
     costUsd: cost,
   });

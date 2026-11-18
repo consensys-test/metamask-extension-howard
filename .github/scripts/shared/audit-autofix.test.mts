@@ -85,6 +85,7 @@ describe('buildPrBody', () => {
     advisoriesBefore: 5,
     advisoriesAfter: 2,
     necessityLines: ['- `a@npm:^1` -> `^2`: needed.'],
+    deadPinLines: [],
     churnLines: ['- child: 1.0.0 -> 2.0.0 [production] [major jump]'],
     ageGateBypassed: ['dompurify'],
     costUsd: 1.234,
@@ -105,6 +106,26 @@ describe('buildPrBody', () => {
 
   it('does not let the agent report add closing keywords', () => {
     expect(body).not.toContain('#99');
+  });
+
+  it('lists removed dead pins only when there are some', () => {
+    const input = {
+      runUrl: 'u',
+      closes: '',
+      report: 'r',
+      advisoriesBefore: 1,
+      advisoriesAfter: 0,
+      necessityLines: [],
+      churnLines: [],
+      ageGateBypassed: [],
+      costUsd: undefined,
+    };
+    expect(buildPrBody({ ...input, deadPinLines: [] })).not.toContain(
+      'Cleaned up',
+    );
+    expect(
+      buildPrBody({ ...input, deadPinLines: ['- Removed dead pin `a`.'] }),
+    ).toContain('  - Removed dead pin `a`.');
   });
 });
 
