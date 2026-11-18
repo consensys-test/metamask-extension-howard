@@ -5,17 +5,13 @@
 //
 // Usage: yarn tsx .github/scripts/allow-scripts-reconcile.mts --base <package.json> --auto <package.json> --before <yarn.lock> --after <yarn.lock> [--out <file>]
 import { readFileSync, writeFileSync } from 'node:fs';
+import { argValue } from './shared/cli.mts';
 import { computeChurn, parseLockfile } from './shared/lockfile-churn.mts';
 import {
   reconcileAllowScripts,
   type AllowScripts,
   type AllowScriptsChange,
 } from './shared/allow-scripts-reconcile.mts';
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
 
 function required(name: string): string {
   const value = argValue(name);
