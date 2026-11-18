@@ -192,6 +192,10 @@ jobs:
           yarn install --immutable --mode=skip-build
           yarn dedupe --check
 
+      - name: Smoke-test the lint and dependency tooling
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: yarn tsx .github/scripts/tooling-smoke.mts
+
       - name: Check lockfile churn and resolutions
         if: ${{ steps.gate.outputs.changed == 'true' }}
         run: |
