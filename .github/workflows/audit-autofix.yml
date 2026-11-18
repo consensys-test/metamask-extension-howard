@@ -155,6 +155,12 @@ jobs:
           echo "gate exit code: $code"
           [ "$code" = 0 ] || [ "$code" = 3 ]
 
+      - name: Save the base files
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: |
+          git show HEAD:package.json > "$WORK_DIR/package.base.json"
+          git show HEAD:yarn.lock > "$WORK_DIR/yarn.base.lock"
+
       - name: Remove dead pins and unused patches
         if: ${{ steps.gate.outputs.changed == 'true' }}
         run: yarn tsx .github/scripts/prune-dead-pins.mts --out "$WORK_DIR/dead-pins.md"
@@ -167,8 +173,6 @@ jobs:
         id: verify
         if: ${{ steps.gate.outputs.changed == 'true' }}
         run: |
-          git show HEAD:package.json > "$WORK_DIR/package.base.json"
-          git show HEAD:yarn.lock > "$WORK_DIR/yarn.base.lock"
           # Fails when the agent moved a package to a path allowScripts has no entry for; the next command adds it.
           yarn install --mode=skip-build || true
           yarn allow-scripts auto
