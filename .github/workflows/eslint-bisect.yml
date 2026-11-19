@@ -1,0 +1,59 @@
+name: ESLint memory bisect (fork only)
+
+# TEMPORARY (1/1): narrows which audit-autofix change makes `yarn lint:eslint` run out of memory.
+# Remove with the trigger-ci-eslint-bisect branch once the cause is known.
+
+on:
+  push:
+    branches:
+      - trigger-ci-eslint-bisect
+
+permissions:
+  contents: read
+
+jobs:
+  eslint:
+    name: eslint (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - as-is
+          - typescript-eslint-8.62.0
+          - import-x-4.17.0
+          - no-minimatch-9-resolution
+    steps:
+      - uses: MetaMask/action-checkout-and-setup@v3
+        with:
+          is-high-risk-environment: false
+          skip-allow-scripts: true
+
+      - name: Apply the variant and reinstall
+        if: ${{ matrix.variant != 'as-is' }}
+        env:
+          VARIANT: ${{ matrix.variant }}
+          YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const r = pkg.resolutions;
+            const v = process.env.VARIANT;
+            if (v === "typescript-eslint-8.62.0") {
+              for (const n of ["typescript-eslint", "parser", "eslint-plugin", "project-service", "scope-manager", "tsconfig-utils", "type-utils", "types", "utils", "visitor-keys"]) {
+                r[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = "8.62.0";
+              }
+            } else if (v === "import-x-4.17.0") {
+              r["eslint-plugin-import-x"] = "4.17.0";
+            } else if (v === "no-minimatch-9-resolution") {
+              delete r["minimatch@npm:^9.0.4"];
+            }
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+          yarn install --mode=skip-build
+          for p in @typescript-eslint/parser eslint-plugin-import-x; do yarn why "$p" | head -3; done
+
+      - name: Lint with ESLint
+        run: yarn lint:eslint
