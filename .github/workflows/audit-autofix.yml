@@ -39,7 +39,7 @@ env:
   WORK_DIR: .tmp/audit-autofix
   # TEMPORARY (2/2): the bot issues live upstream, so push-triggered fork runs read them from there.
   # Once the push trigger is gone this is just `github.repository`.
-  ISSUES_REPO: ${{ github.event_name == 'push' && 'MetaMask/metamask-extension' || github.repository }}
+  ISSUES_REPO: MetaMask/metamask-extension
 
 jobs:
   fix:
