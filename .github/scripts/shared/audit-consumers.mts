@@ -234,6 +234,8 @@ export type ConsumerSection = {
   pkg: string;
   vulnerable: string[];
   safeLines: Fix[];
+  /** Unaffected versions of the package that `yarn.lock` already holds. */
+  installedSafe: string[];
   rows: ConsumerRow[];
 };
 
@@ -265,6 +267,12 @@ export function renderConsumerReport(
       `## ${section.pkg}`,
       '',
       `Affected: ${section.vulnerable.join(' | ')}`,
+      '',
+      `Unaffected versions already in \`yarn.lock\` (prefer one of these for a resolution, so no extra version is added): ${
+        section.installedSafe.length === 0
+          ? 'none'
+          : section.installedSafe.join(', ')
+      }`,
       '',
       `Release lines of \`${section.pkg}\` the advisory does not cover (newest each): ${
         section.safeLines.length === 0

@@ -11,6 +11,7 @@ import type { ParsedAdvisory } from './shared/audit-utils.mts';
 import {
   findBlockers,
   findConsumers,
+  isVulnerable,
   newestSafeInRange,
   parentFixes,
   renderConsumerReport,
@@ -160,9 +161,13 @@ for (const pkg of watched) {
     .map((entry) => entry.version)
     .filter((version) => semver.valid(version));
   const lines = pkgInfo ? safeLines(pkgInfo, vulnerable, clock) : [];
+  const installedSafe = [...new Set(installed)]
+    .filter((version) => !isVulnerable(version, vulnerable))
+    .sort(semver.compare);
   sections.push({
     pkg,
     vulnerable,
+    installedSafe,
     safeLines: lines.filter(
       (fix, index) =>
         index >= lines.length - 3 ||
