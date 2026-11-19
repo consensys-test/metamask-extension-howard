@@ -49,16 +49,7 @@ jobs:
           '
           yarn install --mode=skip-build
 
-      - name: Which minimatch each typescript-estree uses
-        run: yarn why minimatch --recursive | grep -E -B1 -A3 "typescript-estree" | head -40
-
-      - name: Dedupe check
-        continue-on-error: true
-        run: yarn dedupe --check
-
-      - name: Lint with ESLint under the repo heap limit
-        continue-on-error: true
-        run: /usr/bin/time -v yarn lint:eslint 2> >(tee time.log >&2) ; grep -E "Maximum resident|Elapsed" time.log
-
-      - name: Type check
-        run: yarn lint:tsc
+      - name: Show the typescript-estree lockfile entries
+        run: |
+          grep -n -A22 '^"@typescript-eslint/typescript-estree@npm:8.62.0' yarn.lock | grep -E "typescript-estree|version:|minimatch"
+          grep -n -E '^"minimatch@' yarn.lock | head
