@@ -20,9 +20,11 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - typescript-eslint-8.72.2
-          - typescript-eslint-8.70.1
-          - typescript-eslint-8.66.0
+          - typescript-eslint-8.71.0
+          - typescript-eslint-8.71.1
+          - typescript-eslint-8.71.2
+          - typescript-eslint-8.72.0
+          - typescript-eslint-8.72.1
     steps:
       - uses: MetaMask/action-checkout-and-setup@v3
         with:
