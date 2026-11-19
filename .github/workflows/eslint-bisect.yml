@@ -20,37 +20,44 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - typescript-eslint-8.71.0
-          - typescript-eslint-8.71.1
-          - typescript-eslint-8.71.2
-          - typescript-eslint-8.72.0
-          - typescript-eslint-8.72.1
+          - as-is-heap-12288
+          - as-is-heap-14336
+          - typescript-eslint-8.70.1-measure
     steps:
       - uses: MetaMask/action-checkout-and-setup@v3
         with:
           is-high-risk-environment: false
           skip-allow-scripts: true
 
-      - name: Apply the variant and reinstall
+      - name: Runner size
+        run: |
+          free -m
+          nproc
+
+      - name: Pin typescript-eslint for the measure variant
+        if: ${{ endsWith(matrix.variant, '-measure') }}
         env:
-          VARIANT: ${{ matrix.variant }}
           YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
         run: |
           node -e '
             const fs = require("fs");
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-            const r = pkg.resolutions;
-            const v = process.env.VARIANT;
-            if (v.startsWith("typescript-eslint-")) {
-              const ver = v.slice("typescript-eslint-".length);
-              for (const n of ["typescript-eslint", "parser", "eslint-plugin", "project-service", "scope-manager", "tsconfig-utils", "type-utils", "types", "utils", "visitor-keys"]) {
-                r[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = ver;
-              }
+            for (const n of ["typescript-eslint", "parser", "eslint-plugin", "project-service", "scope-manager", "tsconfig-utils", "type-utils", "types", "utils", "visitor-keys"]) {
+              pkg.resolutions[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = "8.70.1";
             }
             fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
           '
           yarn install --mode=skip-build
-          for p in @typescript-eslint/parser eslint-plugin-import-x; do yarn why "$p" | head -3; done
 
-      - name: Lint with ESLint
-        run: yarn lint:eslint
+      - name: Lint with a larger heap
+        if: ${{ startsWith(matrix.variant, 'as-is-heap-') }}
+        env:
+          HEAP_MB: ${{ endsWith(matrix.variant, '14336') && '14336' || '12288' }}
+        run: |
+          NODE_OPTIONS="--max-old-space-size=${HEAP_MB}" /usr/bin/time -v yarn eslint . -c ./.eslintrc.js --ext js,ts,tsx,snap 2> >(tee time.log >&2)
+
+      - name: Lint with the repo script and measure peak memory
+        if: ${{ endsWith(matrix.variant, '-measure') }}
+        run: |
+          /usr/bin/time -v yarn lint:eslint 2> >(tee time.log >&2) || true
+          grep -E "Maximum resident|Elapsed" time.log
