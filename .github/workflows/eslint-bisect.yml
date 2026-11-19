@@ -20,10 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - as-is
-          - typescript-eslint-8.62.0
-          - import-x-4.17.0
-          - no-minimatch-9-resolution
+          - typescript-eslint-8.72.2
+          - typescript-eslint-8.70.1
+          - typescript-eslint-8.66.0
     steps:
       - uses: MetaMask/action-checkout-and-setup@v3
         with:
@@ -31,7 +30,6 @@ jobs:
           skip-allow-scripts: true
 
       - name: Apply the variant and reinstall
-        if: ${{ matrix.variant != 'as-is' }}
         env:
           VARIANT: ${{ matrix.variant }}
           YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
@@ -41,14 +39,11 @@ jobs:
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
             const r = pkg.resolutions;
             const v = process.env.VARIANT;
-            if (v === "typescript-eslint-8.62.0") {
+            if (v.startsWith("typescript-eslint-")) {
+              const ver = v.slice("typescript-eslint-".length);
               for (const n of ["typescript-eslint", "parser", "eslint-plugin", "project-service", "scope-manager", "tsconfig-utils", "type-utils", "types", "utils", "visitor-keys"]) {
-                r[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = "8.62.0";
+                r[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = ver;
               }
-            } else if (v === "import-x-4.17.0") {
-              r["eslint-plugin-import-x"] = "4.17.0";
-            } else if (v === "no-minimatch-9-resolution") {
-              delete r["minimatch@npm:^9.0.4"];
             }
             fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
           '
