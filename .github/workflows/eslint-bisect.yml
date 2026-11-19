@@ -1,7 +1,7 @@
 name: ESLint memory bisect (fork only)
 
-# TEMPORARY (1/1): narrows which audit-autofix change makes `yarn lint:eslint` run out of memory.
-# Remove with the trigger-ci-eslint-bisect branch once the cause is known.
+# TEMPORARY (1/1): checks a parent-scoped minimatch resolution on the audit tree instead of the
+# typescript-eslint 8.73.0 bump. Remove with the trigger-ci-eslint-bisect branch.
 
 on:
   push:
@@ -12,52 +12,53 @@ permissions:
   contents: read
 
 jobs:
-  eslint:
-    name: eslint (${{ matrix.variant }})
+  scoped:
+    name: scoped resolution (${{ matrix.variant }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         variant:
-          - as-is-heap-12288
-          - as-is-heap-14336
-          - typescript-eslint-8.70.1-measure
+          - name-only
+          - with-ranges
     steps:
       - uses: MetaMask/action-checkout-and-setup@v3
         with:
           is-high-risk-environment: false
           skip-allow-scripts: true
 
-      - name: Runner size
-        run: |
-          free -m
-          nproc
-
-      - name: Pin typescript-eslint for the measure variant
-        if: ${{ endsWith(matrix.variant, '-measure') }}
+      - name: Pin typescript-eslint to 8.62.0 and scope the minimatch fix
         env:
+          VARIANT: ${{ matrix.variant }}
           YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
         run: |
           node -e '
             const fs = require("fs");
             const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const r = pkg.resolutions;
             for (const n of ["typescript-eslint", "parser", "eslint-plugin", "project-service", "scope-manager", "tsconfig-utils", "type-utils", "types", "utils", "visitor-keys"]) {
-              pkg.resolutions[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = "8.70.1";
+              r[n === "typescript-eslint" ? n : "@typescript-eslint/" + n] = "8.62.0";
+            }
+            if (process.env.VARIANT === "name-only") {
+              r["@typescript-eslint/typescript-estree/minimatch"] = "11.0.8";
+            } else {
+              r["@typescript-eslint/typescript-estree@npm:8.62.0/minimatch@npm:^10.2.2"] = "11.0.8";
             }
             fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
           '
           yarn install --mode=skip-build
 
-      - name: Lint with a larger heap
-        if: ${{ startsWith(matrix.variant, 'as-is-heap-') }}
-        env:
-          HEAP_MB: ${{ endsWith(matrix.variant, '14336') && '14336' || '12288' }}
-        run: |
-          NODE_OPTIONS="--max-old-space-size=${HEAP_MB}" /usr/bin/time -v yarn eslint . -c ./.eslintrc.js --ext js,ts,tsx,snap 2> >(tee time.log >&2)
+      - name: Which minimatch each typescript-estree uses
+        run: yarn why minimatch --recursive | grep -E -B1 -A3 "typescript-estree" | head -40
 
-      - name: Lint with the repo script and measure peak memory
-        if: ${{ endsWith(matrix.variant, '-measure') }}
-        run: |
-          /usr/bin/time -v yarn lint:eslint 2> >(tee time.log >&2) || true
-          grep -E "Maximum resident|Elapsed" time.log
+      - name: Dedupe check
+        continue-on-error: true
+        run: yarn dedupe --check
+
+      - name: Lint with ESLint under the repo heap limit
+        continue-on-error: true
+        run: /usr/bin/time -v yarn lint:eslint 2> >(tee time.log >&2) ; grep -E "Maximum resident|Elapsed" time.log
+
+      - name: Type check
+        run: yarn lint:tsc
