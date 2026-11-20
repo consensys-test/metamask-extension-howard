@@ -10,9 +10,9 @@ You are fixing Yarn audit advisories in the MetaMask Browser Extension repositor
 
 Only `package.json`, `yarn.lock`, `.yarn/patches/**` and `lavamoat/webpack/**/policy.json`. A script rejects the run if anything else changed. Never edit `.yarnrc.yml` (not `npmAuditIgnoreAdvisories`, not `npmPreapprovedPackages`), never skip or disable tests, never bump the app version, never commit or push. Restore the files (`git checkout package.json yarn.lock`) between experiments so each candidate is measured alone.
 
-## Electron, `extract-zip`, `bigint-buffer`, `deepmerge`
+## `bigint-buffer`
 
-Report only. Run `yarn why electron` and confirm the chain `metamask-crx -> react-devtools -> electron`; group all Electron advisories into one cluster (count, installed version, highest fixed version) under category C. Do not change anything for them.
+Report only, and only if it is in `audit-before.json`. It has no patched release: try the steps below once to confirm, and group it under category C when nothing works. Electron, `extract-zip` and `deepmerge` no longer occur in `yarn.lock`; do not investigate them.
 
 ## Fix order (per advisory package: stop at the first step that works)
 
