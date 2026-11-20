@@ -122,12 +122,17 @@ jobs:
           real_yarn=$(command -v yarn)
           printf '#!/usr/bin/env bash\nexport YARN_HTTP_PROXY="${YARN_HTTP_PROXY:-$HTTP_PROXY}" YARN_HTTPS_PROXY="${YARN_HTTPS_PROXY:-$HTTPS_PROXY}"\nexec %s "$@"\n' "$real_yarn" > ~/agent-bin/yarn
           chmod +x ~/agent-bin/yarn
-          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" --arg key "$RUNNER_TEMP/gateway-key" '{apiKeyHelper: ("cat " + $key), sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyRead: [$key], denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
-          code=0
+          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" --arg key "$RUNNER_TEMP/gateway-key" '{apiKeyHelper: ("cat " + $key), showThinkingSummaries: true, sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyRead: [$key], denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
+          # The pipe prints thinking, messages and commands to the live log; the transcript keeps everything.
+          set +e
           PATH="$HOME/agent-bin:$PATH" claude -p "$(cat .github/audit-autofix/prompt.md)" \
             --model "$MODEL" --settings "$settings" \
             --allowedTools 'Bash,Read,Edit,Write,Glob,Grep' \
-            --max-turns 120 --output-format stream-json --verbose > "$WORK_DIR/claude-transcript.jsonl" || code=$?
+            --max-turns 120 --output-format stream-json --verbose \
+            | tee "$WORK_DIR/claude-transcript.jsonl" \
+            | jq -R --unbuffered -r -f .github/audit-autofix/progress.jq
+          code=${PIPESTATUS[0]}
+          set -e
           jq -c 'select(.type == "result")' "$WORK_DIR/claude-transcript.jsonl" | tail -n 1 > "$WORK_DIR/claude-run.json"
           exit "$code"
 
