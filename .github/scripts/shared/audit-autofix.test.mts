@@ -96,7 +96,9 @@ describe('buildPrBody', () => {
     expect(body).toContain('5 before, 2 after');
     expect(body).toContain('bypassed for: dompurify');
     expect(body).toContain('**LLM spend:** approximately $1.23');
-    expect(body.indexOf('LLM spend')).toBeLessThan(body.indexOf('### Evidence'));
+    expect(body.indexOf('LLM spend')).toBeLessThan(
+      body.indexOf('### Evidence'),
+    );
     expect(body).toContain('  - `a@npm:^1` -> `^2`: needed.');
     expect(body).toContain(
       '  - child: 1.0.0 -> 2.0.0 [production] [major jump]',

@@ -1,3 +1,4 @@
+import type { LockEntry } from './lockfile-churn.mts';
 import {
   addedResolutions,
   returnedAdvisories,
@@ -57,7 +58,7 @@ describe('returnedAdvisories', () => {
 
 describe('parentsOf', () => {
   it('finds lockfile entries that depend on the package', () => {
-    const entries = [
+    const entries: LockEntry[] = [
       {
         name: 'got',
         version: '9.6.0',
