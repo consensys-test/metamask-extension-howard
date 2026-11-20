@@ -96,6 +96,7 @@ describe('buildPrBody', () => {
     expect(body).toContain('$1.23');
     expect(body).toContain('  - `a@npm:^1` -> `^2`: needed.');
     expect(body).toContain('CHANGELOG entry: null');
+    expect(body).toContain('Not run by the workflow');
   });
 
   it('does not let the agent report add closing keywords', () => {
