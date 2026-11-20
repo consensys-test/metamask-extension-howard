@@ -5,9 +5,14 @@
 //          [--attempt 1] [--repairs 0] [--cap 3] [--previous-signature <text>]
 import { argValue } from './shared/cli.mts';
 import { ghApi } from './shared/gh-api.mts';
-import { decideRepair, type FailedJob } from './shared/audit-repair.mts';
+import {
+  decideRepair,
+  LOG_CLASSIFIED_JOB,
+  type FailedJob,
+} from './shared/audit-repair.mts';
 
 type ApiJob = {
+  id: number;
   name: string;
   conclusion: string | null;
   steps?: { name: string; conclusion: string | null }[];
@@ -24,11 +29,25 @@ function failedJobs(repo: string, runId: string, attempt: string): FailedJob[] {
     .map((line) => JSON.parse(line) as ApiJob)
     .filter((job) => job.conclusion === 'failure')
     .map((job) => ({
+      id: job.id,
       name: job.name,
       failedSteps: (job.steps ?? [])
         .filter((step) => step.conclusion === 'failure')
         .map((step) => step.name),
-    }));
+    }))
+    .map((job) => ({ ...job, log: jobLog(repo, job) }));
+}
+
+function jobLog(repo: string, job: FailedJob): string | undefined {
+  if (!LOG_CLASSIFIED_JOB.test(job.name)) {
+    return undefined;
+  }
+  try {
+    return ghApi(`repos/${repo}/actions/jobs/${job.id}/logs`);
+  } catch {
+    // Without the log the job stays in its plain class.
+    return undefined;
+  }
 }
 
 const [command] = process.argv.slice(2);

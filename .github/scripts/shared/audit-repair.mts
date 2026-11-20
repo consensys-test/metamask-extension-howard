@@ -1,4 +1,10 @@
-export type FailedJob = { name: string; failedSteps: string[] };
+export type FailedJob = {
+  name: string;
+  failedSteps: string[];
+  id?: number;
+  /** Whole job log; only fetched for jobs whose class depends on it (the failure text sits before the cleanup lines). */
+  log?: string;
+};
 
 export type FailureKind =
   | 'cascade'
@@ -7,6 +13,7 @@ export type FailureKind =
   | 'lavamoat-policy'
   | 'depcheck'
   | 'lint'
+  | 'lint-heap'
   | 'e2e'
   | 'unit-test'
   | 'build'
@@ -24,7 +31,10 @@ const DETERMINISTIC_ORDER: DeterministicRepair[] = [
   'lavamoat-policy',
 ];
 
-type Rule = { kind: FailureKind; job?: RegExp; step?: RegExp };
+type Rule = { kind: FailureKind; job?: RegExp; step?: RegExp; log?: RegExp };
+
+/** Jobs whose class depends on the log, so the caller fetches it for them. */
+export const LOG_CLASSIFIED_JOB = /^Test lint\b/iu;
 
 // First match wins, so the narrow step rules come before the broad job rules.
 const RULES: Rule[] = [
@@ -37,7 +47,12 @@ const RULES: Rule[] = [
     step: /Check working tree/iu,
   },
   { kind: 'depcheck', step: /depcheck/iu },
-  { kind: 'lint', job: /^Test lint\b/iu },
+  {
+    kind: 'lint-heap',
+    job: LOG_CLASSIFIED_JOB,
+    log: /JavaScript heap out of memory|Reached heap limit/iu,
+  },
+  { kind: 'lint', job: LOG_CLASSIFIED_JOB },
   { kind: 'e2e', job: /\be2e\b/iu },
   { kind: 'unit-test', job: /\b(test-unit|unit|integration|jest)\b/iu },
   { kind: 'build', job: /\bbuild\b/iu },
@@ -48,7 +63,8 @@ export function classifyJob(job: FailedJob): FailureKind {
     const jobMatches = !rule.job || rule.job.test(job.name);
     const stepMatches =
       !rule.step || job.failedSteps.some((step) => rule.step?.test(step));
-    if (jobMatches && stepMatches) {
+    const logMatches = !rule.log || rule.log.test(job.log ?? '');
+    if (jobMatches && stepMatches && logMatches) {
       return rule.kind;
     }
   }
