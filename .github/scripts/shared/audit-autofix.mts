@@ -83,6 +83,8 @@ export type PrBodyInput = {
   advisoriesAfter: number;
   /** One line per added resolution, from `resolution-necessity`. */
   necessityLines: string[];
+  /** Production packages that moved because a targeted package depends on them, from `lockfile-churn-guard`. */
+  churnLines: string[];
   /** Packages whose age gate was bypassed. */
   ageGateBypassed: string[];
   costUsd: number | undefined;
@@ -101,6 +103,12 @@ export function buildPrBody(input: PrBodyInput): string {
       ? ['- Resolutions added, each tested by removing it:']
       : []),
     ...input.necessityLines.map((line) => `  ${line}`),
+    ...(input.churnLines.length > 0
+      ? [
+          '- Production packages that moved with a fix (a targeted package depends on them):',
+        ]
+      : []),
+    ...input.churnLines.map((line) => `  ${line}`),
     "- Not run by the workflow: unit and E2E tests, builds, and `yarn lavamoat:auto`. CI decides, and later steps apply CI's LavaMoat policy diff.",
   ];
 
