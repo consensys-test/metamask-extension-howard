@@ -1,4 +1,8 @@
-import { lintResolutions, parseResolutionKey } from './resolutions-lint.mts';
+import {
+  lintResolutions,
+  parseResolutionKey,
+  sortResolutions,
+} from './resolutions-lint.mts';
 
 describe('parseResolutionKey', () => {
   it.each([
@@ -88,5 +92,50 @@ describe('lintResolutions', () => {
         head: { 'a@2.0.0': 'x', 'a@1.0.0': 'x', 'a@0.5.0': 'new', ws: 'y' },
       }),
     ).toMatchObject([{ packageName: 'a', kind: 'unsorted' }]);
+  });
+});
+
+describe('sortResolutions', () => {
+  it('gathers a touched package into one sorted block at its first key', () => {
+    const head = {
+      'minimatch@npm:^9.0.4': '^11.0.8',
+      'ws@npm:^8.0.0': '^8.21.0',
+      'minimatch@npm:3.1.2': '^3.1.5',
+      'parent/minimatch': '^11.0.8',
+      'minimatch@npm:^7.4.6': '^11.0.8',
+    };
+    expect(Object.keys(sortResolutions({ head }))).toStrictEqual([
+      'minimatch@npm:3.1.2',
+      'minimatch@npm:^7.4.6',
+      'minimatch@npm:^9.0.4',
+      'ws@npm:^8.0.0',
+      'parent/minimatch',
+    ]);
+  });
+
+  it('compares numbers, not text, and puts keys without a version first', () => {
+    const head = { 'a@^10.0.0': '1', a: '2', 'a@^9.0.0': '3' };
+    expect(Object.keys(sortResolutions({ head }))).toStrictEqual([
+      'a',
+      'a@^9.0.0',
+      'a@^10.0.0',
+    ]);
+  });
+
+  it('leaves packages the branch did not touch alone', () => {
+    const base = { 'b@2.0.0': 'x', 'b@1.0.0': 'y', 'c@2.0.0': 'z' };
+    const head = { 'b@2.0.0': 'x', 'b@1.0.0': 'y', 'c@2.0.0': 'new' };
+    expect(Object.keys(sortResolutions({ base, head }))).toStrictEqual([
+      'b@2.0.0',
+      'b@1.0.0',
+      'c@2.0.0',
+    ]);
+  });
+
+  it('produces output the lint accepts', () => {
+    const head = { 'x@^2.0.0': 'a', 'y@1.0.0': 'b', 'x@^1.0.0': 'c' };
+    expect(lintResolutions({ head: sortResolutions({ head }) })).toStrictEqual(
+      [],
+    );
   });
 });

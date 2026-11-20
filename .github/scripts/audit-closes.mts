@@ -4,6 +4,7 @@
 //   --advisories  ParsedAdvisory[] JSON from the audit run on the branch (default: AUDIT_CURRENT_FILE)
 //   --issues      JSON array of { number, body } instead of fetching open issues from GitHub
 import { readFileSync } from 'node:fs';
+import { argValue } from './shared/cli.mts';
 import {
   computeCloses,
   formatClosesMarkdown,
@@ -14,11 +15,6 @@ import { ghApi } from './shared/gh-api.mts';
 
 const ISSUE_TITLE_PREFIX =
   'Yarn Audit: new or newly blocking advisories on main';
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
 
 function fetchOpenAuditIssues(): IssueInput[] {
   const repo =
