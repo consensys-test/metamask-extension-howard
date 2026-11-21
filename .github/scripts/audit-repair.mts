@@ -44,8 +44,11 @@ function jobLog(repo: string, job: FailedJob): string | undefined {
   }
   try {
     return ghApi(`repos/${repo}/actions/jobs/${job.id}/logs`);
-  } catch {
+  } catch (error) {
     // Without the log the job stays in its plain class.
+    console.error(
+      `::warning::No log for ${job.name}: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return undefined;
   }
 }
