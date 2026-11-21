@@ -1,6 +1,7 @@
 import {
   classifyJob,
   decideRepair,
+  needsLog,
   type FailedJob,
   type DecideInput,
 } from './audit-repair.mts';
@@ -90,6 +91,24 @@ describe('classifyJob', () => {
         failedSteps: ['Validate allow-scripts config'],
       }),
     ).toBe('allow-scripts');
+  });
+
+  it('classifies a setup failure by the allowScripts message in its log', () => {
+    const setup = {
+      name: 'Prepare dependencies',
+      failedSteps: ['Checkout and setup environment'],
+    };
+    const log =
+      'detected dependencies without configuration. explicit configuration required.';
+
+    expect(needsLog(setup)).toBe(true);
+    expect(classifyJob({ ...setup, log })).toBe('allow-scripts');
+    expect(classifyJob({ ...setup, log: 'YN0001: network error' })).toBe(
+      'unknown',
+    );
+    expect(needsLog({ name: 'Deploy docs', failedSteps: ['Push'] })).toBe(
+      false,
+    );
   });
 
   it('does not treat another failed LavaMoat step as a policy diff', () => {
