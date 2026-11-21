@@ -11,37 +11,26 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { argValue } from './shared/cli.mts';
-import {
-  buildPreapprovedEnv,
-  parsePreapproved,
-  parseQuarantined,
-} from './shared/age-gate.mts';
+import { parsePreapproved, runWithBypass } from './shared/age-gate.mts';
 
 const MAX_ROUNDS_DEFAULT = 5;
 
-function main(): void {
-  const separator = process.argv.indexOf('--');
-  const [command, ...args] =
-    separator === -1 ? [] : process.argv.slice(separator + 1);
-  if (!command) {
-    throw new Error('Missing command after --');
-  }
+const list = (flag: string): string[] | undefined =>
+  argValue(flag)?.split(',').filter(Boolean);
 
-  const allowed = argValue('--allow')?.split(',').filter(Boolean);
-  const maxRounds = Number(argValue('--max-rounds') ?? MAX_ROUNDS_DEFAULT);
-  const existing = parsePreapproved(readFileSync('.yarnrc.yml', 'utf8'));
-  const bypassed: string[] =
-    argValue('--preapprove')?.split(',').filter(Boolean) ?? [];
+const separator = process.argv.indexOf('--');
+const [command, ...args] =
+  separator === -1 ? [] : process.argv.slice(separator + 1);
+if (!command) {
+  throw new Error('Missing command after --');
+}
 
-  for (let round = 0; round <= maxRounds; round++) {
+const outcome = runWithBypass({
+  run: (preapproved) => {
     const env = { ...process.env };
-    if (bypassed.length > 0) {
-      env.YARN_NPM_PREAPPROVED_PACKAGES = buildPreapprovedEnv(
-        existing,
-        bypassed,
-      );
+    if (preapproved !== undefined) {
+      env.YARN_NPM_PREAPPROVED_PACKAGES = preapproved;
     }
-
     const result = spawnSync(command, args, {
       encoding: 'utf8',
       env,
@@ -50,45 +39,24 @@ function main(): void {
     });
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
+    return result;
+  },
+  existing: parsePreapproved(readFileSync('.yarnrc.yml', 'utf8')),
+  allowed: list('--allow'),
+  preapprove: list('--preapprove'),
+  maxRounds: Number(argValue('--max-rounds') ?? MAX_ROUNDS_DEFAULT),
+  info: (message) => console.log(message),
+  warn: (message) => console.error(message),
+});
 
-    const quarantined = parseQuarantined(`${result.stdout}\n${result.stderr}`);
-    if (result.status === 0 || quarantined.length === 0) {
-      if (bypassed.length > 0) {
-        console.log(`\nAge gate bypassed for: ${bypassed.join(', ')}`);
-        if (result.status === 0 && process.env.AGE_GATE_BYPASS_LOG) {
-          appendFileSync(
-            process.env.AGE_GATE_BYPASS_LOG,
-            `${bypassed.join('\n')}\n`,
-          );
-        }
-      }
-      process.exitCode = result.status ?? 1;
-      return;
-    }
-
-    const refused = allowed
-      ? quarantined.filter((name) => !allowed.includes(name))
-      : [];
-    if (refused.length > 0) {
-      console.error(
-        `\nQuarantined but not allowed to bypass: ${refused.join(', ')}`,
-      );
-      process.exitCode = 2;
-      return;
-    }
-
-    const added = quarantined.filter((name) => !bypassed.includes(name));
-    if (added.length === 0) {
-      console.error('\nStill quarantined after preapproval; stopping.');
-      process.exitCode = 1;
-      return;
-    }
-    bypassed.push(...added);
-    console.log(`\nRetrying with age gate bypassed for: ${added.join(', ')}`);
-  }
-
-  console.error(`\nStill quarantined after ${maxRounds} rounds.`);
-  process.exitCode = 1;
+if (
+  outcome.succeeded &&
+  outcome.bypassed.length > 0 &&
+  process.env.AGE_GATE_BYPASS_LOG
+) {
+  appendFileSync(
+    process.env.AGE_GATE_BYPASS_LOG,
+    `${outcome.bypassed.join('\n')}\n`,
+  );
 }
-
-main();
+process.exitCode = outcome.exitCode;
