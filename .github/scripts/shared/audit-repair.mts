@@ -45,6 +45,8 @@ export const LOG_CLASSIFIED_JOB = /^Test lint\b/iu;
 // First match wins, so the narrow step rules come before the broad job rules.
 const RULES: Rule[] = [
   { kind: 'cascade', job: /\bCI status gate\b|^all-jobs-pass$/iu },
+  // Needs a token exchange that a branch or fork run may lack; no dependency change causes it.
+  { kind: 'cascade', job: /^Publish prerelease\b/iu },
   { kind: 'dedupe', step: /Detect yarn lock deduplications/iu },
   { kind: 'allow-scripts', step: /allow-scripts/iu },
   {
