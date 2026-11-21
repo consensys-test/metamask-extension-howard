@@ -886,7 +886,7 @@
       "eth-lattice-keyring>gridplus-sdk>secp256k1": false,
       "@sentry/cli#2.56.0": true,
       "core-js-pure#3.41.0": true,
-      "core-js-pure#3.49.0": true,
+      "core-js-pure#3.48.0": true,
       "sharp#0.35.3": true,
       "tsx>esbuild#0.28.1": true,
       "ethereumjs-util>ethereum-cryptography>secp256k1#4.0.4": false,
