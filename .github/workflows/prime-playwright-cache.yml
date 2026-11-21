@@ -1,0 +1,36 @@
+name: Prime Playwright cache (fork only)
+
+# Fork only: run-e2e restores `playwright-Linux-<version>-<browsers>` and, on a miss,
+# runs `playwright install`, which is unsupported on ubuntu-26.04. Caches are readable
+# only from the default branch, so this must be dispatched on main.
+# Remove when: the fork's main tracks upstream and has its own caches, or Playwright supports 26.04.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '@playwright/test version in yarn.lock'
+        required: true
+        default: '1.59.1'
+
+permissions:
+  contents: read
+
+jobs:
+  prime:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    steps:
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        id: cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ inputs.version }}-${{ matrix.browser }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          VERSION: ${{ inputs.version }}
+          BROWSER: ${{ matrix.browser }}
+        run: npx --yes "playwright@${VERSION}" install "$BROWSER"
