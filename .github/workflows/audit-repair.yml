@@ -95,6 +95,16 @@ jobs:
             .github/audit-autofix
           persist-credentials: false
 
+      # The planner imports packages from node_modules, so install first. A stale allowScripts entry
+      # fails the install itself; it is judged after the plan.
+      - name: Install the branch
+        run: |
+          if yarn --immutable; then
+            echo "INSTALL_FAILED=false" >> "$GITHUB_ENV"
+          else
+            echo "INSTALL_FAILED=true" >> "$GITHUB_ENV"
+          fi
+
       - name: Find the branch point and earlier repairs
         id: base
         env:
@@ -144,16 +154,17 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install the branch
+      - name: Require a working install
         if: ${{ steps.plan.outputs.action == 'repair' || steps.plan.outputs.action == 'llm' }}
         env:
           STEPS: ${{ steps.plan.outputs.steps }}
         run: |
-          if ! yarn --immutable; then
+          if [ "$INSTALL_FAILED" = true ]; then
             # The allowScripts repair below fixes the entry that broke the install.
             if jq -e 'index("allow-scripts")' <<< "$STEPS" > /dev/null; then
               echo "::warning::The install failed; the allow-scripts repair follows."
             else
+              echo "::error::The install failed and no allow-scripts repair is planned."
               exit 1
             fi
           fi
