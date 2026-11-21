@@ -218,7 +218,8 @@ jobs:
           chmod +x ~/agent-bin/yarn
           settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" --arg key "$RUNNER_TEMP/gateway-key" '{apiKeyHelper: ("cat " + $key), showThinkingSummaries: true, sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyRead: [$key], denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
           set +e
-          PATH="$HOME/agent-bin:$PATH" claude -p "$(cat .tmp/trusted/.github/audit-autofix/repair-prompt.md)" \
+          # The inner limit leaves time for the result file below; the step limit is the outer guard.
+          PATH="$HOME/agent-bin:$PATH" timeout --kill-after=30s 36m claude -p "$(cat .tmp/trusted/.github/audit-autofix/repair-prompt.md)" \
             --model "$MODEL" --settings "$settings" \
             --allowedTools 'Bash,Read,Edit,Write,Glob,Grep' \
             --max-turns 120 --output-format stream-json --verbose \
