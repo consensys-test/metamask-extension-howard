@@ -98,9 +98,6 @@ export function buildPrBody(input: PrBodyInput): string {
     input.ageGateBypassed.length > 0
       ? `- Age gate (\`npmMinimalAgeGate\`) bypassed for: ${input.ageGateBypassed.join(', ')}.`
       : '- Age gate bypassed for: nothing.',
-    input.costUsd === undefined
-      ? '- LLM spend: not reported.'
-      : `- LLM spend in this run: $${input.costUsd.toFixed(2)}.`,
     ...(input.necessityLines.length > 0
       ? ['- Resolutions added, each tested by removing it:']
       : []),
@@ -122,6 +119,11 @@ export function buildPrBody(input: PrBodyInput): string {
     '## **Description**',
     '',
     `This PR was prepared by the [audit autofix workflow](${input.runUrl}), not by a person. It is a draft until a human has reviewed it.`,
+    '',
+    // total_cost_usd is Claude Code's own price-table estimate, not gateway billing.
+    input.costUsd === undefined
+      ? '**LLM spend:** not reported.'
+      : `**LLM spend:** approximately $${input.costUsd.toFixed(2)} (estimated by Claude Code, not the billed amount).`,
     '',
     stripClosingKeywords(input.report).trim(),
     '',
