@@ -42,8 +42,14 @@ function jobLog(repo: string, job: FailedJob): string | undefined {
   if (!LOG_CLASSIFIED_JOB.test(job.name)) {
     return undefined;
   }
+  const path = `repos/${repo}/actions/jobs/${job.id}/logs`;
   try {
-    return ghApi(`repos/${repo}/actions/jobs/${job.id}/logs`);
+    try {
+      return ghApi(path, { allowEscapeSequences: true });
+    } catch {
+      // An older gh does not know the flag.
+      return ghApi(path);
+    }
   } catch (error) {
     // Without the log the job stays in its plain class.
     console.error(

@@ -16,6 +16,8 @@ export type GhApiOptions = {
   jq?: string;
   method?: string;
   body?: Record<string, unknown>;
+  /** Newer gh refuses a response with ANSI escapes (job logs) unless told to pass it. */
+  allowEscapeSequences?: boolean;
 };
 
 /**
@@ -36,6 +38,9 @@ export function ghApi(
   }
   if (opts?.jq) {
     args.push('--jq', opts.jq);
+  }
+  if (opts?.allowEscapeSequences) {
+    args.push('--allow-escape-sequences');
   }
   if (opts?.method) {
     args.push('--method', opts.method);
