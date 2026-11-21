@@ -66,7 +66,9 @@ function select(): void {
     return;
   }
 
-  const issues = ghApi(`/repos/${repo}/issues?state=open&per_page=100`, {
+  // A fork test reads the real bot issues from the upstream repository.
+  const issuesRepo = process.env.ISSUES_REPO || repo;
+  const issues = ghApi(`/repos/${issuesRepo}/issues?state=open&per_page=100`, {
     paginate: true,
     jq: '.[] | select(.pull_request == null) | {number, title, body}',
   })
