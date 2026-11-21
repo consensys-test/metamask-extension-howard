@@ -83,6 +83,8 @@ export type PrBodyInput = {
   advisoriesAfter: number;
   /** One line per added resolution, from `resolution-necessity`. */
   necessityLines: string[];
+  /** Dead pins and unused patches the workflow removed, from `prune-dead-pins`. */
+  deadPinLines: string[];
   /** Production packages that moved because a targeted package depends on them, from `lockfile-churn-guard`. */
   churnLines: string[];
   /** Packages whose age gate was bypassed. */
@@ -103,6 +105,10 @@ export function buildPrBody(input: PrBodyInput): string {
       ? ['- Resolutions added, each tested by removing it:']
       : []),
     ...input.necessityLines.map((line) => `  ${line}`),
+    ...(input.deadPinLines.length > 0
+      ? ['- Cleaned up by the workflow (the lockfile is unchanged by this):']
+      : []),
+    ...input.deadPinLines.map((line) => `  ${line}`),
     ...(input.churnLines.length > 0
       ? [
           '- Production packages that moved with a fix (a targeted package depends on them):',

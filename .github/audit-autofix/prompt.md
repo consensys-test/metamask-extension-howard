@@ -28,6 +28,8 @@ Patched packages (`patch:` descriptors, for example `dompurify`): a new version 
 
 Keep `resolutions` tidy: all keys of one package (every descriptor, scoped `parent/child` keys, `patch:` entries) in one contiguous block next to its existing entries, sorted by ascending version. `yarn patch-commit` appends at the end: move the entry.
 
+Do not remove dead pins or unused `.yarn/patches` files yourself: a later step removes every pin that no dependency matches and every patch nothing references, and checks that `yarn.lock` does not change. Remove a pin only when your own change makes it wrong.
+
 ## Tools you must use
 
 Run the repo scripts below with plain `node` (Node strips the types); `yarn tsx` fails in this sandbox.
