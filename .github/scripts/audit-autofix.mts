@@ -29,6 +29,7 @@ import {
 } from './shared/audit-autofix.mts';
 import { AUDIT_CURRENT_FILE, readAdvisories } from './shared/audit-utils.mts';
 import { ghApi } from './shared/gh-api.mts';
+import { retry } from './shared/utils.mts';
 
 const DIR = '.tmp/audit-autofix';
 const EXIT_NO_CHANGES = 3;
@@ -44,15 +45,20 @@ function readText(file: string): string {
   return existsSync(file) ? readFileSync(file, 'utf8') : '';
 }
 
-function select(): void {
+async function select(): Promise<void> {
   mkdirSync(DIR, { recursive: true });
   const repo = process.env.GITHUB_REPOSITORY ?? 'MetaMask/metamask-extension';
   const prefix = argValue('--existing-pr-head') ?? 'audit-fix/';
 
-  const openPrs = ghApi(`/repos/${repo}/pulls?state=open&per_page=100`, {
-    paginate: true,
-    jq: `.[] | select(.head.ref | startswith("${prefix}")) | "#\\(.number) \\(.head.ref)"`,
-  })
+  // A single GitHub 5xx must not fail the run.
+  const openPrs = (
+    await retry(() =>
+      ghApi(`/repos/${repo}/pulls?state=open&per_page=100`, {
+        paginate: true,
+        jq: `.[] | select(.head.ref | startswith("${prefix}")) | "#\\(.number) \\(.head.ref)"`,
+      }),
+    )
+  )
     .split('\n')
     .filter(Boolean);
   if (openPrs.length > 0) {
@@ -64,10 +70,14 @@ function select(): void {
 
   // A fork test reads the real bot issues from the upstream repository.
   const issuesRepo = process.env.ISSUES_REPO || repo;
-  const issues = ghApi(`/repos/${issuesRepo}/issues?state=open&per_page=100`, {
-    paginate: true,
-    jq: '.[] | select(.pull_request == null) | {number, title, body}',
-  })
+  const issues = (
+    await retry(() =>
+      ghApi(`/repos/${issuesRepo}/issues?state=open&per_page=100`, {
+        paginate: true,
+        jq: '.[] | select(.pull_request == null) | {number, title, body}',
+      }),
+    )
+  )
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as SelectableIssue);
@@ -150,7 +160,7 @@ function body(): void {
 
 const command = process.argv[2];
 if (command === 'select') {
-  select();
+  await select();
 } else if (command === 'gate') {
   gate();
 } else if (command === 'body') {
