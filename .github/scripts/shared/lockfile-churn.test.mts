@@ -1,7 +1,9 @@
 import {
   computeChurn,
   parseLockfile,
+  movedWithTargets,
   productionPackages,
+  reachableFromTargets,
   riskyChanges,
 } from './lockfile-churn.mts';
 
@@ -79,6 +81,23 @@ describe('productionPackages', () => {
   });
 });
 
+describe('reachableFromTargets', () => {
+  it('follows dependencies transitively from the targets only', () => {
+    const entries = parseLockfile(
+      lock([
+        entry('parent@npm:^1.0.0', '1.0.0', { child: 'npm:^1.0.0' }),
+        entry('child@npm:^1.0.0', '1.0.0', { leaf: 'npm:^1.0.0' }),
+        entry('leaf@npm:^1.0.0', '1.0.0'),
+        entry('other@npm:^1.0.0', '1.0.0'),
+      ]),
+    );
+
+    expect(reachableFromTargets(entries, new Set(['parent']))).toStrictEqual(
+      new Set(['parent', 'child', 'leaf']),
+    );
+  });
+});
+
 describe('computeChurn', () => {
   const before = parseLockfile(
     lock([
@@ -121,6 +140,69 @@ describe('computeChurn', () => {
         rootDependencies,
       }),
     ).toStrictEqual([]);
+  });
+
+  describe('children of a target', () => {
+    const rootWithParent = { app: '^1.0.0', parent: '^1.0.0' };
+    const beforeChildren = parseLockfile(
+      lock([
+        entry('app@npm:^1.0.0', '1.0.0', { shared: 'npm:^1.0.0' }),
+        entry('parent@npm:^1.0.0', '1.0.0', { child: 'npm:^1.0.0' }),
+        entry('child@npm:^1.0.0', '1.0.0'),
+        entry('shared@npm:^1.0.0', '1.0.0'),
+      ]),
+    );
+    const afterChildren = parseLockfile(
+      lock([
+        entry('app@npm:^1.0.0', '1.0.0', { shared: 'npm:^1.0.0' }),
+        entry('parent@npm:^1.0.0', '1.1.0', { child: 'npm:^2.0.0' }),
+        entry('child@npm:^2.0.0', '2.0.0'),
+        entry('shared@npm:^1.0.0', '1.2.0'),
+      ]),
+    );
+
+    it('accepts a moved child, reports it and flags a major jump', () => {
+      const changes = computeChurn({
+        before: beforeChildren,
+        after: afterChildren,
+        targets: new Set(['parent']),
+        rootDependencies: rootWithParent,
+      });
+
+      expect(movedWithTargets(changes)).toStrictEqual([
+        expect.objectContaining({ name: 'child', majorJump: true }),
+      ]);
+      expect(riskyChanges(changes).map((change) => change.name)).toStrictEqual([
+        'shared',
+      ]);
+    });
+
+    it('reports a child that gained a second version', () => {
+      const withExtra = parseLockfile(
+        lock([
+          entry('app@npm:^1.0.0', '1.0.0', { shared: 'npm:^1.0.0' }),
+          entry('parent@npm:^1.0.0', '1.1.0', { child: 'npm:^1.1.0' }),
+          entry('child@npm:^1.0.0', '1.0.0'),
+          entry('child@npm:^1.1.0', '1.1.0'),
+          entry('shared@npm:^1.0.0', '1.0.0'),
+        ]),
+      );
+      const changes = computeChurn({
+        before: beforeChildren,
+        after: withExtra,
+        targets: new Set(['parent']),
+        rootDependencies: rootWithParent,
+      });
+
+      expect(movedWithTargets(changes)).toStrictEqual([
+        expect.objectContaining({
+          name: 'child',
+          extraVersion: true,
+          majorJump: false,
+        }),
+      ]);
+      expect(riskyChanges(changes)).toStrictEqual([]);
+    });
   });
 
   it('does not flag a targeted package, even in production', () => {

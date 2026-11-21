@@ -177,7 +177,8 @@ jobs:
           test -s "$WORK_DIR/targets.txt"
           yarn tsx .github/scripts/lockfile-churn-guard.mts \
             --before "$WORK_DIR/yarn.base.lock" --after yarn.lock \
-            --targets "$(paste -sd, "$WORK_DIR/targets.txt")"
+            --targets "$(paste -sd, "$WORK_DIR/targets.txt")" \
+            --out "$WORK_DIR/churn.md"
           yarn tsx .github/scripts/resolutions-lint.mts --base "$WORK_DIR/package.base.json"
 
       - name: Audit the result and compute the Closes lines
