@@ -5,6 +5,7 @@
 //
 // Usage: node .github/scripts/lockfile-churn-guard.mts --before <yarn.lock> --after <yarn.lock> --targets a,b [--package-json <file>] [--out <file>]
 import { readFileSync, writeFileSync } from 'node:fs';
+import { argValue } from './shared/cli.mts';
 import {
   computeChurn,
   movedWithTargets,
@@ -12,11 +13,6 @@ import {
   riskyChanges,
   type PackageChange,
 } from './shared/lockfile-churn.mts';
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
 
 function required(name: string): string {
   const value = argValue(name);

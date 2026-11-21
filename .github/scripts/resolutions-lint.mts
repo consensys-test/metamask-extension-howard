@@ -2,26 +2,38 @@
 //
 // Usage: yarn tsx .github/scripts/resolutions-lint.mts [--base <package.json>] [--head <package.json>]
 //   With --base, only packages the branch touched are checked; without it, every package is.
-import { readFileSync } from 'node:fs';
-import { lintResolutions } from './shared/resolutions-lint.mts';
+//   With --fix, the touched packages are sorted into place in --head first.
+import { readFileSync, writeFileSync } from 'node:fs';
+import { argValue } from './shared/cli.mts';
+import {
+  lintResolutions,
+  sortResolutions,
+} from './shared/resolutions-lint.mts';
 
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
+type PackageJson = Record<string, unknown> & {
+  resolutions?: Record<string, unknown>;
+};
 
-const readResolutions = (path: string): Record<string, unknown> =>
-  (
-    JSON.parse(readFileSync(path, 'utf8')) as {
-      resolutions?: Record<string, unknown>;
-    }
-  ).resolutions ?? {};
+const readPackage = (path: string): PackageJson =>
+  JSON.parse(readFileSync(path, 'utf8')) as PackageJson;
 
 function main(): void {
   const basePath = argValue('--base');
+  const headPath = argValue('--head') ?? 'package.json';
+  const base = basePath ? (readPackage(basePath).resolutions ?? {}) : undefined;
+  const headPackage = readPackage(headPath);
+
+  if (process.argv.includes('--fix')) {
+    headPackage.resolutions = sortResolutions({
+      base,
+      head: headPackage.resolutions ?? {},
+    });
+    writeFileSync(headPath, `${JSON.stringify(headPackage, null, 2)}\n`);
+  }
+
   const violations = lintResolutions({
-    base: basePath ? readResolutions(basePath) : undefined,
-    head: readResolutions(argValue('--head') ?? 'package.json'),
+    base,
+    head: headPackage.resolutions ?? {},
   });
 
   for (const { packageName, kind, detail } of violations) {
