@@ -202,6 +202,7 @@ describe('renderConsumerReport', () => {
           pkg: 'minimatch',
           vulnerable,
           safeLines: [],
+          installedSafe: ['5.1.9', '11.0.9'],
           rows: [
             {
               consumer: {
@@ -228,5 +229,7 @@ describe('renderConsumerReport', () => {
 
     expect(report).toContain('0.29.1 (needs `^11.0.1`, 51 h old, **inside');
     expect(report).toContain('--preapprove');
+    expect(report).toContain('already in `yarn.lock`');
+    expect(report).toContain('5.1.9, 11.0.9');
   });
 });
