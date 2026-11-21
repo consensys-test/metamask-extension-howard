@@ -63,6 +63,12 @@ describe('buildReport', () => {
     expect(body).toContain('**Rounds used:** 0 of 3');
   });
 
+  it('explains a rejected push', () => {
+    expect(buildReport({ ...base, outcome: 'push-failed' })).toContain(
+      'the push was rejected',
+    );
+  });
+
   it('reports a run that died before the plan', () => {
     expect(
       buildReport({ ...base, plan: undefined, outcome: 'unfinished' }),
