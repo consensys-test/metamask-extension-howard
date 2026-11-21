@@ -6,6 +6,7 @@ import {
   renderConsumerReport,
   safeLines,
   sameLine,
+  toolchainFamily,
   type PackageInfo,
 } from './audit-consumers.mts';
 import { parseLockfile } from './lockfile-churn.mts';
@@ -194,7 +195,58 @@ describe('sameLine', () => {
   });
 });
 
+describe('toolchainFamily', () => {
+  it('names the family of a toolchain package and nothing else', () => {
+    expect(toolchainFamily('@typescript-eslint/typescript-estree')).toBe(
+      'typescript-eslint',
+    );
+    expect(toolchainFamily('eslint-plugin-import')).toBe('eslint');
+    expect(toolchainFamily('babel-plugin-macros')).toBe('babel');
+    expect(toolchainFamily('css-loader')).toBe('webpack');
+    expect(toolchainFamily('@storybook/react')).toBe('storybook');
+    expect(toolchainFamily('ws')).toBeUndefined();
+    expect(toolchainFamily('eslintrc-parser')).toBeUndefined();
+  });
+});
+
 describe('renderConsumerReport', () => {
+  it('flags a toolchain parent and a major jump', () => {
+    const report = renderConsumerReport(
+      [
+        {
+          pkg: 'minimatch',
+          vulnerable,
+          safeLines: [],
+          installedSafe: [],
+          rows: [
+            {
+              consumer: {
+                parent: '@typescript-eslint/typescript-estree',
+                parentVersion: '8.62.0',
+                range: '^10.2.2',
+                resolved: '10.2.6',
+              },
+              fixes: {
+                anyLine: {
+                  version: '9.0.0',
+                  ageHours: 500,
+                  gated: false,
+                  requires: '^11.0.1',
+                },
+              },
+              blockers: [],
+            },
+          ],
+        },
+      ],
+      72,
+    );
+
+    expect(report).toContain(
+      '**moves the typescript-eslint toolchain; major jump**',
+    );
+  });
+
   it('marks a fix inside the age gate', () => {
     const report = renderConsumerReport(
       [

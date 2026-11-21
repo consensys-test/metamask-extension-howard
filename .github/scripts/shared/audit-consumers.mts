@@ -214,12 +214,42 @@ export function safeLines(
     .map((candidate) => toFix(candidate, '', clock));
 }
 
-const describeFix = (fix: Fix | undefined): string => {
+// Packages whose upgrade drags a whole tool stack with it, so a lockfile diff here is wide.
+const TOOLCHAIN_FAMILIES: [string, RegExp][] = [
+  ['typescript-eslint', /^(@typescript-eslint\/|typescript-eslint$)/u],
+  ['eslint', /^(eslint($|-)|@eslint\/)/u],
+  ['webpack', /^(webpack($|-)|terser-webpack-plugin$|.+-loader$)/u],
+  ['babel', /^(@babel\/|babel-)/u],
+  ['jest', /^(jest($|-)|@jest\/|ts-jest$)/u],
+  ['storybook', /^(storybook$|@storybook\/)/u],
+  ['typescript', /^typescript$/u],
+];
+
+export function toolchainFamily(name: string): string | undefined {
+  return TOOLCHAIN_FAMILIES.find(([, pattern]) => pattern.test(name))?.[0];
+}
+
+/** Flags on a parent upgrade that say how much else it is likely to move. */
+export function blastNotes(consumer: Consumer, fix: Fix): string[] {
+  const notes: string[] = [];
+  const family = toolchainFamily(consumer.parent);
+  if (family) {
+    notes.push(`moves the ${family} toolchain`);
+  }
+  if (semver.major(fix.version) !== semver.major(consumer.parentVersion)) {
+    notes.push('major jump');
+  }
+  return notes;
+}
+
+const describeFix = (fix: Fix | undefined, consumer?: Consumer): string => {
   if (!fix) {
     return 'none';
   }
   const gate = fix.gated ? `, **inside the age gate: needs --preapprove**` : '';
-  return `${fix.version} (needs \`${fix.requires}\`, ${fix.ageHours} h old${gate})`;
+  const notes = consumer ? blastNotes(consumer, fix) : [];
+  const blast = notes.length > 0 ? `, **${notes.join('; ')}**` : '';
+  return `${fix.version} (needs \`${fix.requires}\`, ${fix.ageHours} h old${gate}${blast})`;
 };
 
 export type ConsumerRow = {
@@ -298,7 +328,7 @@ export function renderConsumerReport(
       lines.push(
         row.unavailable
           ? `| ${consumer.parent} ${consumer.parentVersion} | \`${consumer.range}\` | ${consumer.resolved} | registry lookup failed | | | |`
-          : `| ${consumer.parent} ${consumer.parentVersion} | \`${consumer.range}\` | ${consumer.resolved} | ${describeFix(row.inRange)} | ${describeFix(row.fixes.sameLine)} | ${describeFix(row.fixes.anyLine)} | ${describeBlockers(row.blockers)} |`,
+          : `| ${consumer.parent} ${consumer.parentVersion} | \`${consumer.range}\` | ${consumer.resolved} | ${describeFix(row.inRange)} | ${describeFix(row.fixes.sameLine, consumer)} | ${describeFix(row.fixes.anyLine, consumer)} | ${describeBlockers(row.blockers)} |`,
       );
     }
     lines.push('');
