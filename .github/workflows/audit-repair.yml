@@ -2,8 +2,10 @@ name: Audit repair
 
 # Repairs a failed `Main` run on an `audit-fix/*` branch with the deterministic steps of
 # `.github/scripts/audit-repair.mts plan` (allowScripts, dedupe, LavaMoat policy) and pushes
-# one commit, so CI runs again. A failure it cannot repair this way is only reported.
-# The scripts run from the default branch (`.tmp/trusted`), never from the branch under repair.
+# one commit, so CI runs again. A failure that needs a code change goes to a sandboxed agent
+# (Claude Code through LiteLLM) with `.github/audit-autofix/repair-prompt.md`; the workflow then
+# re-runs the failing check itself before it pushes. Anything else is only reported.
+# The scripts and prompts run from the default branch (`.tmp/trusted`), never from the branch under repair.
 
 on:
   workflow_run:
@@ -28,6 +30,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  LITELLM_BASE_URL: https://litellm.consensys.info
+  MODEL: claude-sonnet-5-5
+  CLAUDE_CODE_VERSION: 2.1.323
   WORK_DIR: .tmp/audit-repair
   REPAIR_CAP: '3'
   DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
@@ -83,7 +88,9 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: .tmp/trusted
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            .github/audit-autofix
           persist-credentials: false
 
       - name: Find the branch point and earlier repairs
@@ -145,8 +152,89 @@ jobs:
           gh run rerun "$RUN_ID" --failed --repo "$GITHUB_REPOSITORY"
 
       - name: Report a failure this workflow does not repair
-        if: ${{ steps.plan.outputs.action == 'llm' || steps.plan.outputs.action == 'needs-human' }}
-        run: echo "::warning::Plan is ${{ steps.plan.outputs.action }}; no deterministic repair applies. See the plan in the job summary."
+        if: ${{ steps.plan.outputs.action == 'needs-human' }}
+        run: echo "::warning::Plan is needs-human; no repair applies. See the plan in the job summary."
+
+      - name: Prepare the agent inputs
+        id: inputs
+        if: ${{ steps.plan.outputs.action == 'llm' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node .tmp/trusted/.github/scripts/audit-repair.mts prepare \
+            --plan "$WORK_DIR/plan.json" --repo "$GITHUB_REPOSITORY" \
+            --base-package "$WORK_DIR/package.base.json" --base-lock "$WORK_DIR/yarn.base.lock"
+          echo "kinds=$(jq -c .kinds .tmp/audit-autofix/repair/failure.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Install bubblewrap, socat and a narrow AppArmor profile
+        if: ${{ steps.plan.outputs.action == 'llm' }}
+        run: |
+          sudo apt-get install -y bubblewrap socat
+          # 26.04 ships a stock bwrap profile whose restricted child blocks the nested user
+          # namespace that Claude Code's seccomp helper needs, so replace it.
+          if [ -f /etc/apparmor.d/bwrap-userns-restrict ]; then
+            sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict
+            sudo rm /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOF
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          bwrap --ro-bind / / --unshare-user --dev /dev unshare -U true
+          npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          claude --version
+
+      # The key lives in a file that only apiKeyHelper (run by Claude outside the sandbox) can read.
+      - name: Write the gateway key file
+        if: ${{ steps.plan.outputs.action == 'llm' }}
+        env:
+          GATEWAY_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/gateway-key"
+          printf '%s' "$GATEWAY_KEY" > "$RUNNER_TEMP/gateway-key"
+
+      - name: Run the repair agent in the Claude Code sandbox
+        id: agent
+        if: ${{ steps.plan.outputs.action == 'llm' }}
+        timeout-minutes: 40
+        # A failed or timed-out agent leaves nothing to push: the verify step requires success.
+        continue-on-error: true
+        env:
+          ANTHROPIC_BASE_URL: ${{ env.LITELLM_BASE_URL }}
+          BASH_DEFAULT_TIMEOUT_MS: '1800000'
+          BASH_MAX_TIMEOUT_MS: '1800000'
+        run: |
+          mkdir -p ~/.cache ~/.yarn ~/.npm ~/.config ~/.ssh ~/agent-bin
+          # Yarn ignores the standard proxy variables, so the sandbox needs this wrapper.
+          real_yarn=$(command -v yarn)
+          # shellcheck disable=SC2016 # the wrapper must keep ${...} literal until it runs
+          printf '#!/usr/bin/env bash\nexport YARN_HTTP_PROXY="${YARN_HTTP_PROXY:-$HTTP_PROXY}" YARN_HTTPS_PROXY="${YARN_HTTPS_PROXY:-$HTTPS_PROXY}"\nexec %s "$@"\n' "$real_yarn" > ~/agent-bin/yarn
+          chmod +x ~/agent-bin/yarn
+          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" --arg key "$RUNNER_TEMP/gateway-key" '{apiKeyHelper: ("cat " + $key), showThinkingSummaries: true, sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyRead: [$key], denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
+          set +e
+          PATH="$HOME/agent-bin:$PATH" claude -p "$(cat .tmp/trusted/.github/audit-autofix/repair-prompt.md)" \
+            --model "$MODEL" --settings "$settings" \
+            --allowedTools 'Bash,Read,Edit,Write,Glob,Grep' \
+            --max-turns 120 --output-format stream-json --verbose \
+            | tee "$WORK_DIR/claude-transcript.jsonl" \
+            | jq -R --unbuffered -r -f .tmp/trusted/.github/audit-autofix/progress.jq
+          code=${PIPESTATUS[0]}
+          set -e
+          jq -c 'select(.type == "result")' "$WORK_DIR/claude-transcript.jsonl" | tail -n 1 > "$WORK_DIR/claude-run.json"
+          exit "$code"
+
+      - name: Record the agent outcome
+        if: ${{ always() && steps.plan.outputs.action == 'llm' }}
+        run: |
+          echo "agent outcome: ${{ steps.agent.outcome }}"
+          jq '{is_error, num_turns, total_cost_usd, denials: ((.permission_denials // []) | length)}' "$WORK_DIR/claude-run.json" || true
+          cat .tmp/audit-autofix/repair-report.md >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Repair allowScripts
         if: ${{ steps.plan.outputs.action == 'repair' && contains(fromJSON(steps.plan.outputs.steps), 'allow-scripts') }}
@@ -188,7 +276,7 @@ jobs:
 
       - name: Verify the repaired tree
         id: changes
-        if: ${{ steps.plan.outputs.action == 'repair' }}
+        if: ${{ steps.plan.outputs.action == 'repair' || (steps.plan.outputs.action == 'llm' && steps.agent.outcome == 'success') }}
         run: |
           yarn install --immutable --mode=skip-build
           yarn dedupe --check
@@ -196,6 +284,12 @@ jobs:
           stray=$(git diff --name-only | grep -v -E '^(package\.json|yarn\.lock|\.yarn/patches/|lavamoat/webpack/)' || true)
           if [ -n "$stray" ]; then
             echo "::error::Repair changed files outside the allowed paths: $stray"
+            exit 1
+          fi
+          # The lint proof below runs this package.json's scripts, so only the dependency sections may differ.
+          strip='del(.dependencies, .devDependencies, .resolutions, .lavamoat)'
+          if [ "$(git show HEAD:package.json | jq -S "$strip")" != "$(jq -S "$strip" package.json)" ]; then
+            echo "::error::Repair changed package.json outside the dependency sections"
             exit 1
           fi
           if git diff --quiet; then
@@ -207,12 +301,20 @@ jobs:
             git diff --stat
           fi
 
+      # The agent proves its own fix, but only this step is trusted: it runs the failing check
+      # itself on the final tree, and a failure stops the push.
+      - name: Prove the lint fix
+        if: ${{ steps.changes.outputs.changed == 'true' && steps.plan.outputs.action == 'llm' && (contains(fromJSON(steps.inputs.outputs.kinds), 'lint-heap') || contains(fromJSON(steps.inputs.outputs.kinds), 'lint')) }}
+        run: yarn lint:eslint
+
       - name: Upload the run files
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: audit-repair
-          path: .tmp/audit-repair/
+          path: |
+            .tmp/audit-repair/
+            .tmp/audit-autofix/
           if-no-files-found: ignore
 
       - name: Get token
@@ -242,7 +344,8 @@ jobs:
           git config user.name 'MetaMask Bot'
           git config user.email 'metamaskbot@users.noreply.github.com'
           git add package.json yarn.lock .yarn/patches lavamoat/webpack
-          git commit -m "bump: repair audit fix ($(jq -r 'join(", ")' <<< "$STEPS"))" \
+          label=$(jq -r 'join(", ")' <<< "$STEPS")
+          git commit -m "bump: repair audit fix (${label:-agent repair})" \
             -m "Repair-Round: $((REPAIRS + 1))" \
             -m "Repair-Signature: $SIGNATURE" \
             -m "Repair-Run: $RUN_ID"
