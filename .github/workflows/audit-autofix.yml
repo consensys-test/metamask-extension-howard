@@ -153,6 +153,10 @@ jobs:
           echo "gate exit code: $code"
           [ "$code" = 0 ] || [ "$code" = 3 ]
 
+      - name: Remove dead pins and unused patches
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: yarn tsx .github/scripts/prune-dead-pins.mts --out "$WORK_DIR/dead-pins.md"
+
       - name: Repair allowScripts and check the install
         id: verify
         if: ${{ steps.gate.outputs.changed == 'true' }}
