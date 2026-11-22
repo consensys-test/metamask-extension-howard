@@ -3,7 +3,11 @@
 // never edited, so no preapproval can be left behind. Prints the bypassed packages for
 // the PR body.
 //
-// Usage: yarn tsx .github/scripts/age-gate-bypass.mts [--allow a,b] [--max-rounds 5] -- <command> [args...]
+// `--preapprove a,b` approves those packages from the first run. Use it for an in-range
+// refresh such as `yarn up -R`, where Yarn silently keeps the older version instead of
+// reporting a quarantine.
+//
+// Usage: yarn tsx .github/scripts/age-gate-bypass.mts [--allow a,b] [--preapprove a,b] [--max-rounds 5] -- <command> [args...]
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { argValue } from './shared/cli.mts';
@@ -26,7 +30,8 @@ function main(): void {
   const allowed = argValue('--allow')?.split(',').filter(Boolean);
   const maxRounds = Number(argValue('--max-rounds') ?? MAX_ROUNDS_DEFAULT);
   const existing = parsePreapproved(readFileSync('.yarnrc.yml', 'utf8'));
-  const bypassed: string[] = [];
+  const bypassed: string[] =
+    argValue('--preapprove')?.split(',').filter(Boolean) ?? [];
 
   for (let round = 0; round <= maxRounds; round++) {
     const env = { ...process.env };
