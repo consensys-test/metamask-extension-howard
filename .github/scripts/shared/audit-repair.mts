@@ -77,7 +77,7 @@ export type DecideInput = {
   runAttempt: number;
 };
 
-const unique = <T,>(items: T[]): T[] => [...new Set(items)];
+const unique = <Item,>(items: Item[]): Item[] => [...new Set(items)];
 
 /**
  * Chooses what the repair job does for one failed CI run. Dedupe and

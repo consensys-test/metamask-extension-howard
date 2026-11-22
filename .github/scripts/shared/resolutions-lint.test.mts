@@ -5,7 +5,7 @@ import {
 } from './resolutions-lint.mts';
 
 describe('parseResolutionKey', () => {
-  it.each([
+  const cases: [string, string, number[] | null][] = [
     ['ws', 'ws', null],
     ['ws@~8.17.1', 'ws', [8, 17, 1]],
     ['minimatch@npm:^10.2.2', 'minimatch', [10, 2, 2]],
@@ -17,13 +17,16 @@ describe('parseResolutionKey', () => {
       null,
     ],
     ['@scope/parent/@other/child@^2.0.0', '@other/child', [2, 0, 0]],
-  ])('reads %s', (key, packageName, version) => {
-    expect(parseResolutionKey(key)).toMatchObject({
-      packageName,
-      version,
-      scoped: key.includes('/') && !/^@[^/]+\/[^/]+(@.*)?$/u.test(key),
+  ];
+  for (const [key, packageName, version] of cases) {
+    it(`reads ${key}`, () => {
+      expect(parseResolutionKey(key)).toMatchObject({
+        packageName,
+        version,
+        scoped: key.includes('/') && !/^@[^/]+\/[^/]+(@.*)?$/u.test(key),
+      });
     });
-  });
+  }
 });
 
 describe('lintResolutions', () => {
