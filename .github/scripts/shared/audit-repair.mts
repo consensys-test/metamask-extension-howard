@@ -1,3 +1,9 @@
+import { createHash } from 'node:crypto';
+
+/** Short stable id of a signature; the full text lists every failed job and is too long for a commit. */
+export const hashSignature = (signature: string): string =>
+  createHash('sha256').update(signature).digest('hex').slice(0, 16);
+
 export type FailedJob = {
   name: string;
   failedSteps: string[];
@@ -80,6 +86,7 @@ export type RepairPlan = {
   reason: string;
   /** Stable text for the failure set, to detect a round that changed nothing. */
   signature: string;
+  signatureHash: string;
 };
 
 export type DecideInput = {
@@ -128,7 +135,14 @@ export function decideRepair({
     reason: string,
     steps: DeterministicRepair[] = [],
     deferred: FailureKind[] = [],
-  ): RepairPlan => ({ action, steps, deferred, reason, signature });
+  ): RepairPlan => ({
+    action,
+    steps,
+    deferred,
+    reason,
+    signature,
+    signatureHash: hashSignature(signature),
+  });
 
   if (kinds.length === 0) {
     return plan('none', 'No failure other than the status gate.');
@@ -136,7 +150,11 @@ export function decideRepair({
   if (repairsSoFar >= cap) {
     return plan('needs-human', `Repair cap of ${cap} reached.`);
   }
-  if (previousSignature !== undefined && previousSignature === signature) {
+  if (
+    previousSignature !== undefined &&
+    (previousSignature === signature ||
+      previousSignature === hashSignature(signature))
+  ) {
     return plan('needs-human', 'The last repair did not change what fails.');
   }
 
