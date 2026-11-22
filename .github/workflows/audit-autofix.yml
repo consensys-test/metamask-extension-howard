@@ -115,7 +115,7 @@ jobs:
       - name: Run the agent in the Claude Code sandbox
         id: agent
         if: ${{ steps.select.outputs.has-work == 'true' }}
-        timeout-minutes: 20
+        timeout-minutes: 40
         # The gate below decides whether a timed-out or failed run produced anything usable.
         continue-on-error: true
         env:
