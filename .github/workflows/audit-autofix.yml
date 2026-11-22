@@ -22,6 +22,7 @@ on:
       - trigger-ci-audit-autofix
     paths:
       - .github/workflows/audit-autofix.yml
+      - .github/audit-autofix/**
 
 permissions: {}
 
