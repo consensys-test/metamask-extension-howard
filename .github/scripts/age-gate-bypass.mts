@@ -6,6 +6,7 @@
 // Usage: yarn tsx .github/scripts/age-gate-bypass.mts [--allow a,b] [--max-rounds 5] -- <command> [args...]
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
+import { argValue } from './shared/cli.mts';
 import {
   buildPreapprovedEnv,
   parsePreapproved,
@@ -13,11 +14,6 @@ import {
 } from './shared/age-gate.mts';
 
 const MAX_ROUNDS_DEFAULT = 5;
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
 
 function main(): void {
   const separator = process.argv.indexOf('--');
