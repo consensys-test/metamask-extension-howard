@@ -82,6 +82,8 @@ jobs:
           is-high-risk-environment: false
           ref: ${{ steps.run.outputs.head-sha }}
           persist-credentials: false
+          # Installed below, because a stale allowScripts entry makes the install itself fail.
+          skip-install: true
 
       - name: Checkout the trusted scripts
         uses: actions/checkout@v6
@@ -141,6 +143,20 @@ jobs:
             jq '.plan' "$WORK_DIR/plan.json"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install the branch
+        if: ${{ steps.plan.outputs.action == 'repair' || steps.plan.outputs.action == 'llm' }}
+        env:
+          STEPS: ${{ steps.plan.outputs.steps }}
+        run: |
+          if ! yarn --immutable; then
+            # The allowScripts repair below fixes the entry that broke the install.
+            if jq -e 'index("allow-scripts")' <<< "$STEPS" > /dev/null; then
+              echo "::warning::The install failed; the allow-scripts repair follows."
+            else
+              exit 1
+            fi
+          fi
 
       - name: Rerun the failed jobs once
         if: ${{ steps.plan.outputs.action == 'retry' && env.DRY_RUN != 'true' }}
