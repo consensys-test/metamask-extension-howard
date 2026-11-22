@@ -409,6 +409,7 @@ jobs:
           if [ "$PUSH" = success ]; then
             outcome=pushed
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          elif [ "$PUSH" = failure ]; then outcome=push-failed
           elif [ "$PROVE" = failure ]; then outcome=proof-failed
           elif [ "$VERIFY" = failure ]; then outcome=verify-failed
           elif [ "$AGENT" = failure ]; then outcome=agent-failed

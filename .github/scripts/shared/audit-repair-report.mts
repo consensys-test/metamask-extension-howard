@@ -32,6 +32,8 @@ const NO_PUSH: Record<string, string> = {
   'agent-failed': 'the agent step failed',
   'verify-failed': 'the repaired tree failed the verification',
   'proof-failed': 'the failing check still fails on the repaired tree',
+  'push-failed':
+    'the push was rejected, usually because the branch moved after the failed run',
   'no-change': 'the repair changed nothing',
   unfinished: 'a repair step failed or the run was cancelled',
 };
