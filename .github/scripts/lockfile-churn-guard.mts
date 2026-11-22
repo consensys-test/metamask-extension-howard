@@ -1,9 +1,13 @@
 // Fails when a fix changed packages it did not target and that ship in the extension.
 //
-// Usage: yarn tsx .github/scripts/lockfile-churn-guard.mts --before <yarn.lock> --after <yarn.lock> --targets a,b [--package-json <file>]
-import { readFileSync } from 'node:fs';
+// Production packages that a targeted package depends on may move; they are listed
+// (with major jumps and extra versions marked) for the PR body via --out.
+//
+// Usage: node .github/scripts/lockfile-churn-guard.mts --before <yarn.lock> --after <yarn.lock> --targets a,b [--package-json <file>] [--out <file>]
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   computeChurn,
+  movedWithTargets,
   parseLockfile,
   riskyChanges,
   type PackageChange,
@@ -28,9 +32,12 @@ const describe = ({
   after,
   targeted,
   production,
+  majorJump,
+  extraVersion,
 }: PackageChange) =>
   `- ${name}: ${before.join(', ') || '(none)'} -> ${after.join(', ') || '(none)'}` +
-  `${targeted ? ' [targeted]' : ''}${production ? ' [production]' : ''}`;
+  `${targeted ? ' [targeted]' : ''}${production ? ' [production]' : ''}` +
+  `${majorJump ? ' [major jump]' : ''}${extraVersion ? ' [extra version]' : ''}`;
 
 function main(): void {
   const packageJson = JSON.parse(
@@ -44,11 +51,17 @@ function main(): void {
     rootDependencies: packageJson.dependencies ?? {},
   });
   const risky = riskyChanges(changes);
+  const moved = movedWithTargets(changes);
 
   console.log(
     `${changes.length} packages changed, ${risky.length} untargeted in production.`,
   );
   console.log(changes.map(describe).join('\n'));
+
+  const outFile = argValue('--out');
+  if (outFile) {
+    writeFileSync(outFile, moved.map(describe).join('\n'));
+  }
 
   if (risky.length > 0) {
     console.error(
