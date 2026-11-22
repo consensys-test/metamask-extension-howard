@@ -4,6 +4,7 @@ You are fixing Yarn audit advisories in the MetaMask Browser Extension repositor
 
 - `.tmp/audit-autofix/issues.json`: the open audit issues still having advisories (`number`, `title`, `body`). The body lists each advisory (package, severity, GHSA URL) and a "Native audit tree" block.
 - `.tmp/audit-autofix/audit-before.json`: the current audit of this checkout (`ParsedAdvisory[]`: `moduleName`, `url`, `effectiveSeverity`, `affectsProduction`, `isDevOnly`, `treeVersions`, `dependents`).
+- `.tmp/audit-autofix/consumers.md`: for each advisory package, every parent that lets it resolve to an affected version, with the cheapest fix on that parent's own release line, the age of that release against the age gate, and the requirers that block it. It was built from the registry before you started; read it first and do not rebuild it by hand.
 - `node_modules` is already installed. You have `yarn`, `node`, `git`, `jq`, `grep`. You have no GitHub token: do not call the GitHub API.
 
 ## What you may change
@@ -22,9 +23,9 @@ Work through every advisory package in `audit-before.json`, one at a time, befor
 2. A parent upgrade that pulls in the patched child. For each ancestor on the chain (`yarn why -R <pkg>`), check its latest release and whether it still depends on the vulnerable child: `yarn npm info <pkg> --fields version` and `yarn npm info <pkg>@<ver> --fields dependencies --json`. Never run `yarn npm info` without `--fields`; it can print megabytes.
 3. A `resolutions` entry only when no parent upgrade exists (the parent check in step 2 is your evidence; record it in the report). Scope it to the narrowest descriptor that occurs in `yarn.lock`. The workflow later removes each resolution you added and re-audits, and lists the result in the PR.
 
-Decide step 2 and step 3 **per consumer, not per package**. A vulnerable package often has several parents (`yarn why -R <pkg>` lists them) that each have a different cheapest fix. Fix each parent on its own, and never write one resolution that moves every descriptor of the package to the patched major. For each parent, in this order:
+Decide step 2 and step 3 **per consumer, not per package**. `consumers.md` has one row per parent. Fix each row on its own, and never write one resolution that moves every descriptor of the package to the patched major. Every row must end up fixed, or in category C with the reason; do not skip a row. For each row, in this order:
 
-- (a) Update the parent or the vulnerable child inside the parent's existing range (`yarn up -R <child>`), or a parent upgrade that stays on the same major. Take these first, and always check them even when the advisory's patched version is a new major for other parents.
+- (a) Update the parent or the vulnerable child inside the parent's existing range (`yarn up -R <child>`), or a parent upgrade that stays on the same major. Take these first, and always check them even when the advisory's patched version is a new major for other parents. A fix marked "inside the age gate" needs `--preapprove <package>[,<package>]` (the parent, plus any package that has to move with it). A requirer listed under "Blocked by" has to move too, with its own bump; one that names this repo's package.json means editing that pin.
 - (b) A resolution that moves only that parent to a version that is not vulnerable and keeps the API the parent needs. That includes **a version below the advisory's vulnerable range** when the advisory's range starts above it (read `vulnerableVersions` in `audit-before.json`; for example `>=7.0.0 <11.0.1` leaves `5.x` unaffected) and a lower major the parent can still use.
 - (c) A resolution that crosses to the patched major, only when (a) and (b) are not possible, and only for the parents the earlier options could not fix.
 
