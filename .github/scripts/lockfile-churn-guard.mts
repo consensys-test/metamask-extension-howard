@@ -1,0 +1,61 @@
+// Fails when a fix changed packages it did not target and that ship in the extension.
+//
+// Usage: yarn tsx .github/scripts/lockfile-churn-guard.mts --before <yarn.lock> --after <yarn.lock> --targets a,b [--package-json <file>]
+import { readFileSync } from 'node:fs';
+import {
+  computeChurn,
+  parseLockfile,
+  riskyChanges,
+  type PackageChange,
+} from './shared/lockfile-churn.mts';
+
+function argValue(name: string): string | undefined {
+  const index = process.argv.indexOf(name);
+  return index === -1 ? undefined : process.argv[index + 1];
+}
+
+function required(name: string): string {
+  const value = argValue(name);
+  if (!value) {
+    throw new Error(`Missing ${name}`);
+  }
+  return value;
+}
+
+const describe = ({
+  name,
+  before,
+  after,
+  targeted,
+  production,
+}: PackageChange) =>
+  `- ${name}: ${before.join(', ') || '(none)'} -> ${after.join(', ') || '(none)'}` +
+  `${targeted ? ' [targeted]' : ''}${production ? ' [production]' : ''}`;
+
+function main(): void {
+  const packageJson = JSON.parse(
+    readFileSync(argValue('--package-json') ?? 'package.json', 'utf8'),
+  ) as { dependencies?: Record<string, string> };
+
+  const changes = computeChurn({
+    before: parseLockfile(readFileSync(required('--before'), 'utf8')),
+    after: parseLockfile(readFileSync(required('--after'), 'utf8')),
+    targets: new Set(required('--targets').split(',').filter(Boolean)),
+    rootDependencies: packageJson.dependencies ?? {},
+  });
+  const risky = riskyChanges(changes);
+
+  console.log(
+    `${changes.length} packages changed, ${risky.length} untargeted in production.`,
+  );
+  console.log(changes.map(describe).join('\n'));
+
+  if (risky.length > 0) {
+    console.error(
+      `\nUntargeted production changes:\n${risky.map(describe).join('\n')}`,
+    );
+    process.exitCode = 1;
+  }
+}
+
+main();
