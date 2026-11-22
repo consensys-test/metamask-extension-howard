@@ -34,7 +34,8 @@ env:
   LITELLM_BASE_URL: https://litellm.consensys.info
   MODEL: claude-sonnet-5-5
   CLAUDE_CODE_VERSION: 2.1.323
-  DRY_RUN: ${{ github.event_name == 'push' || inputs.dry-run }}
+  # TEMPORARY (2/2): a push publishes only when its head commit message contains [publish].
+  DRY_RUN: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '[publish]') || inputs.dry-run }}
   WORK_DIR: .tmp/audit-autofix
   # TEMPORARY (2/2): the bot issues live upstream, so push-triggered fork runs read them from there.
   ISSUES_REPO: ${{ github.event_name == 'push' && 'MetaMask/metamask-extension' || github.repository }}
@@ -220,7 +221,7 @@ jobs:
 
       - name: Get token
         id: token
-        if: ${{ steps.body.outcome == 'success' && env.DRY_RUN != 'true' && vars.TOKEN_EXCHANGE_URL != '' }}
+        if: ${{ steps.body.outcome == 'success' && env.DRY_RUN != 'true' && github.repository == 'MetaMask/metamask-extension' && vars.TOKEN_EXCHANGE_URL != '' }}
         uses: MetaMask/github-tools/.github/actions/get-token@v1
         with:
           token-exchange-url: ${{ vars.TOKEN_EXCHANGE_URL }}
