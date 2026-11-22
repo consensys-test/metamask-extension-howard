@@ -8,6 +8,7 @@ import { argValue } from './shared/cli.mts';
 import { ghApi } from './shared/gh-api.mts';
 import {
   buildReport,
+  parseAutofixCost,
   parseState,
   REPORT_MARKER,
 } from './shared/audit-repair-report.mts';
@@ -36,12 +37,16 @@ const { total_cost_usd: cost } =
   readJson<Record<string, number>>(`${dir}/claude-run.json`) ?? {};
 
 // The `head=` filter returned nothing for a branch name with a slash, so filter the list.
-const prNumber = ghApi(`repos/${repo}/pulls?state=open&per_page=100`, {
+const pr = ghApi(`repos/${repo}/pulls?state=open&per_page=100`, {
   paginate: true,
-  jq: `.[] | select(.head.ref == "${branch}") | .number`,
+  jq: `.[] | select(.head.ref == "${branch}") | {number, body} | tojson`,
 })
-  .split('\n')[0]
-  .trim();
+  .split('\n')
+  .filter(Boolean)
+  .map(
+    (line) => JSON.parse(line) as { number: number; body: string | null },
+  )[0];
+const prNumber = pr ? String(pr.number) : '';
 const comment = prNumber
   ? ghApi(`repos/${repo}/issues/${prNumber}/comments`, {
       paginate: true,
@@ -52,6 +57,7 @@ const comment = prNumber
       .map((line) => JSON.parse(line) as { id: number; body: string })[0]
   : undefined;
 
+const reportFile = `${argValue('--in-dir') ?? '.tmp/report-in'}/audit-autofix/repair-report.md`;
 const dryRun = process.argv.includes('--dry-run');
 const body = buildReport({
   plan,
@@ -64,6 +70,10 @@ const body = buildReport({
   runUrl: required('--run-url'),
   previous: parseState(comment?.body),
   dryRun,
+  agentReport: existsSync(reportFile)
+    ? readFileSync(reportFile, 'utf8')
+    : undefined,
+  autofixCostUsd: parseAutofixCost(pr?.body ?? undefined),
 });
 
 if (dryRun) {

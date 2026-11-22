@@ -26,6 +26,10 @@ export type ReportInput = {
   runUrl: string;
   previous: Round[];
   dryRun: boolean;
+  /** The repair-report.md the agent wrote; only an LLM round has one. */
+  agentReport?: string;
+  /** Cost of the autofix run that opened the PR, read from the PR body. */
+  autofixCostUsd?: number;
 };
 
 const NO_PUSH: Record<string, string> = {
@@ -37,6 +41,28 @@ const NO_PUSH: Record<string, string> = {
   'no-change': 'the repair changed nothing',
   unfinished: 'a repair step failed or the run was cancelled',
 };
+
+/** The autofix run's own spend line in the PR body, if it has one. */
+export function parseAutofixCost(
+  prBody: string | undefined,
+): number | undefined {
+  const match = prBody?.match(
+    /\*\*LLM spend:\*\* approximately \$(\d+(?:\.\d+)?)/u,
+  );
+  return match ? Number(match[1]) : undefined;
+}
+
+/** Agent text goes into a comment: no pings, no forged markers, bounded length. */
+export function quoteAgentText(text: string, max = 3000): string {
+  const clipped =
+    text.length > max
+      ? `${text.slice(0, max)}\n\n(cut at ${max} characters)`
+      : text;
+  return clipped
+    .replace(/<!--/gu, '&lt;!--')
+    .replace(/@(?=\w)/gu, '@\u200b')
+    .trim();
+}
 
 /** Rounds recorded by earlier comments, kept in a hidden base64 block so `-->` cannot end it. */
 export function parseState(body: string | undefined): Round[] {
@@ -93,6 +119,12 @@ function headline(input: ReportInput): { text: string; stopped: boolean } {
       stopped: true,
     };
   }
+  if (plan.action === 'llm' && outcome === 'no-change') {
+    return {
+      text: `Stopped in round ${round}: the agent made no change and handed the failure to a human. Its report is below. The branch is unchanged, so CI does not run again.`,
+      stopped: true,
+    };
+  }
   const why = NO_PUSH[outcome] ?? `the run ended as "${outcome}"`;
   return {
     text: `Stopped in round ${round}: no push, because ${why}. The branch is unchanged, so CI does not run again.`,
@@ -115,7 +147,17 @@ export function buildReport(input: ReportInput): string {
   const { text, stopped } = headline(input);
   const used = input.repairsSoFar + (input.outcome === 'pushed' ? 1 : 0);
   const priced = rounds.filter((round) => round.costUsd !== undefined);
-  const total = priced.reduce((sum, round) => sum + (round.costUsd ?? 0), 0);
+  const repairs = priced.reduce((sum, round) => sum + (round.costUsd ?? 0), 0);
+  const total = repairs + (input.autofixCostUsd ?? 0);
+  const parts = [
+    input.autofixCostUsd === undefined
+      ? undefined
+      : `autofix run $${input.autofixCostUsd.toFixed(2)}`,
+    priced.length === 0
+      ? undefined
+      : `${priced.length} repair run${priced.length === 1 ? '' : 's'} $${repairs.toFixed(2)}`,
+  ].filter(Boolean);
+  const agentReport = input.plan?.action === 'llm' && input.agentReport?.trim();
 
   const lines = [
     REPORT_MARKER,
@@ -124,9 +166,9 @@ export function buildReport(input: ReportInput): string {
     text,
     '',
     `**Rounds used:** ${used} of ${input.cap}`,
-    priced.length === 0
-      ? '**LLM spend:** none so far.'
-      : `**LLM spend:** approximately $${total.toFixed(2)} across ${priced.length} run${priced.length === 1 ? '' : 's'} (estimated by Claude Code, not the billed amount).`,
+    parts.length === 0
+      ? '**LLM spend:** none recorded.'
+      : `**LLM spend:** approximately $${total.toFixed(2)} in total (${parts.join(' + ')}; estimated by Claude Code, not the billed amount).`,
     '',
     '| Run | Plan | Steps | Outcome | LLM cost |',
     '| --- | --- | --- | --- | --- |',
@@ -134,6 +176,16 @@ export function buildReport(input: ReportInput): string {
       (round) =>
         `| ${round.run} | ${round.action} | ${round.steps.join(', ') || '-'} | ${round.outcome} | ${round.costUsd === undefined ? '-' : `$${round.costUsd.toFixed(2)}`} |`,
     ),
+    ...(agentReport
+      ? [
+          '',
+          "<details><summary>The agent's report</summary>",
+          '',
+          quoteAgentText(agentReport),
+          '',
+          '</details>',
+        ]
+      : []),
     '',
     `[Latest run](${input.runUrl})`,
     `${STATE_OPEN}${Buffer.from(JSON.stringify(rounds)).toString('base64')}${STATE_CLOSE}`,
