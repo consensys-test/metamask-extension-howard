@@ -52,6 +52,15 @@ describe('classifyJob', () => {
     });
   }
 
+  it('ignores the prerelease publish job', () => {
+    expect(
+      classifyJob({
+        name: 'Publish prerelease / Publish prerelease',
+        failedSteps: ['Get token'],
+      }),
+    ).toBe('cascade');
+  });
+
   it('classifies a lint job that ran out of heap by its log', () => {
     expect(
       classifyJob({
