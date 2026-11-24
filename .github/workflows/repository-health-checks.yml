@@ -120,6 +120,10 @@ jobs:
           run-id: ${{ steps.find-baseline-run.outputs.run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: TEST ONLY -- corrupt downloaded baseline
+        if: ${{ steps.download-baseline.outcome == 'success' }}
+        run: echo '{"not":"a list"}' > .tmp/audit-baseline.json
+
       - name: Audit -- check for vulnerabilities
         if: ${{ !cancelled() && github.event_name != 'merge_group' }}
         env:
