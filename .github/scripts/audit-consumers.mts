@@ -61,7 +61,7 @@ async function loadPackage(name: string): Promise<PackageInfo | undefined> {
     if (!response.ok) {
       return undefined;
     }
-    const document = (await response.json()) as {
+    const registryDoc = (await response.json()) as {
       time?: Record<string, string>;
       versions?: Record<
         string,
@@ -71,7 +71,7 @@ async function loadPackage(name: string): Promise<PackageInfo | undefined> {
         }
       >;
     };
-    const versions = Object.entries(document.versions ?? {})
+    const versions = Object.entries(registryDoc.versions ?? {})
       .filter(
         ([version]) =>
           semver.valid(version) && semver.prerelease(version) === null,
@@ -83,7 +83,7 @@ async function loadPackage(name: string): Promise<PackageInfo | undefined> {
         };
         return {
           version,
-          publishedAt: Date.parse(document.time?.[version] ?? ''),
+          publishedAt: Date.parse(registryDoc.time?.[version] ?? ''),
           ranges: Object.fromEntries(
             watched.filter((n) => n in all).map((n) => [n, all[n]]),
           ),
@@ -104,16 +104,17 @@ function packageInfo(name: string): Promise<PackageInfo | undefined> {
   return cache.get(name) as Promise<PackageInfo | undefined>;
 }
 
-async function mapLimited<T, R>(
-  items: T[],
-  work: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+async function mapLimited<Item, Result>(
+  items: Item[],
+  work: (item: Item) => Promise<Result>,
+): Promise<Result[]> {
+  const results: Result[] = new Array(items.length);
   let next = 0;
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
       while (next < items.length) {
-        const index = next++;
+        const index = next;
+        next += 1;
         results[index] = await work(items[index]);
       }
     }),

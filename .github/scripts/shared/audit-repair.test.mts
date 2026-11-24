@@ -38,16 +38,19 @@ const decide = (failures: FailedJob[], overrides: Partial<DecideInput> = {}) =>
   });
 
 describe('classifyJob', () => {
-  it.each([
+  const cases: [FailedJob, ReturnType<typeof classifyJob>][] = [
     [lint, 'lint'],
     [policyMv2, 'lavamoat-policy'],
     [policyMv3, 'lavamoat-policy'],
     [health, 'dedupe'],
     [e2e, 'e2e'],
     [gate, 'cascade'],
-  ] as const)('classifies %j as %s', (job, kind) => {
-    expect(classifyJob(job)).toBe(kind);
-  });
+  ];
+  for (const [job, kind] of cases) {
+    it(`classifies ${job.name} as ${kind}`, () => {
+      expect(classifyJob(job)).toBe(kind);
+    });
+  }
 
   it('classifies a depcheck-only health failure as depcheck', () => {
     expect(classifyJob({ ...health, failedSteps: ['Run depcheck'] })).toBe(
