@@ -135,6 +135,21 @@ describe('buildReport', () => {
     );
   });
 
+  it('closes the comment when Main passes after a repair', () => {
+    const first = buildReport(base);
+    const body = buildReport({
+      ...base,
+      plan: undefined,
+      outcome: 'green',
+      runId: '300',
+      previous: parseState(first),
+    });
+    expect(body).toContain('### Audit repair: done');
+    expect(body).toContain('Main passed after 1 repair round.');
+    expect(body).toContain('**Rounds used:** 1 of 3');
+    expect(body).toContain('| 300 | - | - | green | - |');
+  });
+
   it('marks a dry run', () => {
     expect(
       buildReport({ ...base, outcome: 'dry-run', dryRun: true }),

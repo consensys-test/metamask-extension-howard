@@ -82,9 +82,21 @@ export function parseState(body: string | undefined): Round[] {
   }
 }
 
-function headline(input: ReportInput): { text: string; stopped: boolean } {
+function headline(input: ReportInput): {
+  text: string;
+  stopped: boolean;
+  done?: boolean;
+} {
   const { plan, outcome, repairsSoFar, cap } = input;
   const round = repairsSoFar + 1;
+  if (outcome === 'green') {
+    const earlier = input.previous.filter((r) => r.outcome === 'pushed').length;
+    return {
+      text: `Main passed${earlier === 0 ? '' : ` after ${earlier} repair round${earlier === 1 ? '' : 's'}`}. Nothing is left to repair. A human reviews and merges.`,
+      stopped: true,
+      done: true,
+    };
+  }
   if (!plan) {
     return {
       text: 'The repair run failed before it made a plan. See the run log.',
@@ -135,7 +147,7 @@ function headline(input: ReportInput): { text: string; stopped: boolean } {
 export function buildReport(input: ReportInput): string {
   const current: Round = {
     run: input.runId,
-    action: input.plan?.action ?? 'none',
+    action: input.plan?.action ?? (input.outcome === 'green' ? '-' : 'none'),
     steps: input.plan?.steps ?? [],
     outcome: input.outcome,
     ...(input.costUsd === undefined ? {} : { costUsd: input.costUsd }),
@@ -144,8 +156,11 @@ export function buildReport(input: ReportInput): string {
     ...input.previous.filter((round) => round.run !== input.runId),
     current,
   ];
-  const { text, stopped } = headline(input);
-  const used = input.repairsSoFar + (input.outcome === 'pushed' ? 1 : 0);
+  const { text, stopped, done } = headline(input);
+  const used =
+    input.outcome === 'green'
+      ? input.previous.filter((r) => r.outcome === 'pushed').length
+      : input.repairsSoFar + (input.outcome === 'pushed' ? 1 : 0);
   const priced = rounds.filter((round) => round.costUsd !== undefined);
   const repairs = priced.reduce((sum, round) => sum + (round.costUsd ?? 0), 0);
   const total = repairs + (input.autofixCostUsd ?? 0);
@@ -157,11 +172,17 @@ export function buildReport(input: ReportInput): string {
       ? undefined
       : `${priced.length} repair run${priced.length === 1 ? '' : 's'} $${repairs.toFixed(2)}`,
   ].filter(Boolean);
+  let state = 'in progress';
+  if (done) {
+    state = 'done';
+  } else if (stopped) {
+    state = 'stopped';
+  }
   const agentReport = input.plan?.action === 'llm' && input.agentReport?.trim();
 
   const lines = [
     REPORT_MARKER,
-    `### Audit repair: ${stopped ? 'stopped' : 'in progress'}${input.dryRun ? ' (dry run)' : ''}`,
+    `### Audit repair: ${state}${input.dryRun ? ' (dry run)' : ''}`,
     '',
     text,
     '',
