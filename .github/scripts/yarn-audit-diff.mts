@@ -15,10 +15,7 @@ import {
   uniqueAdvisoriesByIdentity,
   writeStepSummary,
 } from './shared/audit-utils.mts';
-import {
-  autofixEnabled,
-  dispatchAutofix,
-} from './shared/audit-autofix-dispatch.mts';
+import { dispatchAutofix } from './shared/audit-autofix-dispatch.mts';
 import { ghApi } from './shared/gh-api.mts';
 import { getGitHubToken } from './shared/github-token.mts';
 
@@ -916,7 +913,7 @@ async function main() {
     );
 
     // Start the autofix for a new issue; a dispatch failure must not fail the audit.
-    if (issueResult?.isNew && autofixEnabled(process.env)) {
+    if (issueResult?.isNew) {
       try {
         dispatchAutofix(
           process.env.GITHUB_REPOSITORY ?? '',

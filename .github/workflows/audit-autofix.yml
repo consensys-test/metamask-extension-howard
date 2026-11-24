@@ -51,8 +51,6 @@ env:
 jobs:
   fix:
     name: Triage and fix
-    # The sweep and the dispatch from the audit both need the repository variable AUDIT_AUTOFIX_ENABLED.
-    if: ${{ github.event_name != 'schedule' || vars.AUDIT_AUTOFIX_ENABLED == 'true' }}
     # The sandbox setup below is tested on both 24.04 and 26.04 (ubuntu-latest moves between them).
     runs-on: ubuntu-latest
     timeout-minutes: 120

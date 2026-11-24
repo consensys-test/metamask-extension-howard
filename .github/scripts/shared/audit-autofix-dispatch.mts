@@ -24,16 +24,6 @@ export function buildDispatchRequest(
   };
 }
 
-/**
- * The switch is the repository variable AUDIT_AUTOFIX_ENABLED, passed in as an env var, so
- * merging the workflows changes nothing until someone turns it on.
- */
-export function autofixEnabled(
-  env: Record<string, string | undefined>,
-): boolean {
-  return env.AUDIT_AUTOFIX_ENABLED === 'true';
-}
-
 /** A dispatch with GITHUB_TOKEN does start a run; only other events are suppressed for it. */
 export function dispatchAutofix(
   repo: string,
