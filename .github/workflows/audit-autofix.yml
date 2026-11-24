@@ -1,0 +1,221 @@
+name: Audit autofix
+
+# Prepares a draft PR that fixes the advisories in the open "Yarn Audit" bot issues.
+# An agent (Claude Code through LiteLLM, sandboxed) edits the dependency files; scripts
+# under .github/scripts check the result and write the PR. A human reviews and merges.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: 'Issue numbers (comma-separated) or "open"'
+        default: open
+        type: string
+      dry-run:
+        description: 'Do everything except pushing the branch and opening the PR'
+        default: true
+        type: boolean
+  # TEMPORARY (2/2): test runs on a trigger-ci branch (always dry-run). Remove this
+  # trigger once the workflow is on main and has been run with workflow_dispatch.
+  push:
+    branches:
+      - trigger-ci-audit-autofix
+    paths:
+      - .github/workflows/audit-autofix.yml
+
+permissions: {}
+
+concurrency:
+  group: audit-autofix
+  cancel-in-progress: false
+
+env:
+  LITELLM_BASE_URL: https://litellm.consensys.info
+  MODEL: claude-sonnet-5-5
+  CLAUDE_CODE_VERSION: 2.1.323
+  DRY_RUN: ${{ github.event_name == 'push' || inputs.dry-run }}
+  WORK_DIR: .tmp/audit-autofix
+  # TEMPORARY (2/2): the bot issues live upstream, so push-triggered fork runs read them from there.
+  ISSUES_REPO: ${{ github.event_name == 'push' && 'MetaMask/metamask-extension' || github.repository }}
+
+jobs:
+  fix:
+    name: Triage and fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - name: Checkout and install
+        uses: MetaMask/action-checkout-and-setup@v3
+        with:
+          # TEMPORARY (1/2): false while this workflow is developed. Set to true when the PR is opened.
+          is-high-risk-environment: false
+          persist-credentials: false
+
+      - name: Audit the current checkout
+        run: |
+          mkdir -p "$WORK_DIR"
+          yarn tsx .github/scripts/yarn-audit-and-triage.mts
+          cp .tmp/audit-current.json "$WORK_DIR/audit-before.json"
+
+      - name: Select the issues to fix
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUES: ${{ inputs.issues || 'open' }}
+        run: yarn tsx .github/scripts/audit-autofix.mts select --issues "$ISSUES"
+
+      - name: Install bubblewrap, socat and a narrow AppArmor profile
+        if: ${{ steps.select.outputs.has-work == 'true' }}
+        run: |
+          sudo apt-get install -y bubblewrap socat
+          sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+            include if exists <local/bwrap>
+          }
+          EOF
+          sudo systemctl reload apparmor
+          npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          claude --version
+
+      - name: Run the agent in the Claude Code sandbox
+        id: agent
+        if: ${{ steps.select.outputs.has-work == 'true' }}
+        timeout-minutes: 20
+        # The gate below decides whether a timed-out or failed run produced anything usable.
+        continue-on-error: true
+        env:
+          ANTHROPIC_BASE_URL: ${{ env.LITELLM_BASE_URL }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
+          BASH_DEFAULT_TIMEOUT_MS: '1800000'
+          BASH_MAX_TIMEOUT_MS: '1800000'
+        run: |
+          mkdir -p ~/.cache ~/.yarn ~/.npm ~/.config ~/.ssh ~/agent-bin
+          # Yarn ignores the standard proxy variables, so the sandbox needs this wrapper.
+          real_yarn=$(command -v yarn)
+          printf '#!/usr/bin/env bash\nexport YARN_HTTP_PROXY="${YARN_HTTP_PROXY:-$HTTP_PROXY}" YARN_HTTPS_PROXY="${YARN_HTTPS_PROXY:-$HTTPS_PROXY}"\nexec %s "$@"\n' "$real_yarn" > ~/agent-bin/yarn
+          chmod +x ~/agent-bin/yarn
+          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" '{sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
+          PATH="$HOME/agent-bin:$PATH" claude -p "$(cat .github/audit-autofix/prompt.md)" \
+            --model "$MODEL" --settings "$settings" \
+            --allowedTools 'Bash,Read,Edit,Write,Glob,Grep' \
+            --max-turns 120 --output-format json > "$WORK_DIR/claude-run.json"
+
+      - name: Record the agent outcome
+        if: ${{ always() && steps.select.outputs.has-work == 'true' }}
+        run: |
+          echo "agent outcome: ${{ steps.agent.outcome }}"
+          jq '{is_error, num_turns, total_cost_usd, denials: ((.permission_denials // []) | length)}' "$WORK_DIR/claude-run.json" || true
+          ls -la "$WORK_DIR"
+
+      - name: Check which paths changed
+        id: gate
+        if: ${{ steps.select.outputs.has-work == 'true' }}
+        run: |
+          code=0
+          yarn tsx .github/scripts/audit-autofix.mts gate || code=$?
+          echo "changed=$([ "$code" = 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "gate exit code: $code"
+          [ "$code" = 0 ] || [ "$code" = 3 ]
+
+      - name: Repair allowScripts and check the install
+        id: verify
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: |
+          git show HEAD:package.json > "$WORK_DIR/package.base.json"
+          git show HEAD:yarn.lock > "$WORK_DIR/yarn.base.lock"
+          yarn install --mode=skip-build
+          yarn allow-scripts auto
+          code=0
+          yarn tsx .github/scripts/allow-scripts-reconcile.mts \
+            --base "$WORK_DIR/package.base.json" --auto package.json \
+            --before "$WORK_DIR/yarn.base.lock" --after yarn.lock \
+            --out "$WORK_DIR/allow-scripts.json" || code=$?
+          echo "allow-scripts-reconcile exit code: $code (1 means unrelated entries were dropped)"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.lavamoat.allowScripts = JSON.parse(fs.readFileSync(process.env.WORK_DIR + '/allow-scripts.json', 'utf8'));
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          yarn lint:json:fix
+          yarn install --immutable --mode=skip-build
+          yarn dedupe --check
+
+      - name: Check lockfile churn and resolutions
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: |
+          test -s "$WORK_DIR/targets.txt"
+          yarn tsx .github/scripts/lockfile-churn-guard.mts \
+            --before "$WORK_DIR/yarn.base.lock" --after yarn.lock \
+            --targets "$(paste -sd, "$WORK_DIR/targets.txt")"
+          yarn tsx .github/scripts/resolutions-lint.mts --base "$WORK_DIR/package.base.json"
+
+      - name: Audit the result and compute the Closes lines
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          yarn tsx .github/scripts/yarn-audit-and-triage.mts
+          cp .tmp/audit-current.json "$WORK_DIR/audit-after.json"
+          yarn tsx .github/scripts/audit-closes.mts --advisories "$WORK_DIR/audit-after.json" | tee "$WORK_DIR/closes.md"
+
+      - name: Test each added resolution
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: yarn tsx .github/scripts/resolution-necessity.mts --base "$WORK_DIR/package.base.json" --out "$WORK_DIR/necessity.md"
+
+      - name: Write the PR body and the patch
+        id: body
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: |
+          yarn tsx .github/scripts/audit-autofix.mts body --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          git diff --binary > "$WORK_DIR/audit-fix.patch"
+          git diff --stat
+          cat "$WORK_DIR/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the run files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-autofix
+          path: .tmp/audit-autofix/
+          if-no-files-found: ignore
+
+      - name: Get token
+        id: token
+        if: ${{ steps.body.outcome == 'success' && env.DRY_RUN != 'true' && vars.TOKEN_EXCHANGE_URL != '' }}
+        uses: MetaMask/github-tools/.github/actions/get-token@v1
+        with:
+          token-exchange-url: ${{ vars.TOKEN_EXCHANGE_URL }}
+          permissions: |
+            contents: write
+            pull_requests: write
+
+      - name: Push the branch and open the draft PR
+        if: ${{ steps.body.outcome == 'success' && env.DRY_RUN != 'true' }}
+        env:
+          # The fork test uses a PAT; the real repository uses the exchanged token.
+          GH_TOKEN: ${{ steps.token.outputs.token || secrets.AUDIT_AUTOFIX_PAT }}
+        run: |
+          test -n "$GH_TOKEN"
+          echo "::add-mask::$GH_TOKEN"
+          branch="audit-fix/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          git config user.name 'MetaMask Bot'
+          git config user.email 'metamaskbot@users.noreply.github.com'
+          git checkout -b "$branch"
+          git add package.json yarn.lock .yarn/patches lavamoat/webpack
+          git commit -m 'bump: fix audit advisories'
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$branch"
+          gh pr create --draft --base main --head "$branch" \
+            --title 'bump: fix audit advisories' --body-file "$WORK_DIR/pr-body.md"
