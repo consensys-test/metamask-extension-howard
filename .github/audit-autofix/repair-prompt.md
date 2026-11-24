@@ -26,7 +26,7 @@ Only the rows named in `rows.md`: `package.json`, `yarn.lock`, `.yarn/patches/**
    - `depcheck`: `yarn depcheck`.
    - `unit-test`: the failing test file, with `yarn test:unit <file>`.
    - Anything else: the command from the failing step in `failure.json`.
-   Run it once on the final tree. If it still fails, revert the row's change, report the row under C and stop.
+     Run it once on the final tree. If it still fails, revert the row's change, report the row under C and stop.
 7. Re-audit: `yarn npm audit --recursive --json` must still show the row's advisory fixed. A repair that brings the advisory back is not a repair.
 
 ## Report
