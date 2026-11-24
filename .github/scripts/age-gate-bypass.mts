@@ -5,7 +5,7 @@
 //
 // Usage: yarn tsx .github/scripts/age-gate-bypass.mts [--allow a,b] [--max-rounds 5] -- <command> [args...]
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import {
   buildPreapprovedEnv,
   parsePreapproved,
@@ -54,6 +54,12 @@ function main(): void {
     if (result.status === 0 || quarantined.length === 0) {
       if (bypassed.length > 0) {
         console.log(`\nAge gate bypassed for: ${bypassed.join(', ')}`);
+        if (result.status === 0 && process.env.AGE_GATE_BYPASS_LOG) {
+          appendFileSync(
+            process.env.AGE_GATE_BYPASS_LOG,
+            `${bypassed.join('\n')}\n`,
+          );
+        }
       }
       process.exitCode = result.status ?? 1;
       return;
