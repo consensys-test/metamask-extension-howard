@@ -73,6 +73,10 @@ jobs:
           ISSUES: ${{ inputs.issues || 'open' }}
         run: yarn tsx .github/scripts/audit-autofix.mts select --issues "$ISSUES"
 
+      - name: Build the per-consumer fix table
+        if: ${{ steps.select.outputs.has-work == 'true' }}
+        run: yarn tsx .github/scripts/audit-consumers.mts --audit "$WORK_DIR/audit-before.json" --out "$WORK_DIR/consumers.md"
+
       - name: Install bubblewrap, socat and a narrow AppArmor profile
         if: ${{ steps.select.outputs.has-work == 'true' }}
         run: |
