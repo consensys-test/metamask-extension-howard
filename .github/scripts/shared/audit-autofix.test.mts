@@ -1,6 +1,10 @@
 import {
   buildPrBody,
+  autofixRunIds,
   buildPrSection,
+  missingEarlierItems,
+  reportItems,
+  sameBody,
   classifyPaths,
   mentionedIssues,
   parsePorcelain,
@@ -157,6 +161,82 @@ describe('buildPrSection', () => {
 
   it('strips closing keywords the agent wrote itself', () => {
     expect(section).not.toContain('Fixes: #98');
+  });
+});
+
+describe('buildPrBody over several runs', () => {
+  const input = {
+    runUrl: 'https://x/runs/3',
+    runUrls: ['https://x/runs/1', 'https://x/runs/3'],
+    closes: 'Closes: #1',
+    report: 'r',
+    advisoriesBefore: 5,
+    advisoriesAfter: 1,
+    necessityLines: [],
+    deadPinLines: [],
+    churnLines: [],
+    ageGateBypassed: [],
+    costUsd: 2.5,
+  };
+
+  it('links every run and sums the spend over them', () => {
+    const body = buildPrBody(input);
+    expect(body).toContain(
+      '([run 1](https://x/runs/1), [run 2](https://x/runs/3))',
+    );
+    expect(body).toContain('approximately $2.50 in total over 2 autofix runs');
+    expect(body).toContain('5 before, 1 after');
+  });
+
+  it('keeps the single-run wording without runUrls', () => {
+    const body = buildPrBody({ ...input, runUrls: undefined });
+    expect(body).toContain('[audit autofix workflow](https://x/runs/3)');
+    expect(body).not.toContain('in total over');
+  });
+});
+
+describe('autofixRunIds', () => {
+  it('reads the trailers oldest first and skips repeats and other commits', () => {
+    expect(
+      autofixRunIds([
+        'bump: fix audit advisories\n\nAudit-Autofix: 11',
+        'bump: repair audit fix (lavamoat-policy)',
+        'bump: fix audit advisories\n\nAudit-Autofix: 22\n',
+        'again\n\nAudit-Autofix: 11',
+      ]),
+    ).toStrictEqual(['11', '22']);
+  });
+});
+
+describe('missingEarlierItems', () => {
+  const earlier =
+    '### B\n- **fast-xml-parser** (low)\n  - **not a package line**\n- **hono** (low)\n\n### C\n- **nanoid** (high)\n';
+
+  it('lists items at any depth', () => {
+    expect(reportItems(earlier)).toStrictEqual([
+      'fast-xml-parser',
+      'not a package line',
+      'hono',
+      'nanoid',
+    ]);
+  });
+
+  it('finds the items a merged report dropped', () => {
+    const merged =
+      '### B\n- **fast-xml-parser** (low)\n- **hono** (low)\n- **nanoid** (high)\n  - **not a package line**\n- **new-one** (low)\n';
+    expect(missingEarlierItems(earlier, merged)).toStrictEqual([]);
+    expect(missingEarlierItems(earlier, '- **hono** (low)\n')).toStrictEqual([
+      'fast-xml-parser',
+      'not a package line',
+      'nanoid',
+    ]);
+  });
+});
+
+describe('sameBody', () => {
+  it('ignores CRLF and surrounding whitespace', () => {
+    expect(sameBody('a\r\nb\r\n', 'a\nb')).toBe(true);
+    expect(sameBody('a\nb', 'a\nc')).toBe(false);
   });
 });
 

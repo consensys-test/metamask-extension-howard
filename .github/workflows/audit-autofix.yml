@@ -106,6 +106,14 @@ jobs:
           if [ -n "$ROLLING_PR" ]; then args+=(--rolling-pr "$ROLLING_PR"); fi
           yarn tsx .github/scripts/audit-autofix.mts select "${args[@]}"
 
+      # The files of the earlier rounds on this PR, so the agent and the description cover them all.
+      - name: Fetch the earlier autofix runs
+        if: ${{ steps.select.outputs.has-work == 'true' && steps.open-pr.outputs.number != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROLLING_PR: ${{ steps.open-pr.outputs.number }}
+        run: yarn tsx .github/scripts/audit-autofix.mts previous --pr "$ROLLING_PR"
+
       - name: Build the per-consumer fix table
         if: ${{ steps.select.outputs.has-work == 'true' }}
         run: yarn tsx .github/scripts/audit-consumers.mts --audit "$WORK_DIR/audit-before.json" --out "$WORK_DIR/consumers.md"
@@ -194,10 +202,38 @@ jobs:
           [ "$code" = 0 ] || [ "$code" = 3 ]
 
       - name: Save the base files
-        if: ${{ steps.gate.outputs.changed == 'true' }}
+        if: ${{ steps.gate.outputs.changed == 'true' && steps.open-pr.outputs.number == '' }}
         run: |
           git show HEAD:package.json > "$WORK_DIR/package.base.json"
           git show HEAD:yarn.lock > "$WORK_DIR/yarn.base.lock"
+
+      # A rolling run compares with main, not with the branch it rolls onto, so the checks and the
+      # description cover every round.
+      - name: Save the base files from main
+        if: ${{ steps.gate.outputs.changed == 'true' && steps.open-pr.outputs.number != '' }}
+        uses: actions/github-script@v9
+        env:
+          PR_SHA: ${{ steps.open-pr.outputs.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { data: compare } = await github.rest.repos.compareCommitsWithBasehead({
+              ...context.repo,
+              basehead: `${process.env.DEFAULT_BRANCH}...${process.env.PR_SHA}`,
+            });
+            const ref = compare.merge_base_commit.sha;
+            core.info(`merge base with ${process.env.DEFAULT_BRANCH}: ${ref}`);
+            const files = { 'package.json': 'package.base.json', 'yarn.lock': 'yarn.base.lock' };
+            for (const [path, out] of Object.entries(files)) {
+              const { data } = await github.request('GET /repos/{owner}/{repo}/contents/{path}', {
+                ...context.repo,
+                path,
+                ref,
+                mediaType: { format: 'raw' },
+              });
+              fs.writeFileSync(`${process.env.WORK_DIR}/${out}`, data);
+            }
 
       - name: Remove dead pins and unused patches
         if: ${{ steps.gate.outputs.changed == 'true' }}
@@ -240,7 +276,7 @@ jobs:
           test -s "$WORK_DIR/targets.txt"
           yarn tsx .github/scripts/lockfile-churn-guard.mts \
             --before "$WORK_DIR/yarn.base.lock" --after yarn.lock \
-            --targets "$(paste -sd, "$WORK_DIR/targets.txt")" \
+            --targets "$(cat "$WORK_DIR/targets.txt" .tmp/audit-autofix-previous/targets.txt 2>/dev/null | sort -u | paste -sd,)" \
             --out "$WORK_DIR/churn.md"
           yarn tsx .github/scripts/resolutions-lint.mts --base "$WORK_DIR/package.base.json"
 
@@ -336,5 +372,6 @@ jobs:
             exit 1
           fi
           # Read the body right before writing it, so a person's edit is not overwritten.
-          { gh pr view "$PR_NUMBER" --json body --jq .body; printf '\n\n---\n\n'; cat "$WORK_DIR/pr-section.md"; } > "$WORK_DIR/pr-body-rolled.md"
+          gh pr view "$PR_NUMBER" --json body --jq .body > "$WORK_DIR/pr-body-current.md"
+          yarn tsx .github/scripts/audit-autofix.mts rolled-body --current "$WORK_DIR/pr-body-current.md"
           gh pr edit "$PR_NUMBER" --body-file "$WORK_DIR/pr-body-rolled.md"

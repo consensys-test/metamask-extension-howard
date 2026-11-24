@@ -75,6 +75,8 @@ export function stripClosingKeywords(text: string): string {
 
 export type PrBodyInput = {
   runUrl: string;
+  /** Every autofix run behind the PR, oldest first, when a rolling run rewrites the whole description. */
+  runUrls?: string[];
   /** Output of `audit-closes` (`Closes: #N` lines and the not-closed notes). */
   closes: string;
   /** The agent's own explanation. */
@@ -117,21 +119,28 @@ function evidenceLines(input: PrBodyInput): string[] {
 }
 
 // total_cost_usd is Claude Code's own price-table estimate, not gateway billing.
-function spendLine(costUsd: number | undefined): string {
-  return costUsd === undefined
-    ? '**LLM spend:** not reported.'
-    : `**LLM spend:** approximately $${costUsd.toFixed(2)} (estimated by Claude Code, not the billed amount).`;
+function spendLine(costUsd: number | undefined, runs = 1): string {
+  if (costUsd === undefined) {
+    return '**LLM spend:** not reported.';
+  }
+  const total = runs > 1 ? ` in total over ${runs} autofix runs` : '';
+  return `**LLM spend:** approximately $${costUsd.toFixed(2)}${total} (estimated by Claude Code, not the billed amount).`;
 }
 
 export function buildPrBody(input: PrBodyInput): string {
   const evidence = evidenceLines(input);
+  const runUrls = input.runUrls ?? [input.runUrl];
+  const runs =
+    runUrls.length > 1
+      ? runUrls.map((url, index) => `[run ${index + 1}](${url})`).join(', ')
+      : `[audit autofix workflow](${input.runUrl})`;
 
   return [
     '## **Description**',
     '',
-    `This PR was prepared by the [audit autofix workflow](${input.runUrl}), not by a person. It is a draft until a human has reviewed it.`,
+    `This PR was prepared by the audit autofix workflow (${runs}), not by a person. It is a draft until a human has reviewed it.`,
     '',
-    spendLine(input.costUsd),
+    spendLine(input.costUsd, runUrls.length),
     '',
     stripClosingKeywords(input.report).trim(),
     '',
@@ -178,6 +187,42 @@ export function mentionedIssues(body: string): Set<number> {
   return new Set(
     [...body.matchAll(/#(\d+)/gu)].map((match) => Number(match[1])),
   );
+}
+
+/** Run ids from the `Audit-Autofix: <run id>` trailers of a PR's commit messages, oldest first. */
+export function autofixRunIds(messages: string[]): string[] {
+  const ids: string[] = [];
+  for (const message of messages) {
+    for (const match of message.matchAll(/^Audit-Autofix:\s*(\d+)\s*$/gmu)) {
+      if (!ids.includes(match[1])) {
+        ids.push(match[1]);
+      }
+    }
+  }
+  return ids;
+}
+
+/** The packages a report names as list items (`- **pkg** ...`), at any depth. */
+export function reportItems(report: string): string[] {
+  return [...report.matchAll(/^\s*[-*]\s+\*\*([^*]+)\*\*/gmu)].map((match) =>
+    match[1].trim(),
+  );
+}
+
+/** Items the earlier rounds reported that a merged report no longer names. */
+export function missingEarlierItems(
+  earlierReport: string,
+  mergedReport: string,
+): string[] {
+  const kept = new Set(reportItems(mergedReport));
+  return reportItems(earlierReport).filter((item) => !kept.has(item));
+}
+
+/** GitHub may store the body with CRLF and trim it; compare without those. */
+export function sameBody(left: string, right: string): boolean {
+  const normalize = (text: string): string =>
+    text.replace(/\r\n/gu, '\n').trim();
+  return normalize(left) === normalize(right);
 }
 
 export type SelectableIssue = { number: number; title: string; body: string };
