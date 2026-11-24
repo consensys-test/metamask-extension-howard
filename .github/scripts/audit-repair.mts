@@ -37,7 +37,7 @@ type ApiJob = {
 
 function failedJobs(repo: string, runId: string, attempt: string): FailedJob[] {
   const lines = ghApi(
-    `repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
+    `repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=30`,
     { paginate: true, jq: '.jobs[]|tojson' },
   )
     .split('\n')

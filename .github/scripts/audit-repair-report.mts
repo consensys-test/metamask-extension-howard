@@ -22,9 +22,12 @@ function required(name: string): string {
 }
 
 function readJson<Shape>(path: string): Shape | undefined {
-  return existsSync(path)
-    ? (JSON.parse(readFileSync(path, 'utf8')) as Shape)
-    : undefined;
+  // A step that died mid-write leaves an empty file, so treat it as missing.
+  if (!existsSync(path)) {
+    return undefined;
+  }
+  const text = readFileSync(path, 'utf8').trim();
+  return text ? (JSON.parse(text) as Shape) : undefined;
 }
 
 const repo = required('--repo');
