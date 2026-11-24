@@ -19,13 +19,14 @@ Only the rows named in `rows.md`: `package.json`, `yarn.lock`, `.yarn/patches/**
    - A parent change on the same major that does not move a toolchain family.
    - Otherwise move the row to category C with the reason and revert it.
 3. Restore the row's old `package.json` and `yarn.lock` lines first (the base files are `.tmp/audit-autofix/package.base.json` and `.tmp/audit-autofix/yarn.base.lock`; keep the other rows' entries from `rows.md`), then apply the smaller change, `yarn install --mode=update-lockfile`, `yarn dedupe --check`, and run the churn guard: `node .tmp/trusted/.github/scripts/lockfile-churn-guard.mts --before .tmp/audit-autofix/yarn.base.lock --after yarn.lock --targets "$(paste -sd, .tmp/audit-autofix/targets.txt)"`. `targets.txt` lists the packages `package.json` changed; edit that file when you change which packages you target. A release younger than `npmMinimalAgeGate` is skipped silently; wrap the Yarn command with `AGE_GATE_BYPASS_LOG=.tmp/audit-autofix/bypassed.txt node .tmp/trusted/.github/scripts/age-gate-bypass.mts --preapprove <pkg> -- <yarn command>` only for the package the repair needs. Change only the dependency sections of `package.json`; the workflow rejects any other edit there.
-4. Prove it by re-running the failing check itself on the final tree. Do not stand in the generic smoke test for it:
+4. Run every check in the foreground, as one command whose exit code you read. `yarn lint:eslint` takes 6 to 9 minutes and the Bash timeout is 30 minutes. Do not start it with `&` and poll a log: in an earlier run a background job never wrote its exit line and the wait loop used 25 of the 40 minutes. You have about 35 minutes in total, so run each long check once.
+5. Prove it by re-running the failing check itself on the final tree. Do not stand in the generic smoke test for it:
    - `lint` and `lint-heap`: `yarn lint:eslint` (the repo script, with its own heap limit, about 6 to 9 minutes). A heap failure is fixed only when it completes without the memory error.
    - `depcheck`: `yarn depcheck`.
    - `unit-test`: the failing test file, with `yarn test:unit <file>`.
    - Anything else: the command from the failing step in `failure.json`.
    Run it once on the final tree. If it still fails, revert the row's change, report the row under C and stop.
-5. Re-audit: `yarn npm audit --recursive --json` must still show the row's advisory fixed. A repair that brings the advisory back is not a repair.
+6. Re-audit: `yarn npm audit --recursive --json` must still show the row's advisory fixed. A repair that brings the advisory back is not a repair.
 
 ## Report
 
