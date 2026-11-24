@@ -5496,12 +5496,17 @@
     },
     "@metamask/snaps-utils>fast-xml-parser": {
       "globals": {
+        "Buffer": true,
+        "TextDecoder": true,
         "exports.isExist": true
       },
       "packages": {
         "@metamask/snaps-utils>fast-xml-parser>@nodable/entities": true,
+        "buffer": true,
+        "@metamask/snaps-utils>fast-xml-parser>is-unsafe": true,
         "@metamask/snaps-utils>fast-xml-parser>path-expression-matcher": true,
-        "@metamask/snaps-utils>fast-xml-parser>strnum": true
+        "@metamask/snaps-utils>fast-xml-parser>strnum": true,
+        "@metamask/snaps-utils>fast-xml-parser>xml-naming": true
       }
     },
     "@metamask/notification-services-controller>firebase": {
@@ -7288,6 +7293,11 @@
     "eth-method-registry>@metamask/ethjs-query>@metamask/ethjs-format>strip-hex-prefix": {
       "packages": {
         "eth-method-registry>@metamask/ethjs-query>@metamask/ethjs-format>is-hex-prefixed": true
+      }
+    },
+    "@metamask/snaps-utils>fast-xml-parser>strnum": {
+      "packages": {
+        "@metamask/snaps-utils>fast-xml-parser>strnum>anynum": true
       }
     },
     "react-markdown>style-to-object": {
