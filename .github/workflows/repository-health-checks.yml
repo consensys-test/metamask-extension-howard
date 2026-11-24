@@ -148,6 +148,10 @@ jobs:
           }}
         run: mv .tmp/audit-current.json .tmp/audit-baseline.json
 
+      - name: TEST ONLY -- poison baseline
+        if: ${{ !cancelled() }}
+        run: echo '[]' > .tmp/audit-baseline.json
+
       - name: Audit -- upload baseline artifact
         if: >-
           ${{
