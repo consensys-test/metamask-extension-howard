@@ -41,8 +41,8 @@ env:
 jobs:
   fix:
     name: Triage and fix
-    # Pinned: the sandbox setup was tested on 24.04; ubuntu-latest moved to 26.04, where bubblewrap fails.
-    runs-on: ubuntu-24.04
+    # The sandbox setup below is tested on both 24.04 and 26.04 (ubuntu-latest moves between them).
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: read
@@ -74,6 +74,12 @@ jobs:
         if: ${{ steps.select.outputs.has-work == 'true' }}
         run: |
           sudo apt-get install -y bubblewrap socat
+          # 26.04 ships a stock bwrap profile whose restricted child blocks the nested user
+          # namespace that Claude Code's seccomp helper needs, so replace it.
+          if [ -f /etc/apparmor.d/bwrap-userns-restrict ]; then
+            sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict
+            sudo rm /etc/apparmor.d/bwrap-userns-restrict
+          fi
           sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
           abi <abi/4.0>,
           include <tunables/global>
@@ -83,7 +89,8 @@ jobs:
             include if exists <local/bwrap>
           }
           EOF
-          sudo systemctl reload apparmor
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          bwrap --ro-bind / / --unshare-user --dev /dev unshare -U true
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
           claude --version
 
@@ -109,7 +116,8 @@ jobs:
           PATH="$HOME/agent-bin:$PATH" claude -p "$(cat .github/audit-autofix/prompt.md)" \
             --model "$MODEL" --settings "$settings" \
             --allowedTools 'Bash,Read,Edit,Write,Glob,Grep' \
-            --max-turns 120 --output-format json > "$WORK_DIR/claude-run.json"
+            --max-turns 120 --output-format stream-json --verbose > "$WORK_DIR/claude-transcript.jsonl"
+          jq -c 'select(.type == "result")' "$WORK_DIR/claude-transcript.jsonl" | tail -n 1 > "$WORK_DIR/claude-run.json"
 
       - name: Record the agent outcome
         if: ${{ always() && steps.select.outputs.has-work == 'true' }}
