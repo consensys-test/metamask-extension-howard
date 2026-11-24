@@ -6,16 +6,12 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { argValue } from './shared/cli.mts';
 import {
   hashMismatches,
   parsePatchFiles,
   unexpectedPaths,
 } from './shared/lavamoat-patch.mts';
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
 
 const git = (...args: string[]): string =>
   execFileSync('git', args, { encoding: 'utf8' }).trim();

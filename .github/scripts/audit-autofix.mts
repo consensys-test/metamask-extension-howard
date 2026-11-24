@@ -18,6 +18,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { argValue } from './shared/cli.mts';
 import { computeCloses } from './shared/audit-closes.mts';
 import {
   buildPrBody,
@@ -31,11 +32,6 @@ import { ghApi } from './shared/gh-api.mts';
 
 const DIR = '.tmp/audit-autofix';
 const EXIT_NO_CHANGES = 3;
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
 
 function setOutput(name: string, value: string): void {
   console.log(`${name}=${value}`);

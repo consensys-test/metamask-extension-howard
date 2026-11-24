@@ -34,9 +34,11 @@ env:
   LITELLM_BASE_URL: https://litellm.consensys.info
   MODEL: claude-sonnet-5-5
   CLAUDE_CODE_VERSION: 2.1.323
+  # TEMPORARY (2/2): once the push trigger is gone this is just `inputs.dry-run`.
   DRY_RUN: ${{ github.event_name == 'push' || inputs.dry-run }}
   WORK_DIR: .tmp/audit-autofix
   # TEMPORARY (2/2): the bot issues live upstream, so push-triggered fork runs read them from there.
+  # Once the push trigger is gone this is just `github.repository`.
   ISSUES_REPO: ${{ github.event_name == 'push' && 'MetaMask/metamask-extension' || github.repository }}
 
 jobs:
@@ -156,6 +158,10 @@ jobs:
       - name: Remove dead pins and unused patches
         if: ${{ steps.gate.outputs.changed == 'true' }}
         run: yarn tsx .github/scripts/prune-dead-pins.mts --out "$WORK_DIR/dead-pins.md"
+
+      - name: Sort the resolutions
+        if: ${{ steps.gate.outputs.changed == 'true' }}
+        run: yarn tsx .github/scripts/resolutions-lint.mts --base "$WORK_DIR/package.base.json" --fix
 
       - name: Repair allowScripts and check the install
         id: verify

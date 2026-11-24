@@ -4,10 +4,10 @@
 // are restored after every trial. Each trial costs one lockfile update plus one audit.
 //
 // Usage: yarn tsx .github/scripts/resolution-necessity.mts --base <package.json> [--head package.json] [--out <file>]
-// Set NECESSITY_YARN_COMMAND="corepack yarn" where plain `yarn` is not on PATH.
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import semver from 'semver';
+import { argValue } from './shared/cli.mts';
+import { updateLockfile, writePackageJson, yarn } from './shared/yarn-cli.mts';
 import { parseLockfile } from './shared/lockfile-churn.mts';
 import { parseResolutionKey } from './shared/resolutions-lint.mts';
 import {
@@ -23,39 +23,6 @@ import {
 } from './shared/resolution-necessity.mts';
 
 const NEWEST_PARENT_VERSIONS = 10;
-const [YARN, ...YARN_ARGS] = (
-  process.env.NECESSITY_YARN_COMMAND ?? 'yarn'
-).split(' ');
-
-function argValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
-}
-
-function yarn(args: string[], tolerateFailure = false): string {
-  try {
-    return execFileSync(YARN, [...YARN_ARGS, ...args], {
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
-      shell: process.platform === 'win32',
-    });
-  } catch (error) {
-    // `yarn npm audit` exits non-zero whenever it finds advisories.
-    if (!tolerateFailure) {
-      throw error;
-    }
-    return (error as { stdout?: string }).stdout ?? '';
-  }
-}
-
-function updateLockfile(): void {
-  const output = yarn(['install', '--mode=update-lockfile'], true);
-  // Without node_modules the install still exits 1 after the lockfile update (postinstall).
-  if (/YN0(001|016|027|035)/u.test(output) || !output.includes('Link step')) {
-    throw new Error(`Lockfile update failed:\n${output}`);
-  }
-}
-
 function npmInfo<Value>(spec: string, field: string): Value | undefined {
   const output = yarn(['npm', 'info', spec, '--json', '--fields', field], true);
   try {
@@ -76,7 +43,7 @@ function runTrial(
     ...headPackage,
     resolutions: withoutResolution(headPackage.resolutions, resolution.key),
   };
-  writeFileSync('package.json', `${JSON.stringify(trialPackage, null, 2)}\n`);
+  writePackageJson(trialPackage);
   updateLockfile();
   const audit = yarn(['npm', 'audit', '--recursive', '--json'], true);
   const lockText = readFileSync('yarn.lock', 'utf8');
