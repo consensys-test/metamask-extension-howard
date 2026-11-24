@@ -15,6 +15,10 @@ import {
   uniqueAdvisoriesByIdentity,
   writeStepSummary,
 } from './shared/audit-utils.mts';
+import {
+  autofixEnabled,
+  dispatchAutofix,
+} from './shared/audit-autofix-dispatch.mts';
 import { ghApi } from './shared/gh-api.mts';
 import { getGitHubToken } from './shared/github-token.mts';
 
@@ -562,7 +566,7 @@ function maybeCreateIssue(
   advisories: ParsedAdvisory[],
   blockingAdvisories: ParsedAdvisory[],
   treeText: string,
-): { url: string; isNew: boolean } | null {
+): { url: string; number: number; isNew: boolean } | null {
   if (!IS_MAIN || advisories.length === 0) {
     return null;
   }
@@ -616,7 +620,7 @@ function maybeCreateIssue(
     if (typeof match?.number === 'number') {
       const url = `https://github.com/${owner}/${repo}/issues/${match.number}`;
       githubAnnotate('notice', `Tracking issue already exists: ${url}`);
-      return { url, isNew: false };
+      return { url, number: match.number, isNew: false };
     }
   } catch {
     // Search failed — proceed to create (worst case: a duplicate).
@@ -683,7 +687,7 @@ function maybeCreateIssue(
     if (typeof json.number === 'number') {
       const url = `https://github.com/${owner}/${repo}/issues/${json.number}`;
       githubAnnotate('notice', `Created tracking issue: ${url}`);
-      return { url, isNew: true };
+      return { url, number: json.number, isNew: true };
     }
   } catch (error) {
     githubAnnotate(
@@ -910,6 +914,26 @@ async function main() {
       blockingAdvisories,
       treeText,
     );
+
+    // Start the autofix for a new issue; a dispatch failure must not fail the audit.
+    if (issueResult?.isNew && autofixEnabled(process.env)) {
+      try {
+        dispatchAutofix(
+          process.env.GITHUB_REPOSITORY ?? '',
+          BRANCH,
+          issueResult.number,
+          getGitHubToken(),
+        );
+        console.log(
+          `Started the audit autofix for issue #${issueResult.number}.`,
+        );
+      } catch (error) {
+        githubAnnotate(
+          'warning',
+          `Could not start the audit autofix: ${String(error)}`,
+        );
+      }
+    }
 
     // On push-to-main, send a Slack notification so the team knows immediately.
     // Skip if the issue already existed — that means we already notified for this

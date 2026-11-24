@@ -13,6 +13,8 @@ jobs:
       BRANCH: ${{ github.head_ref || github.ref_name }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SLACK_WEBHOOK_METAMASK_EXTENSION: ${{ secrets.SLACK_WEBHOOK_METAMASK_EXTENSION }}
+      # Set to 'true' to start the audit autofix for each new tracking issue.
+      AUDIT_AUTOFIX_ENABLED: ${{ vars.AUDIT_AUTOFIX_ENABLED }}
       # True only when the PR head lives in a different repository (no secrets).
       IS_CROSS_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
     steps:

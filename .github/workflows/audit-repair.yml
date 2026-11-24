@@ -60,10 +60,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
           INPUT_RUN_ID: ${{ inputs.run-id }}
+          EVENT_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         run: |
           run_id="${INPUT_RUN_ID:-$EVENT_RUN_ID}"
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" \
-            --jq '"run-id=\(.id)\nhead-branch=\(.head_branch)\nhead-sha=\(.head_sha)\nattempt=\(.run_attempt)"' >> "$GITHUB_OUTPUT"
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")
+          # The event names the attempt that just failed; the API names the latest, which a rerun may already have moved on.
+          attempt="${EVENT_ATTEMPT:-$(jq -r .run_attempt <<< "$run")}"
+          jq -r --arg attempt "$attempt" '"run-id=\(.id)\nhead-branch=\(.head_branch)\nhead-sha=\(.head_sha)\nattempt=\($attempt)"' <<< "$run" >> "$GITHUB_OUTPUT"
 
       - name: Check the branch
         env:
@@ -180,8 +183,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUDIT_AUTOFIX_PAT }}
           RUN_ID: ${{ steps.run.outputs.run-id }}
+          ATTEMPT: ${{ steps.run.outputs.attempt }}
         run: |
           test -n "$GH_TOKEN"
+          # triage-and-retry-system.yml also reruns flaky PR runs; do not start a second rerun.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .run_attempt)
+          if [ "$latest" -gt "$ATTEMPT" ]; then
+            echo "::notice::Run $RUN_ID is already on attempt $latest; another workflow reran it."
+            exit 0
+          fi
           gh run rerun "$RUN_ID" --failed --repo "$GITHUB_REPOSITORY"
 
       - name: Report a failure this workflow does not repair
