@@ -305,9 +305,14 @@ jobs:
       - name: Verify the repaired tree
         id: changes
         if: ${{ steps.plan.outputs.action == 'repair' || (steps.plan.outputs.action == 'llm' && steps.agent.outcome == 'success') }}
+        env:
+          STEPS: ${{ steps.plan.outputs.steps }}
         run: |
           yarn install --immutable --mode=skip-build
-          yarn dedupe --check
+          # An allowScripts-only repair leaves the lock alone, so a pending dedupe waits for its own round.
+          if [ "${{ steps.plan.outputs.action }}" = llm ] || jq -e 'index("dedupe")' <<< "$STEPS" > /dev/null; then
+            yarn dedupe --check
+          fi
           # The same paths the autofix workflow may change; anything else is a bug here.
           stray=$(git diff --name-only | grep -v -E '^(package\.json|yarn\.lock|\.yarn/patches/|lavamoat/webpack/)' || true)
           if [ -n "$stray" ]; then
