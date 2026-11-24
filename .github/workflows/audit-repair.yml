@@ -1,0 +1,251 @@
+name: Audit repair
+
+# Repairs a failed `Main` run on an `audit-fix/*` branch with the deterministic steps of
+# `.github/scripts/audit-repair.mts plan` (allowScripts, dedupe, LavaMoat policy) and pushes
+# one commit, so CI runs again. A failure it cannot repair this way is only reported.
+# The scripts run from the default branch (`.tmp/trusted`), never from the branch under repair.
+
+on:
+  workflow_run:
+    workflows: [Main]
+    types: [completed]
+    branches: ['audit-fix/**']
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: 'Failed Main run to plan and repair'
+        required: true
+        type: string
+      dry-run:
+        description: 'Do everything except pushing. Required for a branch outside audit-fix/'
+        default: true
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: audit-repair-${{ github.event.workflow_run.head_branch || inputs.run-id }}
+  cancel-in-progress: false
+
+env:
+  WORK_DIR: .tmp/audit-repair
+  REPAIR_CAP: '3'
+  DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+
+jobs:
+  repair:
+    name: Plan and repair
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - name: Resolve the failed run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          INPUT_RUN_ID: ${{ inputs.run-id }}
+        run: |
+          run_id="${INPUT_RUN_ID:-$EVENT_RUN_ID}"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" \
+            --jq '"run-id=\(.id)\nhead-branch=\(.head_branch)\nhead-sha=\(.head_sha)\nattempt=\(.run_attempt)"' >> "$GITHUB_OUTPUT"
+
+      - name: Check the branch
+        env:
+          HEAD_BRANCH: ${{ steps.run.outputs.head-branch }}
+        run: |
+          case "$HEAD_BRANCH" in
+            audit-fix/*) ;;
+            *)
+              # TEMPORARY (1/1): lets a dry run plan a failed fork test branch. Remove once an
+              # audit-fix/* PR has been repaired by this workflow.
+              if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] || [ "$DRY_RUN" != true ]; then
+                echo "::error::Only a dry run may repair $HEAD_BRANCH"
+                exit 1
+              fi
+              ;;
+          esac
+
+      - name: Checkout and install the branch
+        uses: MetaMask/action-checkout-and-setup@v3
+        with:
+          # TEMPORARY (1/1): false while this workflow is developed. Set to true when the PR is opened.
+          is-high-risk-environment: false
+          ref: ${{ steps.run.outputs.head-sha }}
+          persist-credentials: false
+
+      - name: Checkout the trusted scripts
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .tmp/trusted
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Find the branch point and earlier repairs
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          HEAD_SHA: ${{ steps.run.outputs.head-sha }}
+        run: |
+          mkdir -p "$WORK_DIR"
+          gh api "repos/$GITHUB_REPOSITORY/compare/$DEFAULT_BRANCH...$HEAD_SHA" > "$WORK_DIR/compare.json"
+          base=$(jq -r .merge_base_commit.sha "$WORK_DIR/compare.json")
+          repairs=$(jq '[.commits[].commit.message | select(test("(^|\n)Repair-Round: "))] | length' "$WORK_DIR/compare.json")
+          previous=$(jq -r '([.commits[].commit.message | select(test("(^|\n)Repair-Round: "))] | last // "") | (capture("(^|\n)Repair-Signature: (?<s>[^\n]*)") // {s: ""}) | .s' "$WORK_DIR/compare.json")
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --depth=1 origin "$base"
+          git show "$base:package.json" > "$WORK_DIR/package.base.json"
+          git show "$base:yarn.lock" > "$WORK_DIR/yarn.base.lock"
+          {
+            echo "repairs=$repairs"
+            echo "previous-signature=$previous"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Plan the repair
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.run.outputs.run-id }}
+          ATTEMPT: ${{ steps.run.outputs.attempt }}
+          REPAIRS: ${{ steps.base.outputs.repairs }}
+          PREVIOUS_SIGNATURE: ${{ steps.base.outputs.previous-signature }}
+        run: |
+          args=(plan --run-id "$RUN_ID" --repo "$GITHUB_REPOSITORY" --attempt "$ATTEMPT" --repairs "$REPAIRS" --cap "$REPAIR_CAP")
+          if [ -n "$PREVIOUS_SIGNATURE" ]; then
+            args+=(--previous-signature "$PREVIOUS_SIGNATURE")
+          fi
+          node .tmp/trusted/.github/scripts/audit-repair.mts "${args[@]}" > "$WORK_DIR/plan.json"
+          jq '.plan' "$WORK_DIR/plan.json"
+          {
+            echo "action=$(jq -r .plan.action "$WORK_DIR/plan.json")"
+            echo "steps=$(jq -c .plan.steps "$WORK_DIR/plan.json")"
+            echo "signature=$(jq -r .plan.signature "$WORK_DIR/plan.json")"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo '### Audit repair plan'
+            echo '```json'
+            jq '.plan' "$WORK_DIR/plan.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rerun the failed jobs once
+        if: ${{ steps.plan.outputs.action == 'retry' && env.DRY_RUN != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.AUDIT_AUTOFIX_PAT }}
+          RUN_ID: ${{ steps.run.outputs.run-id }}
+        run: |
+          test -n "$GH_TOKEN"
+          gh run rerun "$RUN_ID" --failed --repo "$GITHUB_REPOSITORY"
+
+      - name: Report a failure this workflow does not repair
+        if: ${{ steps.plan.outputs.action == 'llm' || steps.plan.outputs.action == 'needs-human' }}
+        run: echo "::warning::Plan is ${{ steps.plan.outputs.action }}; no deterministic repair applies. See the plan in the job summary."
+
+      - name: Repair allowScripts
+        if: ${{ steps.plan.outputs.action == 'repair' && contains(fromJSON(steps.plan.outputs.steps), 'allow-scripts') }}
+        run: |
+          # Fails when a package moved to a path allowScripts has no entry for; the next command adds it.
+          yarn install --mode=skip-build || true
+          yarn allow-scripts auto
+          code=0
+          node .tmp/trusted/.github/scripts/allow-scripts-reconcile.mts \
+            --base "$WORK_DIR/package.base.json" --auto package.json \
+            --before "$WORK_DIR/yarn.base.lock" --after yarn.lock \
+            --out "$WORK_DIR/allow-scripts.json" || code=$?
+          echo "allow-scripts-reconcile exit code: $code (1 means unrelated entries were dropped)"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.lavamoat.allowScripts = JSON.parse(fs.readFileSync(process.env.WORK_DIR + '/allow-scripts.json', 'utf8'));
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          yarn lint:json:fix
+
+      - name: Deduplicate the lockfile
+        if: ${{ steps.plan.outputs.action == 'repair' && contains(fromJSON(steps.plan.outputs.steps), 'dedupe') }}
+        run: yarn dedupe
+
+      - name: Download the LavaMoat policy diffs from CI
+        if: ${{ steps.plan.outputs.action == 'repair' && contains(fromJSON(steps.plan.outputs.steps), 'lavamoat-policy') }}
+        uses: actions/download-artifact@v7
+        with:
+          path: ${{ env.WORK_DIR }}/policy-diffs
+          pattern: lavamoat-policy-diff-*
+          merge-multiple: true
+          run-id: ${{ steps.run.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Apply the LavaMoat policy diffs
+        if: ${{ steps.plan.outputs.action == 'repair' && contains(fromJSON(steps.plan.outputs.steps), 'lavamoat-policy') }}
+        run: node .tmp/trusted/.github/scripts/lavamoat-apply-ci-diff.mts --dir "$WORK_DIR/policy-diffs"
+
+      - name: Verify the repaired tree
+        id: changes
+        if: ${{ steps.plan.outputs.action == 'repair' }}
+        run: |
+          yarn install --immutable --mode=skip-build
+          yarn dedupe --check
+          # The same paths the autofix workflow may change; anything else is a bug here.
+          stray=$(git diff --name-only | grep -v -E '^(package\.json|yarn\.lock|\.yarn/patches/|lavamoat/webpack/)' || true)
+          if [ -n "$stray" ]; then
+            echo "::error::Repair changed files outside the allowed paths: $stray"
+            exit 1
+          fi
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::The repair changed nothing."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --binary > "$WORK_DIR/repair.patch"
+            git diff --stat
+          fi
+
+      - name: Upload the run files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-repair
+          path: .tmp/audit-repair/
+          if-no-files-found: ignore
+
+      - name: Get token
+        id: token
+        if: ${{ steps.changes.outputs.changed == 'true' && env.DRY_RUN != 'true' && github.repository == 'MetaMask/metamask-extension' && vars.TOKEN_EXCHANGE_URL != '' }}
+        uses: MetaMask/github-tools/.github/actions/get-token@v1
+        with:
+          token-exchange-url: ${{ vars.TOKEN_EXCHANGE_URL }}
+          permissions: |
+            contents: write
+
+      - name: Commit and push the repair
+        if: ${{ steps.changes.outputs.changed == 'true' && env.DRY_RUN != 'true' }}
+        env:
+          # The fork test uses a PAT; the real repository uses the exchanged token. A push with
+          # the default token would not start CI again.
+          GH_TOKEN: ${{ steps.token.outputs.token || secrets.AUDIT_AUTOFIX_PAT }}
+          HEAD_BRANCH: ${{ steps.run.outputs.head-branch }}
+          RUN_ID: ${{ steps.run.outputs.run-id }}
+          STEPS: ${{ steps.plan.outputs.steps }}
+          SIGNATURE: ${{ steps.plan.outputs.signature }}
+          REPAIRS: ${{ steps.base.outputs.repairs }}
+        run: |
+          test -n "$GH_TOKEN"
+          echo "::add-mask::$GH_TOKEN"
+          case "$HEAD_BRANCH" in audit-fix/*) ;; *) echo "::error::Refusing to push $HEAD_BRANCH"; exit 1 ;; esac
+          git config user.name 'MetaMask Bot'
+          git config user.email 'metamaskbot@users.noreply.github.com'
+          git add package.json yarn.lock .yarn/patches lavamoat/webpack
+          git commit -m "bump: repair audit fix ($(jq -r 'join(", ")' <<< "$STEPS"))" \
+            -m "Repair-Round: $((REPAIRS + 1))" \
+            -m "Repair-Signature: $SIGNATURE" \
+            -m "Repair-Run: $RUN_ID"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$HEAD_BRANCH"
