@@ -52,6 +52,22 @@ describe('classifyJob', () => {
     });
   }
 
+  it('classifies a lint job that ran out of heap by its log', () => {
+    expect(
+      classifyJob({
+        ...lint,
+        log: 'FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory',
+      }),
+    ).toBe('lint-heap');
+    expect(classifyJob({ ...lint, log: 'error  no-unused-vars' })).toBe('lint');
+  });
+
+  it('sends a lint heap failure to the LLM repair', () => {
+    const heap = { ...lint, log: 'JavaScript heap out of memory' };
+
+    expect(decide([heap])).toMatchObject({ action: 'llm' });
+  });
+
   it('classifies a depcheck-only health failure as depcheck', () => {
     expect(classifyJob({ ...health, failedSteps: ['Run depcheck'] })).toBe(
       'depcheck',
