@@ -42,11 +42,25 @@ type Rule = { kind: FailureKind; job?: RegExp; step?: RegExp; log?: RegExp };
 /** Jobs whose class depends on the log, so the caller fetches it for them. */
 export const LOG_CLASSIFIED_JOB = /^Test lint\b/iu;
 
+/** The setup action's install step; its log tells a stale allowScripts entry from a real install failure. */
+export const SETUP_STEP = /^Checkout and setup environment$/iu;
+
+/** Whether the planner needs the log of this failed job to classify it. */
+export const needsLog = (job: FailedJob): boolean =>
+  LOG_CLASSIFIED_JOB.test(job.name) ||
+  job.failedSteps.some((step) => SETUP_STEP.test(step));
+
 // First match wins, so the narrow step rules come before the broad job rules.
 const RULES: Rule[] = [
   { kind: 'cascade', job: /\bCI status gate\b|^all-jobs-pass$/iu },
   // Needs a token exchange that a branch or fork run may lack; no dependency change causes it.
   { kind: 'cascade', job: /^Publish prerelease\b/iu },
+  // `yarn --immutable` itself fails when a package has no allowScripts entry, so every job dies in setup.
+  {
+    kind: 'allow-scripts',
+    step: SETUP_STEP,
+    log: /dependencies without configuration/iu,
+  },
   { kind: 'dedupe', step: /Detect yarn lock deduplications/iu },
   { kind: 'allow-scripts', step: /allow-scripts/iu },
   {

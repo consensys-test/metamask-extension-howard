@@ -16,7 +16,7 @@ import { ghApi } from './shared/gh-api.mts';
 import {
   classifyJob,
   decideRepair,
-  LOG_CLASSIFIED_JOB,
+  needsLog,
   type FailedJob,
   type FailureKind,
   type RepairPlan,
@@ -54,7 +54,7 @@ function failedJobs(repo: string, runId: string, attempt: string): FailedJob[] {
     }))
     .map((job) => ({
       ...job,
-      log: LOG_CLASSIFIED_JOB.test(job.name) ? fetchLog(repo, job) : undefined,
+      log: needsLog(job) ? fetchLog(repo, job) : undefined,
     }));
 }
 
