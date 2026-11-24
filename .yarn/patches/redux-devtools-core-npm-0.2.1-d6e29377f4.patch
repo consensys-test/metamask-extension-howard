@@ -1,0 +1,13 @@
+diff --git a/lib/utils/index.js b/lib/utils/index.js
+index fcda6adc562c2bac4b81ff04f08a934140f46f4f..3e3834489bd4d324003f29c8de88a2ddbe89a6d6 100644
+--- a/lib/utils/index.js
++++ b/lib/utils/index.js
+@@ -21,7 +21,7 @@ var _jsan = require('jsan');
+ 
+ var _jsan2 = _interopRequireDefault(_jsan);
+ 
+-var _nonSecure = require('nanoid/non-secure');
++var _nonSecure = require('nanoid/non-secure').nanoid;
+ 
+ var _nonSecure2 = _interopRequireDefault(_nonSecure);
+ 
