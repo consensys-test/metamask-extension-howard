@@ -35,10 +35,13 @@ const plan = readJson<{
 const { total_cost_usd: cost } =
   readJson<Record<string, number>>(`${dir}/claude-run.json`) ?? {};
 
-const prNumber = ghApi(
-  `repos/${repo}/pulls?head=${encodeURIComponent(`${repo.split('/')[0]}:${branch}`)}&state=open`,
-  { jq: '.[0].number // empty' },
-).trim();
+// The `head=` filter returned nothing for a branch name with a slash, so filter the list.
+const prNumber = ghApi(`repos/${repo}/pulls?state=open&per_page=100`, {
+  paginate: true,
+  jq: `.[] | select(.head.ref == "${branch}") | .number`,
+})
+  .split('\n')[0]
+  .trim();
 const comment = prNumber
   ? ghApi(`repos/${repo}/issues/${prNumber}/comments`, {
       paginate: true,
