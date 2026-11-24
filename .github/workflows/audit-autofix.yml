@@ -94,6 +94,17 @@ jobs:
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
           claude --version
 
+      # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 hides the key from the sandbox but also makes
+      # package.json and yarn.lock read-only there. Instead the key lives in a file that
+      # only apiKeyHelper (run by Claude outside the sandbox) can read.
+      - name: Write the gateway key file
+        if: ${{ steps.select.outputs.has-work == 'true' }}
+        env:
+          GATEWAY_KEY: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/gateway-key"
+          printf '%s' "$GATEWAY_KEY" > "$RUNNER_TEMP/gateway-key"
+
       - name: Run the agent in the Claude Code sandbox
         id: agent
         if: ${{ steps.select.outputs.has-work == 'true' }}
@@ -102,8 +113,6 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_BASE_URL: ${{ env.LITELLM_BASE_URL }}
-          ANTHROPIC_AUTH_TOKEN: ${{ secrets.AI_ANALYZER_LITELLM_KEY }}
-          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
           BASH_DEFAULT_TIMEOUT_MS: '1800000'
           BASH_MAX_TIMEOUT_MS: '1800000'
         run: |
@@ -112,7 +121,7 @@ jobs:
           real_yarn=$(command -v yarn)
           printf '#!/usr/bin/env bash\nexport YARN_HTTP_PROXY="${YARN_HTTP_PROXY:-$HTTP_PROXY}" YARN_HTTPS_PROXY="${YARN_HTTPS_PROXY:-$HTTPS_PROXY}"\nexec %s "$@"\n' "$real_yarn" > ~/agent-bin/yarn
           chmod +x ~/agent-bin/yarn
-          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" '{sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
+          settings=$(jq -nc --arg ws "$GITHUB_WORKSPACE" --arg tmp "$RUNNER_TEMP" --arg ssh "$HOME/.ssh" --arg key "$RUNNER_TEMP/gateway-key" '{apiKeyHelper: ("cat " + $key), sandbox: {enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true, filesystem: {denyRead: [$key], denyWrite: [$tmp, $ssh], allowWrite: [$ws, "~/.cache", "~/.yarn", "~/.npm", "~/.config"]}, network: {allowedDomains: ["registry.npmjs.org", "registry.yarnpkg.com", "repo.yarnpkg.com", "github.com", "codeload.github.com"]}}}')
           PATH="$HOME/agent-bin:$PATH" claude -p "$(cat .github/audit-autofix/prompt.md)" \
             --model "$MODEL" --settings "$settings" \
             --allowedTools 'Bash,Read,Edit,Write,Glob,Grep' \
