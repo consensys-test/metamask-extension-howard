@@ -921,7 +921,6 @@ async function main() {
         dispatchAutofix(
           process.env.GITHUB_REPOSITORY ?? '',
           BRANCH,
-          issueResult.number,
           getGitHubToken(),
         );
         console.log(

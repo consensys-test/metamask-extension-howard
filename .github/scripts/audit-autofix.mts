@@ -1,14 +1,16 @@
 // Deterministic steps around the audit autofix agent.
 //
-//   select --issues <open|1,2> [--existing-pr-head audit-fix/]
+//   select --issues <open|1,2> [--existing-pr-head audit-fix/] [--rolling-pr <number>]
 //       Picks the open bot issues that still have advisories (from AUDIT_CURRENT_FILE), writes
 //       .tmp/audit-autofix/issues.json and sets has-work for the workflow. Stops when an open
-//       PR from an audit-fix/ branch already exists.
+//       PR from an audit-fix/ branch already exists, except the --rolling-pr one: a rolling run
+//       adds to that PR and skips the issues its body already mentions.
 //   gate
 //       Fails when the agent changed anything outside the allowed paths; deletes the empty
 //       dotfiles the sandbox leaves behind. Exit 3 means the agent changed nothing.
 //   body --run-url <url>
-//       Writes .tmp/audit-autofix/pr-body.md from the agent report and the command outputs.
+//       Writes .tmp/audit-autofix/pr-body.md (a new PR) and pr-section.md (an addition to an
+//       open PR) from the agent report and the command outputs.
 import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -22,7 +24,9 @@ import { argValue } from './shared/cli.mts';
 import { computeCloses } from './shared/audit-closes.mts';
 import {
   buildPrBody,
+  buildPrSection,
   classifyPaths,
+  mentionedIssues,
   parsePorcelain,
   selectIssues,
   type SelectableIssue,
@@ -61,8 +65,13 @@ async function select(): Promise<void> {
   )
     .split('\n')
     .filter(Boolean);
-  if (openPrs.length > 0) {
-    console.log(`An audit fix PR is already open: ${openPrs.join(', ')}`);
+  // A rolling run adds to this one open PR; any other open audit PR still stops the run.
+  const rollingPr = argValue('--rolling-pr');
+  const blocking = rollingPr
+    ? openPrs.filter((line) => !line.startsWith(`#${rollingPr} `))
+    : openPrs;
+  if (blocking.length > 0) {
+    console.log(`An audit fix PR is already open: ${blocking.join(', ')}`);
     setOutput('has-work', 'false');
     setOutput('reason', 'open-pr');
     return;
@@ -81,7 +90,17 @@ async function select(): Promise<void> {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as SelectableIssue);
-  const selected = selectIssues(issues, argValue('--issues') ?? 'open');
+  const wanted = argValue('--issues') ?? 'open';
+  const rolledIn = rollingPr
+    ? mentionedIssues(
+        await retry(() =>
+          ghApi(`/repos/${repo}/pulls/${rollingPr}`, { jq: '.body // ""' }),
+        ),
+      )
+    : new Set<number>();
+  const selected = selectIssues(issues, wanted).filter(
+    ({ number }) => wanted.trim() !== 'open' || !rolledIn.has(number),
+  );
 
   const advisories = readAdvisories(AUDIT_CURRENT_FILE);
   if (advisories === null || advisories.length === 0) {
@@ -140,7 +159,7 @@ function body(): void {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const text = buildPrBody({
+  const input = {
     runUrl: argValue('--run-url') ?? '',
     closes: readText(`${DIR}/closes.md`),
     report: readText(`${DIR}/agent-report.md`),
@@ -153,9 +172,13 @@ function body(): void {
     deadPinLines: readText(`${DIR}/dead-pins.md`).split('\n').filter(Boolean),
     ageGateBypassed: [...new Set(bypassed)],
     costUsd: cost,
-  });
+  };
+  const text = buildPrBody(input);
   writeFileSync(`${DIR}/pr-body.md`, text);
-  console.log(`Wrote ${DIR}/pr-body.md (${text.length} characters).`);
+  writeFileSync(`${DIR}/pr-section.md`, buildPrSection(input));
+  console.log(
+    `Wrote ${DIR}/pr-body.md (${text.length} characters) and pr-section.md.`,
+  );
 }
 
 const command = process.argv[2];

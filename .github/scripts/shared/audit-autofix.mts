@@ -92,8 +92,8 @@ export type PrBodyInput = {
   costUsd: number | undefined;
 };
 
-export function buildPrBody(input: PrBodyInput): string {
-  const evidence = [
+function evidenceLines(input: PrBodyInput): string[] {
+  return [
     `- Advisories on the branch: ${input.advisoriesBefore} before, ${input.advisoriesAfter} after (\`yarn npm audit --recursive\`).`,
     input.ageGateBypassed.length > 0
       ? `- Age gate (\`npmMinimalAgeGate\`) bypassed for: ${input.ageGateBypassed.join(', ')}.`
@@ -114,16 +114,24 @@ export function buildPrBody(input: PrBodyInput): string {
     ...input.churnLines.map((line) => `  ${line}`),
     "- Not run by the workflow: unit and E2E tests, builds, and `yarn lavamoat:auto`. CI decides, and later steps apply CI's LavaMoat policy diff.",
   ];
+}
+
+// total_cost_usd is Claude Code's own price-table estimate, not gateway billing.
+function spendLine(costUsd: number | undefined): string {
+  return costUsd === undefined
+    ? '**LLM spend:** not reported.'
+    : `**LLM spend:** approximately $${costUsd.toFixed(2)} (estimated by Claude Code, not the billed amount).`;
+}
+
+export function buildPrBody(input: PrBodyInput): string {
+  const evidence = evidenceLines(input);
 
   return [
     '## **Description**',
     '',
     `This PR was prepared by the [audit autofix workflow](${input.runUrl}), not by a person. It is a draft until a human has reviewed it.`,
     '',
-    // total_cost_usd is Claude Code's own price-table estimate, not gateway billing.
-    input.costUsd === undefined
-      ? '**LLM spend:** not reported.'
-      : `**LLM spend:** approximately $${input.costUsd.toFixed(2)} (estimated by Claude Code, not the billed amount).`,
+    spendLine(input.costUsd),
     '',
     stripClosingKeywords(input.report).trim(),
     '',
@@ -147,6 +155,29 @@ export function buildPrBody(input: PrBodyInput): string {
     '-->',
     '',
   ].join('\n');
+}
+
+/** What a rolling run adds to the open PR's body: the facts of a new PR body under their own heading. */
+export function buildPrSection(input: PrBodyInput): string {
+  return [
+    `### Added by the [audit autofix run](${input.runUrl})`,
+    '',
+    spendLine(input.costUsd),
+    '',
+    stripClosingKeywords(input.report).trim(),
+    '',
+    ...evidenceLines(input),
+    '',
+    input.closes.trim(),
+    '',
+  ].join('\n');
+}
+
+/** Issues a PR body already mentions (closed or left over); a rolling run does not retry them. */
+export function mentionedIssues(body: string): Set<number> {
+  return new Set(
+    [...body.matchAll(/#(\d+)/gu)].map((match) => Number(match[1])),
+  );
 }
 
 export type SelectableIssue = { number: number; title: string; body: string };

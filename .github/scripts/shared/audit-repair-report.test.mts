@@ -177,6 +177,14 @@ describe('parseAutofixCost', () => {
     expect(parseAutofixCost('**LLM spend:** not reported.')).toBeUndefined();
     expect(parseAutofixCost(undefined)).toBeUndefined();
   });
+
+  it('adds the spend of every autofix run that touched the PR', () => {
+    expect(
+      parseAutofixCost(
+        '**LLM spend:** approximately $1.25 (a)\n\n---\n**LLM spend:** approximately $0.50 (b)',
+      ),
+    ).toBe(1.75);
+  });
 });
 
 describe('quoteAgentText', () => {

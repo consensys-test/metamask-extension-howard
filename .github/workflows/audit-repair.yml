@@ -124,8 +124,9 @@ jobs:
           mkdir -p "$WORK_DIR"
           gh api "repos/$GITHUB_REPOSITORY/compare/$DEFAULT_BRANCH...$HEAD_SHA" > "$WORK_DIR/compare.json"
           base=$(jq -r .merge_base_commit.sha "$WORK_DIR/compare.json")
-          repairs=$(jq '[.commits[].commit.message | select(test("(^|\n)Repair-Round: "))] | length' "$WORK_DIR/compare.json")
-          previous=$(jq -r '([.commits[].commit.message | select(test("(^|\n)Repair-Round: "))] | last // "") | (capture("(^|\n)Repair-Signature: (?<s>[^\n]*)") // {s: ""}) | .s' "$WORK_DIR/compare.json")
+          # Only repairs after the last autofix commit count: a rolling autofix run resets the cap.
+          repairs=$(jq '[.commits[].commit.message] | ((to_entries | map(select(.value | test("(^|\n)Audit-Autofix: "))) | last | .key) // -1) as $i | [.[$i + 1:][] | select(test("(^|\n)Repair-Round: "))] | length' "$WORK_DIR/compare.json")
+          previous=$(jq -r '[.commits[].commit.message] | ((to_entries | map(select(.value | test("(^|\n)Audit-Autofix: "))) | last | .key) // -1) as $i | ([.[$i + 1:][] | select(test("(^|\n)Repair-Round: "))] | last // "") | (capture("(^|\n)Repair-Signature: (?<s>[^\n]*)") // {s: ""}) | .s' "$WORK_DIR/compare.json")
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           echo "::add-mask::$auth"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --depth=1 origin "$base"

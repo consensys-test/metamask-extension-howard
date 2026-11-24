@@ -1,6 +1,8 @@
 import {
   buildPrBody,
+  buildPrSection,
   classifyPaths,
+  mentionedIssues,
   parsePorcelain,
   selectIssues,
   stripClosingKeywords,
@@ -129,6 +131,41 @@ describe('buildPrBody', () => {
     expect(
       buildPrBody({ ...input, deadPinLines: ['- Removed dead pin `a`.'] }),
     ).toContain('  - Removed dead pin `a`.');
+  });
+});
+
+describe('buildPrSection', () => {
+  const section = buildPrSection({
+    runUrl: 'https://github.com/o/r/actions/runs/2',
+    closes: 'Closes: #20',
+    report: 'Bumped nanoid.\nFixes: #98',
+    advisoriesBefore: 3,
+    advisoriesAfter: 2,
+    necessityLines: [],
+    deadPinLines: [],
+    churnLines: [],
+    ageGateBypassed: [],
+    costUsd: 0.5,
+  });
+
+  it('adds the run, its spend and its Closes line under one heading', () => {
+    expect(section).toContain('### Added by the [audit autofix run]');
+    expect(section).toContain('**LLM spend:** approximately $0.50');
+    expect(section).toContain('Closes: #20');
+    expect(section).toContain('3 before, 2 after');
+  });
+
+  it('strips closing keywords the agent wrote itself', () => {
+    expect(section).not.toContain('Fixes: #98');
+  });
+});
+
+describe('mentionedIssues', () => {
+  it('collects every issue number in a PR body', () => {
+    expect(
+      mentionedIssues('Closes: #10\nNot closed: #11\nsee #10'),
+    ).toStrictEqual(new Set([10, 11]));
+    expect(mentionedIssues('nothing here')).toStrictEqual(new Set());
   });
 });
 

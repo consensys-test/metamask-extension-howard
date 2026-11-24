@@ -4,10 +4,10 @@ import {
 } from './audit-autofix-dispatch.mts';
 
 describe('buildDispatchRequest', () => {
-  it('targets the autofix workflow with the issue and a real run', () => {
-    expect(buildDispatchRequest('o/r', 'main', 159)).toStrictEqual({
+  it('targets the autofix workflow for every open issue and a real run', () => {
+    expect(buildDispatchRequest('o/r', 'main')).toStrictEqual({
       path: '/repos/o/r/actions/workflows/audit-autofix.yml/dispatches',
-      body: { ref: 'main', inputs: { issues: '159', 'dry-run': 'false' } },
+      body: { ref: 'main', inputs: { issues: 'open', 'dry-run': 'false' } },
     });
   });
 });

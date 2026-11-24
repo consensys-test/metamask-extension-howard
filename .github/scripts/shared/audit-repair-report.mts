@@ -42,14 +42,18 @@ const NO_PUSH: Record<string, string> = {
   unfinished: 'a repair step failed or the run was cancelled',
 };
 
-/** The autofix run's own spend line in the PR body, if it has one. */
+/** The autofix spend in the PR body: the sum of its spend lines, one per autofix run. */
 export function parseAutofixCost(
   prBody: string | undefined,
 ): number | undefined {
-  const match = prBody?.match(
-    /\*\*LLM spend:\*\* approximately \$(\d+(?:\.\d+)?)/u,
-  );
-  return match ? Number(match[1]) : undefined;
+  const costs = [
+    ...(prBody ?? '').matchAll(
+      /\*\*LLM spend:\*\* approximately \$(\d+(?:\.\d+)?)/gu,
+    ),
+  ].map((match) => Number(match[1]));
+  return costs.length === 0
+    ? undefined
+    : costs.reduce((sum, cost) => sum + cost, 0);
 }
 
 /** Agent text goes into a comment: no pings, no forged markers, bounded length. */

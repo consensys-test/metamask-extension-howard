@@ -15,6 +15,10 @@ on:
         description: 'Do everything except pushing the branch and opening the PR'
         default: true
         type: boolean
+      rolling-retry:
+        description: 'Set by the workflow when it starts itself again after the branch moved; leave at 0'
+        default: '0'
+        type: string
   # Daily sweep for issues that arrived while another autofix PR was open. Runs after the overnight Main.
   schedule:
     - cron: '0 8 * * *'
@@ -57,10 +61,31 @@ jobs:
       issues: read
       pull-requests: read
       id-token: write
+      actions: write # start the one retry run when the branch moved
     steps:
+      # Exactly one open audit PR means this run rolls onto it instead of starting a new one.
+      - name: Find the open audit PR
+        id: open-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=30" \
+            --jq '.[] | select(.head.ref | startswith("audit-fix/")) | "\(.number) \(.head.ref) \(.head.sha)"')
+          count=$(grep -c . <<< "$prs" || true)
+          echo "open audit PRs: $count"
+          if [ "$count" = 1 ]; then
+            read -r number branch sha <<< "$prs"
+            {
+              echo "number=$number"
+              echo "branch=$branch"
+              echo "sha=$sha"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout and install
         uses: MetaMask/action-checkout-and-setup@v3
         with:
+          ref: ${{ steps.open-pr.outputs.sha }}
           # TEMPORARY (1/2): false while this workflow is developed. Set to true when the PR is opened.
           is-high-risk-environment: false
           persist-credentials: false
@@ -76,7 +101,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUES: ${{ inputs.issues || 'open' }}
-        run: yarn tsx .github/scripts/audit-autofix.mts select --issues "$ISSUES"
+          ROLLING_PR: ${{ steps.open-pr.outputs.number }}
+        run: |
+          args=(--issues "$ISSUES")
+          if [ -n "$ROLLING_PR" ]; then args+=(--rolling-pr "$ROLLING_PR"); fi
+          yarn tsx .github/scripts/audit-autofix.mts select "${args[@]}"
 
       - name: Build the per-consumer fix table
         if: ${{ steps.select.outputs.has-work == 'true' }}
@@ -261,17 +290,48 @@ jobs:
         env:
           # The fork test uses a PAT; the real repository uses the exchanged token.
           GH_TOKEN: ${{ steps.token.outputs.token || secrets.AUDIT_AUTOFIX_PAT }}
+          GH_REPO: ${{ github.repository }}
+          ACTIONS_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_NUMBER: ${{ steps.open-pr.outputs.number }}
+          PR_BRANCH: ${{ steps.open-pr.outputs.branch }}
+          PR_SHA: ${{ steps.open-pr.outputs.sha }}
+          ISSUES: ${{ inputs.issues || 'open' }}
+          RETRY: ${{ inputs.rolling-retry || '0' }}
         run: |
           test -n "$GH_TOKEN"
           echo "::add-mask::$GH_TOKEN"
-          branch="audit-fix/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
           git config user.name 'MetaMask Bot'
           git config user.email 'metamaskbot@users.noreply.github.com'
-          git checkout -b "$branch"
-          git add package.json yarn.lock .yarn/patches lavamoat/webpack
-          git commit -m 'bump: fix audit advisories'
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           echo "::add-mask::$auth"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$branch"
-          gh pr create --draft --base main --head "$branch" \
-            --title 'bump: fix audit advisories' --body-file "$WORK_DIR/pr-body.md"
+          push() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push "$@"; }
+          # The repair loop counts only its own commits after the last one carrying this trailer.
+          commit() { git commit -m 'bump: fix audit advisories' -m "Audit-Autofix: $GITHUB_RUN_ID"; }
+          if [ -z "$PR_BRANCH" ]; then
+            branch="audit-fix/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+            git checkout -b "$branch"
+            git add package.json yarn.lock .yarn/patches lavamoat/webpack
+            commit
+            push origin "HEAD:refs/heads/$branch"
+            gh pr create --draft --base main --head "$branch" \
+              --title 'bump: fix audit advisories' --body-file "$WORK_DIR/pr-body.md"
+            exit 0
+          fi
+          # Rolling: add a commit to the open PR. The lease fails when the branch moved during the run
+          # (a repair, a person or another run) or the PR was merged and its branch deleted.
+          git add package.json yarn.lock .yarn/patches lavamoat/webpack
+          commit
+          if ! push --force-with-lease="refs/heads/$PR_BRANCH:$PR_SHA" origin "HEAD:refs/heads/$PR_BRANCH"; then
+            if [ "$RETRY" = 0 ]; then
+              echo "::warning::$PR_BRANCH moved during the run; starting one more run from its new head."
+              GH_TOKEN="$ACTIONS_TOKEN" gh workflow run audit-autofix.yml --ref "$DEFAULT_BRANCH" \
+                -f issues="$ISSUES" -f dry-run=false -f rolling-retry=1
+              exit 0
+            fi
+            echo "::error::$PR_BRANCH moved again; the sweep will pick the issues up."
+            exit 1
+          fi
+          # Read the body right before writing it, so a person's edit is not overwritten.
+          { gh pr view "$PR_NUMBER" --json body --jq .body; printf '\n\n---\n\n'; cat "$WORK_DIR/pr-section.md"; } > "$WORK_DIR/pr-body-rolled.md"
+          gh pr edit "$PR_NUMBER" --body-file "$WORK_DIR/pr-body-rolled.md"
