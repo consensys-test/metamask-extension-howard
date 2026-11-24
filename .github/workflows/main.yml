@@ -617,7 +617,8 @@ jobs:
   deploy-platform-api-docs:
     name: Deploy Platform API Docs
     needs: lint-workflows
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    # The token exchange service only issues tokens to upstream.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'MetaMask/metamask-extension' }}
     permissions:
       contents: read
       id-token: write
