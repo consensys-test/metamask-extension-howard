@@ -41,7 +41,8 @@ env:
 jobs:
   fix:
     name: Triage and fix
-    runs-on: ubuntu-latest
+    # Pinned: the sandbox setup was tested on 24.04; ubuntu-latest moved to 26.04, where bubblewrap fails.
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
       contents: read
