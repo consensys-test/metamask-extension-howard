@@ -1,6 +1,8 @@
 import {
   buildReport,
+  parseAutofixCost,
   parseState,
+  quoteAgentText,
   REPORT_MARKER,
   type ReportInput,
 } from './audit-repair-report.mts';
@@ -90,13 +92,47 @@ describe('buildReport', () => {
       previous: parseState(second),
     });
 
-    expect(second).toContain('approximately $0.75 across 2 runs');
-    expect(rerun).toContain('approximately $0.90 across 2 runs');
+    expect(second).toContain(
+      'approximately $0.75 in total (2 repair runs $0.75',
+    );
+    expect(rerun).toContain(
+      'approximately $0.90 in total (2 repair runs $0.90',
+    );
     expect(rerun.match(/^\| 200 /gmu)).toHaveLength(1);
   });
 
   it('says no LLM spend when only deterministic rounds ran', () => {
-    expect(buildReport(base)).toContain('**LLM spend:** none so far.');
+    expect(buildReport(base)).toContain('**LLM spend:** none recorded.');
+  });
+
+  it('adds the autofix run to the running total', () => {
+    const body = buildReport({ ...base, costUsd: 0.25, autofixCostUsd: 0.5 });
+
+    expect(body).toContain(
+      'approximately $0.75 in total (autofix run $0.50 + 1 repair run $0.25;',
+    );
+    expect(buildReport({ ...base, autofixCostUsd: 0.37 })).toContain(
+      'approximately $0.37 in total (autofix run $0.37;',
+    );
+  });
+
+  it('shows the agent report when the agent handed the failure over', () => {
+    const body = buildReport({
+      ...base,
+      plan: { action: 'llm', steps: [], reason: 'Needs a code repair.' },
+      outcome: 'no-change',
+      agentReport: 'No dependency change; lint fails on a markdown file.',
+    });
+
+    expect(body).toContain('the agent made no change and handed the failure');
+    expect(body).toContain("<summary>The agent's report</summary>");
+    expect(body).toContain('lint fails on a markdown file.');
+  });
+
+  it('leaves out an agent report for a deterministic round', () => {
+    expect(buildReport({ ...base, agentReport: 'stale' })).not.toContain(
+      "agent's report",
+    );
   });
 
   it('marks a dry run', () => {
@@ -112,6 +148,30 @@ describe('parseState', () => {
     expect(parseState('hello')).toStrictEqual([]);
     expect(parseState('<!-- audit-repair-state not-json -->')).toStrictEqual(
       [],
+    );
+  });
+});
+
+describe('parseAutofixCost', () => {
+  it('reads the spend line of the autofix PR body', () => {
+    expect(
+      parseAutofixCost(
+        '**LLM spend:** approximately $1.23 (estimated by Claude Code, not the billed amount).',
+      ),
+    ).toBe(1.23);
+    expect(parseAutofixCost('**LLM spend:** not reported.')).toBeUndefined();
+    expect(parseAutofixCost(undefined)).toBeUndefined();
+  });
+});
+
+describe('quoteAgentText', () => {
+  it('stops pings and forged markers and bounds the length', () => {
+    const quoted = quoteAgentText('hi @octocat <!-- audit-repair-status -->');
+
+    expect(quoted).not.toContain('@octocat');
+    expect(quoted).not.toContain('<!--');
+    expect(quoteAgentText('x'.repeat(50), 10)).toContain(
+      'cut at 10 characters',
     );
   });
 });
