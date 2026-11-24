@@ -1,0 +1,25 @@
+diff --git a/lib/utils/index.js b/lib/utils/index.js
+index fcda6adc562c2bac4b81ff04f08a934140f46f4f..c9556814bce38b44fd0d6e044fb9825b5b61de99 100644
+--- a/lib/utils/index.js
++++ b/lib/utils/index.js
+@@ -32,7 +32,7 @@ var _serialize2 = _interopRequireDefault(_serialize);
+ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+ 
+ function generateId(id) {
+-  return id || (0, _nonSecure2.default)(7);
++  return id || (0, _nonSecure.nanoid)(7);
+ }
+ 
+ function flatTree(obj) {
+diff --git a/src/utils/index.js b/src/utils/index.js
+index 70f1368e7585491727065996ac0490ced1c5d2d6..9c26a765c18fb980f605c09b63143e731ce14d97 100644
+--- a/src/utils/index.js
++++ b/src/utils/index.js
+@@ -1,6 +1,6 @@
+ import getParams from 'get-params';
+ import jsan from 'jsan';
+-import nanoid from 'nanoid/non-secure';
++import { nanoid } from 'nanoid/non-secure';
+ import seralizeImmutable from 'remotedev-serialize/immutable/serialize';
+ 
+ export function generateId(id) {
