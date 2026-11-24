@@ -21,7 +21,8 @@ on:
         type: string
   # Daily sweep for issues that arrived while another autofix PR was open. Runs after the overnight Main.
   schedule:
-    - cron: '0 8 * * *'
+    # TEMPORARY (cron 1/1): one-off time for a sweep test on the fork. Restore '0 8 * * *' once that run has started.
+    - cron: '58 19 * * *'
   # TEMPORARY (2/2): test runs on a trigger-ci branch (always dry-run). Remove this
   # trigger once the workflow is on main and has been run with workflow_dispatch.
   push:
