@@ -47,6 +47,12 @@ jobs:
       contents: read
       actions: read
       id-token: write
+    outputs:
+      head-branch: ${{ steps.run.outputs.head-branch }}
+      run-id: ${{ steps.run.outputs.run-id }}
+      repairs: ${{ steps.base.outputs.repairs }}
+      outcome: ${{ steps.outcome.outputs.outcome }}
+      sha: ${{ steps.outcome.outputs.sha }}
     steps:
       - name: Resolve the failed run
         id: run
@@ -337,6 +343,7 @@ jobs:
       # The agent proves its own fix, but only this step is trusted: it runs the failing check
       # itself on the final tree, and a failure stops the push.
       - name: Prove the lint fix
+        id: prove
         if: ${{ steps.changes.outputs.changed == 'true' && steps.plan.outputs.action == 'llm' && (contains(fromJSON(steps.inputs.outputs.kinds), 'lint-heap') || contains(fromJSON(steps.inputs.outputs.kinds), 'lint')) }}
         run: yarn lint:eslint
 
@@ -360,6 +367,7 @@ jobs:
             contents: write
 
       - name: Commit and push the repair
+        id: push
         if: ${{ steps.changes.outputs.changed == 'true' && env.DRY_RUN != 'true' }}
         env:
           # The fork test uses a PAT; the real repository uses the exchanged token. A push with
@@ -385,3 +393,76 @@ jobs:
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           echo "::add-mask::$auth"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$HEAD_BRANCH"
+
+      - name: Record what happened
+        id: outcome
+        if: ${{ always() }}
+        env:
+          ACTION: ${{ steps.plan.outputs.action }}
+          AGENT: ${{ steps.agent.outcome }}
+          CHANGED: ${{ steps.changes.outputs.changed }}
+          VERIFY: ${{ steps.changes.outcome }}
+          PROVE: ${{ steps.prove.outcome }}
+          PUSH: ${{ steps.push.outcome }}
+        run: |
+          outcome=unfinished
+          if [ "$PUSH" = success ]; then
+            outcome=pushed
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          elif [ "$PROVE" = failure ]; then outcome=proof-failed
+          elif [ "$VERIFY" = failure ]; then outcome=verify-failed
+          elif [ "$AGENT" = failure ]; then outcome=agent-failed
+          elif [ "$CHANGED" = false ]; then outcome=no-change
+          elif [ "$CHANGED" = true ] && [ "$DRY_RUN" = true ]; then outcome=dry-run
+          elif [ "$ACTION" = needs-human ] || [ "$ACTION" = none ] || [ "$ACTION" = retry ]; then outcome="$ACTION"
+          fi
+          echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+
+  # Its own job, so the token that can comment is never in the job that runs the agent.
+  report:
+    name: Report on the PR
+    needs: repair
+    if: ${{ always() && needs.repair.result != 'skipped' && needs.repair.outputs.head-branch != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Checkout the trusted scripts
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: |
+            .github/scripts
+            .nvmrc
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      # Missing when the run died before it uploaded anything; the comment then says so.
+      - name: Download the run files
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: audit-repair
+          path: .tmp/report-in
+
+      - name: Post the status comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ needs.repair.outputs.outcome }}
+          SHA: ${{ needs.repair.outputs.sha }}
+          BRANCH: ${{ needs.repair.outputs.head-branch }}
+          RUN_ID: ${{ needs.repair.outputs.run-id }}
+          REPAIRS: ${{ needs.repair.outputs.repairs }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-id "$RUN_ID" --repairs "${REPAIRS:-0}"
+            --cap "$REPAIR_CAP" --outcome "${OUTCOME:-unfinished}" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
+          if [ -n "$SHA" ]; then args+=(--sha "$SHA"); fi
+          if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
+          node .github/scripts/audit-repair-report.mts "${args[@]}"
