@@ -126,7 +126,7 @@ jobs:
           {
             echo "action=$(jq -r .plan.action "$WORK_DIR/plan.json")"
             echo "steps=$(jq -c .plan.steps "$WORK_DIR/plan.json")"
-            echo "signature=$(jq -r .plan.signature "$WORK_DIR/plan.json")"
+            echo "signature=$(jq -r .plan.signatureHash "$WORK_DIR/plan.json")"
           } >> "$GITHUB_OUTPUT"
           {
             echo '### Audit repair plan'

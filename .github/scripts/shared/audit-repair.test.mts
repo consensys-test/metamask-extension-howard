@@ -164,6 +164,15 @@ describe('decideRepair', () => {
     ).toBe('needs-human');
   });
 
+  it('also stops on a stored hash of the same failures', () => {
+    const first = decide([health]);
+
+    expect(first.signatureHash).toHaveLength(16);
+    expect(
+      decide([health], { previousSignature: first.signatureHash }).action,
+    ).toBe('needs-human');
+  });
+
   it('gives the same signature regardless of job order', () => {
     expect(decide([lint, e2e]).signature).toBe(decide([e2e, lint]).signature);
   });
