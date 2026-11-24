@@ -1,6 +1,6 @@
 name: Audit repair
 
-# Repairs a failed `Main` run on an `audit-fix/*` branch with the deterministic steps of
+# Repairs a failed `Main` run on the `audit-autofix` branch with the deterministic steps of
 # `.github/scripts/audit-repair.mts plan` (allowScripts, dedupe, LavaMoat policy) and pushes
 # one commit, so CI runs again. A failure that needs a code change goes to a sandboxed agent
 # (Claude Code through LiteLLM) with `.github/audit-autofix/repair-prompt.md`; the workflow then
@@ -11,7 +11,7 @@ on:
   workflow_run:
     workflows: [Main]
     types: [completed]
-    branches: ['audit-fix/**']
+    branches: [audit-autofix]
   workflow_dispatch:
     inputs:
       run-id:
@@ -19,7 +19,7 @@ on:
         required: true
         type: string
       dry-run:
-        description: 'Do everything except pushing. Required for a branch outside audit-fix/'
+        description: 'Do everything except pushing. Required for a branch other than audit-autofix'
         default: true
         type: boolean
 
@@ -56,27 +56,31 @@ jobs:
     steps:
       - name: Resolve the failed run
         id: run
+        uses: actions/github-script@v9
         env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
           INPUT_RUN_ID: ${{ inputs.run-id }}
-          EVENT_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-        run: |
-          run_id="${INPUT_RUN_ID:-$EVENT_RUN_ID}"
-          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")
-          # The event names the attempt that just failed; the API names the latest, which a rerun may already have moved on.
-          attempt="${EVENT_ATTEMPT:-$(jq -r .run_attempt <<< "$run")}"
-          jq -r --arg attempt "$attempt" '"run-id=\(.id)\nhead-branch=\(.head_branch)\nhead-sha=\(.head_sha)\nattempt=\($attempt)"' <<< "$run" >> "$GITHUB_OUTPUT"
+        with:
+          script: |
+            const event = context.payload.workflow_run;
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              ...context.repo,
+              run_id: Number(process.env.INPUT_RUN_ID || event.id),
+            });
+            // The event names the attempt that just failed; the API names the latest, which a rerun may already have moved on.
+            core.setOutput('run-id', run.id);
+            core.setOutput('head-branch', run.head_branch);
+            core.setOutput('head-sha', run.head_sha);
+            core.setOutput('attempt', event?.run_attempt ?? run.run_attempt);
 
       - name: Check the branch
         env:
           HEAD_BRANCH: ${{ steps.run.outputs.head-branch }}
         run: |
           case "$HEAD_BRANCH" in
-            audit-fix/*) ;;
+            audit-autofix) ;;
             *)
               # TEMPORARY (1/1): lets a dry run plan a failed fork test branch. Remove once an
-              # audit-fix/* PR has been repaired by this workflow.
+              # audit-autofix PR has been repaired by this workflow.
               if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] || [ "$DRY_RUN" != true ]; then
                 echo "::error::Only a dry run may repair $HEAD_BRANCH"
                 exit 1
@@ -125,17 +129,12 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/compare/$DEFAULT_BRANCH...$HEAD_SHA" > "$WORK_DIR/compare.json"
           base=$(jq -r .merge_base_commit.sha "$WORK_DIR/compare.json")
           # Only repairs after the last autofix commit count: a rolling autofix run resets the cap.
-          repairs=$(jq '[.commits[].commit.message] | ((to_entries | map(select(.value | test("(^|\n)Audit-Autofix: "))) | last | .key) // -1) as $i | [.[$i + 1:][] | select(test("(^|\n)Repair-Round: "))] | length' "$WORK_DIR/compare.json")
-          previous=$(jq -r '[.commits[].commit.message] | ((to_entries | map(select(.value | test("(^|\n)Audit-Autofix: "))) | last | .key) // -1) as $i | ([.[$i + 1:][] | select(test("(^|\n)Repair-Round: "))] | last // "") | (capture("(^|\n)Repair-Signature: (?<s>[^\n]*)") // {s: ""}) | .s' "$WORK_DIR/compare.json")
+          node .tmp/trusted/.github/scripts/audit-repair.mts history --compare "$WORK_DIR/compare.json" >> "$GITHUB_OUTPUT"
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           echo "::add-mask::$auth"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --depth=1 origin "$base"
           git show "$base:package.json" > "$WORK_DIR/package.base.json"
           git show "$base:yarn.lock" > "$WORK_DIR/yarn.base.lock"
-          {
-            echo "repairs=$repairs"
-            echo "previous-signature=$previous"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Plan the repair
         id: plan
@@ -181,19 +180,34 @@ jobs:
 
       - name: Rerun the failed jobs once
         if: ${{ steps.plan.outputs.action == 'retry' && env.DRY_RUN != 'true' }}
+        uses: actions/github-script@v9
         env:
-          GH_TOKEN: ${{ secrets.AUDIT_AUTOFIX_PAT }}
           RUN_ID: ${{ steps.run.outputs.run-id }}
           ATTEMPT: ${{ steps.run.outputs.attempt }}
-        run: |
-          test -n "$GH_TOKEN"
-          # triage-and-retry-system.yml also reruns flaky PR runs; do not start a second rerun.
-          latest=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .run_attempt)
-          if [ "$latest" -gt "$ATTEMPT" ]; then
-            echo "::notice::Run $RUN_ID is already on attempt $latest; another workflow reran it."
-            exit 0
-          fi
-          gh run rerun "$RUN_ID" --failed --repo "$GITHUB_REPOSITORY"
+          HAS_PAT: ${{ secrets.AUDIT_AUTOFIX_PAT != '' }}
+        with:
+          github-token: ${{ secrets.AUDIT_AUTOFIX_PAT || github.token }}
+          script: |
+            if (process.env.HAS_PAT !== 'true') {
+              core.setFailed('AUDIT_AUTOFIX_PAT is not set.');
+              return;
+            }
+            const params = { ...context.repo, run_id: Number(process.env.RUN_ID) };
+            const { data: run } = await github.rest.actions.getWorkflowRun(params);
+            // triage-and-retry-system.yml also reruns flaky PR runs; do not start a second rerun.
+            if (run.run_attempt > Number(process.env.ATTEMPT)) {
+              core.notice(`Run ${run.id} is already on attempt ${run.run_attempt}; another workflow reran it.`);
+              return;
+            }
+            try {
+              await github.rest.actions.reRunWorkflowFailedJobs(params);
+            } catch (error) {
+              // Another rerun started between the check and the call.
+              if (!/already running|cannot be rerun/iu.test(error.message)) {
+                throw error;
+              }
+              core.notice(`Run ${run.id} was rerun by another workflow just now.`);
+            }
 
       - name: Report a failure this workflow does not repair
         if: ${{ steps.plan.outputs.action == 'needs-human' }}
@@ -392,7 +406,7 @@ jobs:
         run: |
           test -n "$GH_TOKEN"
           echo "::add-mask::$GH_TOKEN"
-          case "$HEAD_BRANCH" in audit-fix/*) ;; *) echo "::error::Refusing to push $HEAD_BRANCH"; exit 1 ;; esac
+          case "$HEAD_BRANCH" in audit-autofix) ;; *) echo "::error::Refusing to push $HEAD_BRANCH"; exit 1 ;; esac
           git config user.name 'MetaMask Bot'
           git config user.email 'metamaskbot@users.noreply.github.com'
           git add package.json yarn.lock .yarn/patches lavamoat/webpack

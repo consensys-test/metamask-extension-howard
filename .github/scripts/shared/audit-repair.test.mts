@@ -2,6 +2,7 @@ import {
   classifyJob,
   decideRepair,
   needsLog,
+  repairHistory,
   type FailedJob,
   type DecideInput,
 } from './audit-repair.mts';
@@ -121,6 +122,44 @@ describe('classifyJob', () => {
     expect(classifyJob({ name: 'Deploy docs', failedSteps: ['Push'] })).toBe(
       'unknown',
     );
+  });
+});
+
+describe('repairHistory', () => {
+  const autofix = (run: string) =>
+    `bump: fix audit advisories\n\nAudit-Autofix: ${run}`;
+  const repair = (round: number, signature: string) =>
+    `bump: repair\n\nRepair-Round: ${round}\nRepair-Signature: ${signature}`;
+
+  it('counts the rounds and returns the last signature', () => {
+    expect(
+      repairHistory([autofix('1'), repair(1, 'aaa'), repair(2, 'bbb')]),
+    ).toStrictEqual({ repairs: 2, previousSignature: 'bbb' });
+  });
+
+  it('starts a new batch at the last autofix commit', () => {
+    expect(
+      repairHistory([
+        autofix('1'),
+        repair(1, 'aaa'),
+        autofix('2'),
+        repair(1, 'bbb'),
+        repair(2, 'ccc'),
+      ]),
+    ).toStrictEqual({ repairs: 2, previousSignature: 'ccc' });
+    expect(
+      repairHistory([autofix('1'), repair(1, 'aaa'), autofix('2')]),
+    ).toStrictEqual({ repairs: 0, previousSignature: '' });
+  });
+
+  it('counts every round on a branch whose autofix commit has no trailer', () => {
+    expect(
+      repairHistory(['bump: fix audit advisories', repair(1, 'aaa')]),
+    ).toStrictEqual({ repairs: 1, previousSignature: 'aaa' });
+    expect(repairHistory([])).toStrictEqual({
+      repairs: 0,
+      previousSignature: '',
+    });
   });
 });
 

@@ -118,6 +118,27 @@ export type DecideInput = {
 
 const unique = <Item,>(items: Item[]): Item[] => [...new Set(items)];
 
+export type RepairHistory = { repairs: number; previousSignature: string };
+
+/**
+ * Repair rounds on the branch, oldest commit first. Only rounds after the last autofix commit
+ * count, because a rolling autofix run starts a new batch and resets the cap.
+ */
+export function repairHistory(messages: string[]): RepairHistory {
+  let batchStart = 0;
+  messages.forEach((message, index) => {
+    if (/(^|\n)Audit-Autofix: /u.test(message)) {
+      batchStart = index + 1;
+    }
+  });
+  const rounds = messages
+    .slice(batchStart)
+    .filter((message) => /(^|\n)Repair-Round: /u.test(message));
+  const last = rounds.at(-1);
+  const signature = last?.match(/(^|\n)Repair-Signature: ([^\n]*)/u)?.[2];
+  return { repairs: rounds.length, previousSignature: signature ?? '' };
+}
+
 /**
  * Chooses what the repair job does for one failed CI run. Dedupe and
  * allow-scripts change `yarn.lock` or `package.json`, which stales the

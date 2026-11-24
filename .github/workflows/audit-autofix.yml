@@ -63,24 +63,25 @@ jobs:
       id-token: write
       actions: write # start the one retry run when the branch moved
     steps:
-      # Exactly one open audit PR means this run rolls onto it instead of starting a new one.
+      # An open PR on the audit-autofix branch means this run rolls onto it instead of starting a new one.
       - name: Find the open audit PR
         id: open-pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          prs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=30" \
-            --jq '.[] | select(.head.ref | startswith("audit-fix/")) | "\(.number) \(.head.ref) \(.head.sha)"')
-          count=$(grep -c . <<< "$prs" || true)
-          echo "open audit PRs: $count"
-          if [ "$count" = 1 ]; then
-            read -r number branch sha <<< "$prs"
-            {
-              echo "number=$number"
-              echo "branch=$branch"
-              echo "sha=$sha"
-            } >> "$GITHUB_OUTPUT"
-          fi
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const open = (
+              await github.paginate(github.rest.pulls.list, {
+                ...context.repo,
+                state: 'open',
+                per_page: 100,
+              })
+            ).filter((pr) => pr.head.ref === 'audit-autofix');
+            core.info(`open audit PRs: ${open.length}`);
+            if (open.length === 1) {
+              core.setOutput('number', open[0].number);
+              core.setOutput('branch', open[0].head.ref);
+              core.setOutput('sha', open[0].head.sha);
+            }
 
       - name: Checkout and install
         uses: MetaMask/action-checkout-and-setup@v3
@@ -309,11 +310,15 @@ jobs:
           # The repair loop counts only its own commits after the last one carrying this trailer.
           commit() { git commit -m 'bump: fix audit advisories' -m "Audit-Autofix: $GITHUB_RUN_ID"; }
           if [ -z "$PR_BRANCH" ]; then
-            branch="audit-fix/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+            branch=audit-autofix
             git checkout -b "$branch"
             git add package.json yarn.lock .yarn/patches lavamoat/webpack
             commit
-            push origin "HEAD:refs/heads/$branch"
+            # No open PR uses the branch, so anything on it is left over from a merged or closed PR.
+            old=$(git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" ls-remote origin "refs/heads/$branch" | cut -f1)
+            lease=()
+            if [ -n "$old" ]; then lease+=(--force-with-lease="refs/heads/$branch:$old"); fi
+            push "${lease[@]}" origin "HEAD:refs/heads/$branch"
             gh pr create --draft --base main --head "$branch" \
               --title 'bump: fix audit advisories' --body-file "$WORK_DIR/pr-body.md"
             exit 0

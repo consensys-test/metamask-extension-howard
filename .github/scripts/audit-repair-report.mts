@@ -1,5 +1,5 @@
-// Posts or updates the audit repair status comment on the PR of an audit-fix branch.
-//   node .github/scripts/audit-repair-report.mts --repo <owner/repo> --branch <audit-fix/...>
+// Posts or updates the audit repair status comment on the PR of the audit-autofix branch.
+//   node .github/scripts/audit-repair-report.mts --repo <owner/repo> --branch <audit-autofix>
 //     --run-id <id> --run-url <url> --repairs <n> --cap <n> --outcome <name> [--sha <sha>]
 //     [--in-dir .tmp/report-in] [--dry-run]
 // A dry run only prints the comment. Reads <in-dir>/audit-repair/plan.json and claude-run.json from the audit-repair artifact when present.

@@ -1,9 +1,9 @@
 // Deterministic steps around the audit autofix agent.
 //
-//   select --issues <open|1,2> [--existing-pr-head audit-fix/] [--rolling-pr <number>]
+//   select --issues <open|1,2> [--existing-pr-head audit-autofix] [--rolling-pr <number>]
 //       Picks the open bot issues that still have advisories (from AUDIT_CURRENT_FILE), writes
 //       .tmp/audit-autofix/issues.json and sets has-work for the workflow. Stops when an open
-//       PR from an audit-fix/ branch already exists, except the --rolling-pr one: a rolling run
+//       PR from the audit-autofix branch already exists, except the --rolling-pr one: a rolling run
 //       adds to that PR and skips the issues its body already mentions.
 //   gate
 //       Fails when the agent changed anything outside the allowed paths; deletes the empty
@@ -52,14 +52,14 @@ function readText(file: string): string {
 async function select(): Promise<void> {
   mkdirSync(DIR, { recursive: true });
   const repo = process.env.GITHUB_REPOSITORY ?? 'MetaMask/metamask-extension';
-  const prefix = argValue('--existing-pr-head') ?? 'audit-fix/';
+  const head = argValue('--existing-pr-head') ?? 'audit-autofix';
 
   // A single GitHub 5xx must not fail the run.
   const openPrs = (
     await retry(() =>
       ghApi(`/repos/${repo}/pulls?state=open&per_page=100`, {
         paginate: true,
-        jq: `.[] | select(.head.ref | startswith("${prefix}")) | "#\\(.number) \\(.head.ref)"`,
+        jq: `.[] | select(.head.ref == "${head}") | "#\\(.number) \\(.head.ref)"`,
       }),
     )
   )

@@ -5,6 +5,10 @@
 //   node .github/scripts/audit-repair.mts plan --run-id <id> --repo <owner/repo>
 //     [--attempt 1] [--repairs 0] [--cap 3] [--previous-signature <text>]
 //
+// history: prints `repairs=` and `previous-signature=` lines for the repair rounds on a branch,
+//   from the compare API response (`gh api repos/<repo>/compare/main...<sha>`).
+//   node .github/scripts/audit-repair.mts history --compare <compare.json>
+//
 // prepare: writes the inputs of the LLM repair prompt (failure.json, failure.log, rows.md) from a
 //   plan.json, plus the base files and targets.txt the churn guard needs, next to the out dir.
 //   node .github/scripts/audit-repair.mts prepare --plan <plan.json> --repo <owner/repo>
@@ -17,6 +21,7 @@ import {
   classifyJob,
   decideRepair,
   needsLog,
+  repairHistory,
   type FailedJob,
   type FailureKind,
   type RepairPlan,
@@ -178,11 +183,24 @@ function prepare(): void {
   );
 }
 
+function history(): void {
+  const { commits } = JSON.parse(
+    readFileSync(required('--compare'), 'utf8'),
+  ) as { commits: { commit: { message: string } }[] };
+  const { repairs, previousSignature } = repairHistory(
+    commits.map(({ commit }) => commit.message),
+  );
+  console.log(`repairs=${repairs}`);
+  console.log(`previous-signature=${previousSignature}`);
+}
+
 const command = process.argv[2];
 if (command === 'plan') {
   plan();
+} else if (command === 'history') {
+  history();
 } else if (command === 'prepare') {
   prepare();
 } else {
-  throw new Error('Usage: audit-repair.mts <plan|prepare> [options]');
+  throw new Error('Usage: audit-repair.mts <plan|history|prepare> [options]');
 }
