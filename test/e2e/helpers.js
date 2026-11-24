@@ -241,6 +241,15 @@ async function withFixtures(options, testSuite) {
     testTimeout = parseInt(process.env.MOCHA_TIMEOUT, 10) || 0,
   } = options;
 
+  // TEMPORARY (1/1): planted failure for the audit-repair vs triage rerun race test on the fork.
+  // Delete it with the test branch.
+  if (
+    process.env.GITHUB_RUN_ATTEMPT === '1' &&
+    title?.includes('Clear account activity')
+  ) {
+    throw new Error('planted attempt-1 failure');
+  }
+
   const fixtureStartTime = Date.now();
 
   // Normalize localNodeOptions
