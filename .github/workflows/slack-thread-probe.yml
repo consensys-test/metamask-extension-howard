@@ -1,0 +1,78 @@
+name: Slack thread probe
+
+# TEMPORARY: posts an audit-style message with the bot token, then a thread reply to it.
+# Delete this file once the test is done.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Channel name or ID'
+        default: '#tmp-flaky-test-report-test'
+        type: string
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Post and reply
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Post the message, then reply in its thread
+        uses: actions/github-script@v9
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          CHANNEL: ${{ inputs.channel }}
+        with:
+          script: |
+            const token = process.env.SLACK_BOT_TOKEN;
+            if (!token) {
+              core.setFailed('SLACK_BOT_TOKEN is not set.');
+              return;
+            }
+            const post = async (payload) => {
+              const response = await fetch('https://slack.com/api/chat.postMessage', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json; charset=utf-8',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+              });
+              return response.json();
+            };
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const first = await post({
+              channel: process.env.CHANNEL,
+              text: 'TEST: Yarn Audit: 1 new or newly blocking advisory',
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: ':warning: *TEST (probe, not a real advisory): Yarn Audit: 1 new or newly blocking advisory* just hit branch `main`',
+                  },
+                },
+                {
+                  type: 'context',
+                  elements: [{ type: 'mrkdwn', text: `<${runUrl}|View CI Run>` }],
+                },
+              ],
+            });
+            core.info(`post: ok=${first.ok} error=${first.error ?? '-'} channel=${first.channel ?? '-'} ts=${first.ts ?? '-'}`);
+            if (!first.ok) {
+              core.setFailed(`The first post failed: ${first.error}`);
+              return;
+            }
+
+            const reply = await post({
+              channel: first.channel,
+              thread_ts: first.ts,
+              reply_broadcast: false,
+              text: 'TEST reply: a draft PR now fixes this advisory.',
+            });
+            core.info(`reply: ok=${reply.ok} error=${reply.error ?? '-'} ts=${reply.ts ?? '-'} thread_ts=${reply.message?.thread_ts ?? '-'}`);
+            if (!reply.ok) {
+              core.setFailed(`The reply failed: ${reply.error}`);
+            }
