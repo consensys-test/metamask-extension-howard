@@ -54,6 +54,8 @@ jobs:
     # The sandbox setup below is tested on both 24.04 and 26.04 (ubuntu-latest moves between them).
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      pushed: ${{ steps.push.outputs.pushed }}
     permissions:
       contents: read
       issues: read
@@ -321,6 +323,7 @@ jobs:
             pull_requests: write
 
       - name: Push the branch and open the draft PR
+        id: push
         if: ${{ steps.body.outcome == 'success' && env.DRY_RUN != 'true' }}
         env:
           # The fork test uses a PAT; the real repository uses the exchanged token.
@@ -355,6 +358,7 @@ jobs:
             push "${lease[@]}" origin "HEAD:refs/heads/$branch"
             gh pr create --draft --base main --head "$branch" \
               --title 'bump: fix audit advisories' --body-file "$WORK_DIR/pr-body.md"
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Rolling: add a commit to the open PR. The lease fails when the branch moved during the run
@@ -375,6 +379,7 @@ jobs:
           gh pr view "$PR_NUMBER" --json body --jq .body > "$WORK_DIR/pr-body-current.md"
           yarn tsx .github/scripts/audit-autofix.mts rolled-body --current "$WORK_DIR/pr-body-current.md"
           gh pr edit "$PR_NUMBER" --body-file "$WORK_DIR/pr-body-rolled.md"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
 
   # Its own job, so the Langfuse keys are never in the job that runs the agent or on a checkout the agent could edit.
   trace:
@@ -413,3 +418,35 @@ jobs:
           AI_ANALYZER_LANGFUSE_PUBLIC_KEY: ${{ secrets.AI_ANALYZER_LANGFUSE_PUBLIC_KEY }}
           AI_ANALYZER_LANGFUSE_SECRET_KEY: ${{ secrets.AI_ANALYZER_LANGFUSE_SECRET_KEY }}
         run: node .github/scripts/audit-langfuse.mts --workflow audit-autofix --outcome "${{ needs.fix.result }}" --run-json .tmp/trace-in/claude-run.json
+
+  # Its own job, so the Slack token is never next to the agent.
+  slack:
+    name: Reply in the Slack thread
+    needs: fix
+    if: ${{ needs.fix.outputs.pushed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Checkout the trusted scripts
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: |
+            .github/scripts
+            .nvmrc
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Reply to the audit post
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: node .github/scripts/audit-slack-reply.mts --kind opened --branch audit-autofix --status-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

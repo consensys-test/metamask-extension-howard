@@ -13,6 +13,9 @@ jobs:
       BRANCH: ${{ github.head_ref || github.ref_name }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SLACK_WEBHOOK_METAMASK_EXTENSION: ${{ secrets.SLACK_WEBHOOK_METAMASK_EXTENSION }}
+      # The audit posts with the bot so replies can thread under it; the webhook is the fallback.
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_AUDIT_CHANNEL: ${{ vars.SLACK_AUDIT_CHANNEL }}
       # True only when the PR head lives in a different repository (no secrets).
       IS_CROSS_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
     steps:

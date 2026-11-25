@@ -16,6 +16,8 @@ import {
   writeStepSummary,
 } from './shared/audit-utils.mts';
 import { dispatchAutofix } from './shared/audit-autofix-dispatch.mts';
+import { postSlackMessage, slackMarker } from './shared/audit-slack.mts';
+import type { SlackThread } from './shared/audit-slack.mts';
 import { ghApi } from './shared/gh-api.mts';
 import { getGitHubToken } from './shared/github-token.mts';
 
@@ -699,15 +701,49 @@ function maybeCreateIssue(
 // Slack notification (push-to-main only)
 // ---------------------------------------------------------------------------
 
+/** Remembers which Slack message announced the issue, so the autofix can reply in its thread. */
+function recordSlackThread(
+  issueNumber: number | null,
+  thread: SlackThread,
+): void {
+  if (issueNumber === null) {
+    return;
+  }
+  try {
+    ghApi(
+      `/repos/${process.env.GITHUB_REPOSITORY}/issues/${issueNumber}/comments`,
+      {
+        method: 'POST',
+        body: { body: `Announced in Slack.\n${slackMarker(thread)}` },
+      },
+      getGitHubToken(),
+    );
+  } catch (error) {
+    githubAnnotate(
+      'warning',
+      `Could not record the Slack thread on the issue: ${String(error)}`,
+    );
+  }
+}
+
 async function postSlackNotification(
   advisories: ParsedAdvisory[],
   blockingAdvisories: ParsedAdvisory[],
   issueUrl: string | null,
+  issueNumber: number | null,
 ): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_METAMASK_EXTENSION;
-  if (!webhookUrl) {
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  // Only the real repository posts to the real channel by default; a fork needs an explicit channel.
+  const channel =
+    process.env.SLACK_AUDIT_CHANNEL ||
+    (process.env.GITHUB_REPOSITORY === 'MetaMask/metamask-extension'
+      ? '#metamask-extension'
+      : '');
+  const useBot = Boolean(botToken && channel);
+  if (!webhookUrl && !useBot) {
     console.log(
-      'SLACK_WEBHOOK_METAMASK_EXTENSION not set — skipping Slack notification.',
+      'Neither SLACK_BOT_TOKEN nor SLACK_WEBHOOK_METAMASK_EXTENSION is usable — skipping Slack notification.',
     );
     return;
   }
@@ -733,8 +769,6 @@ async function postSlackNotification(
       `None are release-blocking (all dev-only or low severity). ` +
       `PRs and releases are not affected, but these should still be tracked.`;
   }
-
-  const webhook = new IncomingWebhook(webhookUrl);
 
   // Build advisory sections grouped by blocking / informational.
   const informational = advisories.filter(
@@ -804,8 +838,39 @@ async function postSlackNotification(
     ],
   });
 
+  // The bot API returns the message timestamp, which a webhook cannot, so replies can thread under it.
+  if (botToken && useBot) {
+    try {
+      const posted = await postSlackMessage(botToken, {
+        channel,
+        text: `Yarn Audit: ${count} new or newly blocking ${noun}`,
+        blocks: sections,
+      });
+      if (posted.ok && posted.channel && posted.ts) {
+        console.log('Slack notification sent.');
+        recordSlackThread(issueNumber, {
+          channel: posted.channel,
+          ts: posted.ts,
+        });
+        return;
+      }
+      githubAnnotate(
+        'warning',
+        `Slack API post failed (${posted.error ?? 'unknown error'}); trying the webhook.`,
+      );
+    } catch (err) {
+      githubAnnotate(
+        'warning',
+        `Slack API post failed (${err instanceof Error ? err.message : String(err)}); trying the webhook.`,
+      );
+    }
+  }
+  if (!webhookUrl) {
+    return;
+  }
+
   try {
-    await webhook.send({ blocks: sections });
+    await new IncomingWebhook(webhookUrl).send({ blocks: sections });
     console.log('Slack notification sent.');
   } catch (err) {
     githubAnnotate(
@@ -939,6 +1004,7 @@ async function main() {
         newAdvisories,
         blockingAdvisories,
         issueResult?.url ?? null,
+        issueResult?.number ?? null,
       );
     } else {
       console.log(

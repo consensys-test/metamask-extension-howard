@@ -463,6 +463,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       pull-requests: write
     steps:
       - name: Checkout the trusted scripts
@@ -489,6 +490,14 @@ jobs:
             --repairs 0 --cap "$REPAIR_CAP" --outcome green \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
+      - name: Reply to the audit post
+        if: ${{ env.DRY_RUN != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: node .github/scripts/audit-slack-reply.mts --kind done --branch "$BRANCH" --status-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
   # Its own job, so the token that can comment is never in the job that runs the agent.
   report:
     name: Report on the PR
@@ -499,6 +508,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       pull-requests: write
     steps:
       - name: Checkout the trusted scripts
@@ -544,3 +554,12 @@ jobs:
           if [ -n "$SHA" ]; then args+=(--sha "$SHA"); fi
           if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
           node .github/scripts/audit-repair-report.mts "${args[@]}"
+
+      - name: Reply to the audit post
+        if: ${{ env.DRY_RUN != 'true' && contains(fromJSON('["needs-human","none","agent-failed","verify-failed","proof-failed","push-failed","no-change","unfinished"]'), needs.repair.outputs.outcome || 'unfinished') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          BRANCH: ${{ needs.repair.outputs.head-branch }}
+          OUTCOME: ${{ needs.repair.outputs.outcome }}
+        run: node .github/scripts/audit-slack-reply.mts --kind stopped --branch "$BRANCH" --outcome "${OUTCOME:-unfinished}" --status-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
