@@ -61,8 +61,19 @@ async function main(): Promise<void> {
   }
 }
 
+// Node's fetch only says "fetch failed"; the reason (DNS, refused, timeout) is in the cause.
+function describe(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  const { cause } = error;
+  const code =
+    cause instanceof Error
+      ? `${(cause as NodeJS.ErrnoException).code ?? ''} ${cause.message}`.trim()
+      : '';
+  return code ? `${error.message} (${code})` : error.message;
+}
+
 main().catch((error: unknown) => {
-  console.log(
-    `::warning::Langfuse trace failed: ${error instanceof Error ? error.message : String(error)}`,
-  );
+  console.log(`::warning::Langfuse trace failed: ${describe(error)}`);
 });
