@@ -523,6 +523,13 @@ jobs:
           name: audit-repair
           path: .tmp/report-in
 
+      - name: Send the Langfuse trace
+        env:
+          AI_ANALYZER_LANGFUSE_PUBLIC_KEY: ${{ secrets.AI_ANALYZER_LANGFUSE_PUBLIC_KEY }}
+          AI_ANALYZER_LANGFUSE_SECRET_KEY: ${{ secrets.AI_ANALYZER_LANGFUSE_SECRET_KEY }}
+          OUTCOME: ${{ needs.repair.outputs.outcome }}
+        run: node .github/scripts/audit-langfuse.mts --workflow audit-repair --outcome "${OUTCOME:-unfinished}" --run-json .tmp/report-in/audit-repair/claude-run.json
+
       - name: Post the status comment
         env:
           GH_TOKEN: ${{ github.token }}
