@@ -150,6 +150,26 @@ describe('buildReport', () => {
     expect(body).toContain('| 300 | - | - | green | - |');
   });
 
+  it('keeps the retry row when the rerun of that run ends green', () => {
+    const retried = buildReport({
+      ...base,
+      plan: { action: 'retry', steps: [], reason: 'Rerun once.' },
+      outcome: 'retry',
+      repairsSoFar: 0,
+      runId: '300',
+    });
+    const body = buildReport({
+      ...base,
+      plan: undefined,
+      outcome: 'green',
+      repairsSoFar: 0,
+      runId: '300',
+      previous: parseState(retried),
+    });
+    expect(body).toContain('| 300 | retry | - | retry | - |');
+    expect(body).toContain('| 300 | - | - | green | - |');
+  });
+
   it('marks a dry run', () => {
     expect(
       buildReport({ ...base, outcome: 'dry-run', dryRun: true }),

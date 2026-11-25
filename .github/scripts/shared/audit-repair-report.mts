@@ -157,7 +157,12 @@ export function buildReport(input: ReportInput): string {
     ...(input.costUsd === undefined ? {} : { costUsd: input.costUsd }),
   };
   const rounds = [
-    ...input.previous.filter((round) => round.run !== input.runId),
+    // A rerun replaces its own row, but the green end of a rerun keeps the retry row of the same run.
+    ...input.previous.filter(
+      (round) =>
+        round.run !== input.runId ||
+        (round.outcome === 'green') !== (input.outcome === 'green'),
+    ),
     current,
   ];
   const { text, stopped, done } = headline(input);
