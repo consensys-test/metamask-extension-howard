@@ -178,18 +178,28 @@ jobs:
             fi
           fi
 
+      # A rerun made with GITHUB_TOKEN would not start the workflow_run events that carry the result forward.
+      - name: Get token for the rerun
+        id: rerun-token
+        if: ${{ steps.plan.outputs.action == 'retry' && env.DRY_RUN != 'true' && github.repository == 'MetaMask/metamask-extension' && vars.TOKEN_EXCHANGE_URL != '' }}
+        uses: MetaMask/github-tools/.github/actions/get-token@v1
+        with:
+          token-exchange-url: ${{ vars.TOKEN_EXCHANGE_URL }}
+          permissions: |
+            actions: write
+
       - name: Rerun the failed jobs once
         if: ${{ steps.plan.outputs.action == 'retry' && env.DRY_RUN != 'true' }}
         uses: actions/github-script@v9
         env:
           RUN_ID: ${{ steps.run.outputs.run-id }}
           ATTEMPT: ${{ steps.run.outputs.attempt }}
-          HAS_PAT: ${{ secrets.AUDIT_AUTOFIX_PAT != '' }}
+          HAS_TOKEN: ${{ steps.rerun-token.outputs.token != '' || secrets.AUDIT_AUTOFIX_PAT != '' }}
         with:
-          github-token: ${{ secrets.AUDIT_AUTOFIX_PAT || github.token }}
+          github-token: ${{ steps.rerun-token.outputs.token || secrets.AUDIT_AUTOFIX_PAT }}
           script: |
-            if (process.env.HAS_PAT !== 'true') {
-              core.setFailed('AUDIT_AUTOFIX_PAT is not set.');
+            if (process.env.HAS_TOKEN !== 'true') {
+              core.setFailed('No token for the rerun: the App token exchange gave none and AUDIT_AUTOFIX_PAT is not set.');
               return;
             }
             const params = { ...context.repo, run_id: Number(process.env.RUN_ID) };
